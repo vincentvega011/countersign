@@ -1,0 +1,35 @@
+# Env and secrets
+.env
+.env.*
+!.env.example
+secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+*.egg-info/
+dist/
+
+# Node
+node_modules/
+web/*/dist/
+.vite/
+
+# Cassettes: only scrubbed ones are committed. Raw recordings may contain tokens.
+tests/cassettes/*.raw.*
+tests/cassettes/**/*.raw.*
+tests/cassettes/_unscrubbed/
+
+# Eval output other than the pinned latest
+eval/reports/*/
+!eval/reports/.gitkeep
+
+# OS and editors
+.DS_Store
+.idea/
+.vscode/

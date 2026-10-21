@@ -1,0 +1,50 @@
+[project]
+name = "countersign"
+version = "0.0.0"
+description = "AP2 mandate verification and capture gate for PayPal merchants (sandbox only)."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.12,<3.13"
+# The SD-JWT library is chosen on Day 0 and added then.
+dependencies = [
+  "fastapi",
+  "uvicorn",
+  "pydantic>=2",
+  "sqlalchemy>=2",
+  "alembic",
+  "psycopg[binary]>=3",
+  "httpx",
+  "rfc8785",
+  "joserfc",
+  "structlog",
+  "slowapi",
+]
+
+[dependency-groups]
+dev = ["pytest", "hypothesis", "respx", "ruff", "mypy"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/countersign"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.mypy]
+python_version = "3.12"
+
+[[tool.mypy.overrides]]
+module = [
+  "countersign.merchant.*", "countersign.cp.*", "countersign.mpp.*", "countersign.gate.*",
+  "countersign.lock.*", "countersign.constraints.*", "countersign.canonical.*",
+  "countersign.ledger.*", "countersign.evidence.*",
+]
+strict = true
