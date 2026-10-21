@@ -1,0 +1,53 @@
+name: Live sandbox checks (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      smoke:
+        description: Run the live PayPal sandbox smoke test
+        type: boolean
+        default: true
+      eval:
+        description: Run the full evaluation
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  sandbox-smoke:
+    if: ${{ inputs.smoke }}
+    runs-on: ubuntu-latest
+    environment: sandbox
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
+      - run: uv sync --locked
+      # Placeholder until the smoke script exists. Sandbox credentials come from environment secrets.
+      - run: make sandbox-smoke
+        env:
+          PAYPAL_API_BASE: https://api-m.sandbox.paypal.com
+          PAYPAL_CLIENT_ID: ${{ secrets.PAYPAL_CLIENT_ID }}
+          PAYPAL_CLIENT_SECRET: ${{ secrets.PAYPAL_CLIENT_SECRET }}
+
+  full-eval:
+    if: ${{ inputs.eval }}
+    runs-on: ubuntu-latest
+    environment: sandbox
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
+      - run: uv sync --locked
+      # Placeholder until the runner exists.
+      - run: make eval
+        env:
+          PAYPAL_API_BASE: https://api-m.sandbox.paypal.com
+          PAYPAL_CLIENT_ID: ${{ secrets.PAYPAL_CLIENT_ID }}
+          PAYPAL_CLIENT_SECRET: ${{ secrets.PAYPAL_CLIENT_SECRET }}
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: eval-reports
+          path: eval/reports/
+          if-no-files-found: ignore
