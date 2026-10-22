@@ -221,7 +221,7 @@ Targets other than `setup` are stubs until the matching work lands.
 
 Each module is done only when it has code, tests, a docstring with the security reasoning and an
 entry in this document. Stack: Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, Alembic, Postgres
-16, `httpx`, `rfc8785`, `joserfc`, an SD-JWT library chosen in the library selection step.
+16, `httpx`, `rfc8785`, `joserfc`, and an in-house SD-JWT implementation on `joserfc` and `hashlib` ([ENV.md](ENV.md)).
 
 ### 5.1 canonical
 
@@ -266,7 +266,7 @@ entry in this document. Stack: Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, 
 
 ### 5.3 mandates
 
-- SD-JWT parsing and verification using the chosen library: key binding, exact `vct` match, `cnf`
+- SD-JWT parsing and verification using the in-house implementation described in [ENV.md](ENV.md): key binding, exact `vct` match, `cnf`
   extraction, `exp` and `nbf` with a 60 second skew, an algorithm allowlist (ES256 only, no `none`,
   no HS family), chain verification per the Delegate SD-JWT draft including the `~~` rule and the
   `sd_hash` binding in both directions.
@@ -576,8 +576,8 @@ Specs and libraries:
 - [x] Claim names, `vct` strings, hash rules, native constraint types, `merchant_authorization`
       format, UCP error codes, token placement, profile keys format
       ([PROTOCOL.md](PROTOCOL.md) section 1).
-- [ ] JCS, JWS and SD-JWT with key binding library choices, plus Node `jose` for the interop
-      verifier ([ENV.md](ENV.md)).
+- [x] JCS, JWS and SD-JWT with key binding library choices, plus Node `jose` for the interop
+      verifier ([ENV.md](ENV.md)). No third-party SD-JWT library; built on `joserfc`.
 
 PayPal sandbox:
 

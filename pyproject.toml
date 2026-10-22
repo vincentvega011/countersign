@@ -5,7 +5,7 @@ description = "AP2 mandate verification and capture gate for PayPal merchants (s
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.12,<3.13"
-# The SD-JWT library is chosen on Day 0 and added then.
+# No third-party SD-JWT library: mandates are built on joserfc and hashlib (docs/ENV.md).
 dependencies = [
   "fastapi",
   "uvicorn",
@@ -14,14 +14,14 @@ dependencies = [
   "alembic",
   "psycopg[binary]>=3",
   "httpx",
-  "rfc8785",
-  "joserfc",
+  "rfc8785==0.1.4",
+  "joserfc==1.7.5",
   "structlog",
   "slowapi",
 ]
 
 [dependency-groups]
-dev = ["pytest", "hypothesis", "respx", "ruff", "mypy"]
+dev = ["pytest", "hypothesis", "respx", "ruff", "mypy", "cryptography"]
 
 [build-system]
 requires = ["hatchling"]

@@ -21,7 +21,10 @@ A phase starts only when the previous gate has passed.
   with pinned revisions and checksums.
 - The AP2 and UCP spec facts, gaps and design decisions are recorded in
   [PROTOCOL.md](PROTOCOL.md). The architecture is in [architecture.md](architecture.md).
-- Open: library selection, PayPal sandbox smoke test and behavior confirmations.
+- Libraries chosen and proven with spikes: `rfc8785`, `joserfc`, Node `jose` and `canonicalize`. SD-JWT
+  chains are built in-house because no maintained library handles the chain format. See
+  [ENV.md](ENV.md).
+- Open: PayPal sandbox smoke test and behavior confirmations.
 
 ## Definition of done
 

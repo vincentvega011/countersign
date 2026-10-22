@@ -3,7 +3,7 @@
 How Countersign uses AP2, UCP and ACP, grounded in the pinned copies under `spec/vendor/`.
 This file is built up over time. This revision covers the AP2 and UCP facts confirmed by reading
 the vendored files (including RFC 9901 and the Delegate SD-JWT draft), the gaps those files leave,
-and the design decisions Countersign makes to close them. PayPal facts, library choices, gate step
+and the design decisions Countersign makes to close them. PayPal facts, gate step
 codes, the evidence reference encoding and the PayPal field mapping are added by later work and
 are listed under [Still to be written](#4-still-to-be-written).
 
@@ -43,7 +43,7 @@ are listed under [Still to be written](#4-still-to-be-written).
 | UCP AP2 error codes             | seven codes, listed in [1.3.5](#135-error-codes)                                                                                                                                                                                                                   | [1.3.5](#135-error-codes)                   |
 | Payment mandate in UCP          | `payment.instruments[*].credential.token`; format defined by [Decision 8](#decision-8-payment-mandate-credentialtoken-format)                                                                                                                                      | [1.3.4](#134-carrying-the-mandates-in-ucp)  |
 | Profile keys format             | top-level `keys[]`, a JWK Set; each entry requires `kid` and `kty`, EC keys also `crv`, `x`, `y`                                                                                                                                                                   | [1.3.2](#132-profile-and-keys)              |
-| SD-JWT library choice           | Not answerable from the specs. The requirements it must meet are in [1.2.3](#123-sd-jwt-structure-and-chains)                                                                                                                                                      | library selection step                      |
+| SD-JWT library choice           | None: built in-house on `joserfc` and `hashlib`, see [ENV.md](ENV.md)                                                                                                                                                                                              | [ENV.md](ENV.md)                            |
 
 ### 1.2 AP2 v0.2
 
@@ -845,7 +845,6 @@ Added by later work, not yet present in this file:
 
 - Confirmed PayPal facts (identifier lengths, idempotency, order changes after authorization,
   authorization validity, webhooks, vaulting).
-- Library choices for JCS, JWS and SD-JWT with key binding.
 - Human Present token format and receipt transport (see Decisions 8 and gap 4).
 - Gate step codes, principal lock semantics, the evidence reference encoding and the PayPal field
   mapping in both directions.

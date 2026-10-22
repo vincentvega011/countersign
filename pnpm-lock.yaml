@@ -166,6 +166,12 @@ importers:
 
   .:
     devDependencies:
+      canonicalize:
+        specifier: 5.1.0
+        version: 5.1.0
+      jose:
+        specifier: 6.2.12
+        version: 6.2.12
       prettier:
         specifier: ^3.9.10
         version: 3.9.10
@@ -178,11 +184,23 @@ importers:
 
 packages:
 
+  canonicalize@5.1.0:
+    resolution: {integrity: sha512-bab9+WefZljqQ8jT0qRwVmTyzAUU63K97QIQD3agynIBrb6sa5M2eAy8Hv8K3p4V9+ONVYZKtGYl4Dg+/5Gumw==}
+    engines: {node: '>=22'}
+    hasBin: true
+
+  jose@6.2.12:
+    resolution: {integrity: sha512-9NiFmJEex0sy2Dk58j2UGBSHgUs2ypF9eZSu4L6vjOX3Dp96Sw1F3uL+H+D1sx02jZZdzUT0HgvCy59CuvXcWw==}
+
   prettier@3.9.10:
     resolution: {integrity: sha512-skGHTH1Yb9QvaTC4hWnRTzEYtCpApF0UMBPz+t/0ZPzP8ihefo/btKd+QA7pUE0fEwA1SbS/NmhyEcstdXOIdA==}
     engines: {node: '>=14'}
     hasBin: true
 
 snapshots:
+
+  canonicalize@5.1.0: {}
+
+  jose@6.2.12: {}
 
   prettier@3.9.10: {}
