@@ -509,12 +509,12 @@ Status Lifecycle".
 | 5   | Payment Mandate token format inside `payment.instruments[*].credential.token`.                                                                                                                                                                                                                                                                                                                                                                    | Closed by [Decision 8](#decision-8-payment-mandate-credentialtoken-format)                                                                                                                                                                           |
 | 6   | Error transport: HTTP status and message envelope for the seven AP2 error codes.                                                                                                                                                                                                                                                                                                                                                                  | Open. Provisional rule in [Decision 10](#decision-10-provisional-rules-for-open-gaps)                                                                                                                                                                |
 | 7   | Clock skew for `exp` and `nbf`.                                                                                                                                                                                                                                                                                                                                                                                                                   | Open. Provisional rule in [Decision 10](#decision-10-provisional-rules-for-open-gaps)                                                                                                                                                                |
-| 8   | Constraint number formats: `payment.amount_range` fields are integers in minor units, but the prose example shows `"max": 100.50`. `payment.budget.max` is a JSON `number` with no stated unit and a prose example of `1000.00`.                                                                                                                                                                                                                  | Closed by [Decision 2](#decision-2-native-paymentbudget-with-minor-units)                                                                                                                                                                            |
+| 8   | Constraint number formats: `payment.amount_range` fields are integers in minor units, but the prose example shows `"max": 100.50`. `payment.budget.max` is a JSON `number` with no stated unit and a prose example of `1000.00`.                                                                                                                                                                                                                  | Closed by [Decision 2](#decision-2-strict-single-use-and-add-only-budget)                                                                                                                                                                            |
 | 9   | Which fields of each native constraint are selectively disclosed in practice.                                                                                                                                                                                                                                                                                                                                                                     | Open. Fixed when the mandate issuer is implemented, following the `x-selectively-disclosable-*` markers in the vendored schemas                                                                                                                      |
 | 10  | `ucp/docs/documentation/ucp-and-ap2.md` uses older names (`checkoutSignature`, `CheckoutMandate`, `PaymentMandate`) that differ from the extension specification.                                                                                                                                                                                                                                                                                 | Closed. The extension specification and its schema are authoritative                                                                                                                                                                                 |
 | 11  | The UCP version string is a template variable in the docs.                                                                                                                                                                                                                                                                                                                                                                                        | Open. The release tag is `v2026-08-25`; the literal `ucp.version` value is confirmed when the profile endpoint is built                                                                                                                              |
 | 12  | Principal identity. Neither AP2 nor UCP defines a customer id. UCP identifies the platform by profile URI and `keys[]`; AP2 identifies the agent by the `cnf` key and the user by the delegating credential or provider key.                                                                                                                                                                                                                      | Open. Defined in the architecture document (principal lock)                                                                                                                                                                                          |
-| 13  | Repeat use of one open mandate. `checkout.line_items` "does not support splitting the open Checkout Mandate across multiple Checkouts", but `payment.budget` and `payment.agent_recurrence` assume several closed Payment Mandates, each of which `payment.reference` must tie to an open Checkout Mandate in its chain.                                                                                                                          | Closed by interpretation in [Decision 2](#decision-2-native-paymentbudget-with-minor-units)                                                                                                                                                          |
+| 13  | Repeat use of one open mandate. `checkout.line_items` "does not support splitting the open Checkout Mandate across multiple Checkouts", but `payment.budget` and `payment.agent_recurrence` assume several closed Payment Mandates, each of which `payment.reference` must tie to an open Checkout Mandate in its chain.                                                                                                                          | Closed by the strict reading in [Decision 2](#decision-2-strict-single-use-and-add-only-budget); repeat use is future work                                                                                                                           |
 
 ---
 
@@ -527,7 +527,7 @@ used to plan this project, with the decision that resolves each.
 | --- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
 | D1  | The Payment Mandate `transaction_id` is a unique id whose single use can be enforced | `transaction_id` is the hash of `checkout_jwt` and equals `checkout_hash` ([1.2.4](#124-hashes)) | [Decision 1](#decision-1-single-use-keys)                                                                                  |
 | D2  | AP2 natively defines amount, merchant and expiry constraints                         | Ten native types; expiry is the `exp` claim, not a constraint ([1.2.6](#126-constraints))        | [Decision 4](#decision-4-no-custom-constraint-types)                                                                       |
-| D3  | A cumulative budget constraint is entirely new                                       | `payment.budget` with `payment.agent_recurrence` exists, with verifier-side state                | [Decision 2](#decision-2-native-paymentbudget-with-minor-units)                                                            |
+| D3  | A cumulative budget constraint is entirely new                                       | `payment.budget` with `payment.agent_recurrence` exists, with verifier-side state                | [Decision 2](#decision-2-strict-single-use-and-add-only-budget)                                                            |
 | D4  | Open mandates express "headphones under $80" with an amount and a category           | The open Checkout Mandate must contain `checkout.line_items`; no native category constraint      | [Decision 3](#decision-3-line-items-in-the-mandate-categories-in-merchant-policy)                                          |
 | D5  | Custom constraint types can be added and validated                                   | Schemas are closed; unknown constraints fail evaluation                                          | [Decision 4](#decision-4-no-custom-constraint-types)                                                                       |
 | D6  | A device-bound customer key registered with Countersign signs the mandates           | Two trust models are defined; a directly trusted user key is only a possible future model        | [Decision 5](#decision-5-trusted-platform-provider-with-a-device-consent-signature)                                        |
@@ -535,7 +535,7 @@ used to plan this project, with the decision that resolves each.
 | D8  | `vp_formats_supported` is a profile-level key next to `keys[]`                       | It sits under `config` in the AP2 capability entry                                               | [Decision 6](#decision-6-vp_formats_supported-placement)                                                                   |
 | D9  | The UCP Security Lock may be strengthened to the principal                           | The lock is per session only                                                                     | No contradiction; the principal lock is an addition (architecture document)                                                |
 | D10 | Domain-separated hash helpers are used for every hash                                | AP2 hashes are plain hashes ([1.2.4](#124-hashes))                                               | Domain separation only for Countersign-internal hashes. AP2 hashes use the spec algorithm with no prefix                   |
-| D11 | Amounts are integer minor units everywhere                                           | True for UCP and most AP2 fields; `payment.budget.max` is a JSON `number`                        | [Decision 2](#decision-2-native-paymentbudget-with-minor-units). Non-`each` quantities need `quantity_unit.scale` handling |
+| D11 | Amounts are integer minor units everywhere                                           | True for UCP and most AP2 fields; `payment.budget.max` is a JSON `number`                        | [Decision 2](#decision-2-strict-single-use-and-add-only-budget). Non-`each` quantities need `quantity_unit.scale` handling |
 | D12 | Receipts use one field naming                                                        | Schemas and generic text differ ([1.2.7](#127-receipts))                                         | Follow the mandate schemas (`status`)                                                                                      |
 
 Facts confirmed with no deviation: the five roles and the non-agentic Trusted Surface rule, the
@@ -560,58 +560,80 @@ Resolves: D1; ambiguity of `transaction_id` (section [1.2.4](#124-hashes)).
 Single use is a Countersign rule enforced on these keys, across every protocol:
 
 1. **Checkout hash.** At most one authorization may ever be started for a given `checkout_hash`.
-   The checkout id is also unique to one authorization.
+   The checkout id is also unique to one authorization. A retry after a rejection is a new checkout
+   with a new checkout hash. The earlier hash stays consumed.
 2. **Mandate nonce.** The `nonce` of each closed mandate key-binding JWT is accepted once, scoped
    to the agent key thumbprint and the audience (`merchant` or `credential-provider`).
-3. **In-flight open mandate.** One open mandate backs at most one in-flight closed mandate. A new
-   closed mandate from the same open mandate (identified by the digest used in `sd_hash`) is
-   refused until the earlier presentation has a rejection receipt, matching "Shopping Agents MUST
-   NOT present any subsequent open ... Mandates without receiving a rejection receipt"
+3. **One purchase per open mandate.** An open mandate backs exactly one successful purchase
+   ([Decision 2](#decision-2-strict-single-use-and-add-only-budget)). While a presentation is in
+   flight, no second closed mandate from the same open mandate (identified by the digest used in
+   `sd_hash`) is accepted. This is the AP2 rule that "Shopping Agents MUST NOT present any
+   subsequent open ... Mandates without receiving a rejection receipt"
    ([1.2.1](#121-roles-modes-and-agentic-rules)).
-4. **Consumption.** A successful presentation consumes the open mandate unless its Payment Mandate
-   carries `payment.agent_recurrence`. With recurrence, each success counts toward
-   `max_occurrences` and toward the budget ([Decision 2](#decision-2-native-paymentbudget-with-minor-units)).
-   AP2 says the agent "reduces the scope of the open mandate based on the receipt, often
-   preventing future presentations entirely" (`ap2/docs/agent_authorization.md`, "Action
-   Authorization"); this decision makes the verifier enforce it.
+4. **States of an open mandate.** `unused`, `in_flight` (a presentation is being verified, or a
+   PayPal authorization exists and has not been captured or voided), `consumed` (a capture
+   succeeded) and `revoked` or `expired`. Only `consumed` is permanent.
 
 The keys are enforced with database uniqueness constraints and row locks, not with in-memory
 state.
 
-### Decision 2: Native `payment.budget` with minor units
+### Decision 2: Strict single use and add-only budget
 
 Resolves: D3, D11; gap 8 and gap 13 ([1.4](#14-gaps-in-the-vendored-files-and-how-each-is-closed)).
 
-- Use the native `payment.budget` constraint, always together with `payment.agent_recurrence`, as
-  the spec says it is "To be used with the Agent Recurrence constraint".
-- **Unit (Countersign interpretation).** `payment.budget.max` is interpreted as an integer count
-  of minor units of the constraint `currency`. A value that is not a JSON integer (a fraction, an
-  exponent form, or a value outside +/-(2^53 - 1)) makes the mandate invalid. The spec types `max`
-  as a `number` without a unit, so this is our reading, chosen to match `payment.amount_range` and
-  `payment_amount`, which are integer minor units. A mandate whose budget currency differs from the
-  payment currency fails evaluation.
+**One open mandate backs exactly one successful purchase.** This is the strict reading of AP2: the
+agent must not present a subsequent open mandate without a rejection receipt for the previous one
+([1.2.1](#121-roles-modes-and-agentic-rules)), and `checkout.line_items` "does not support
+splitting the open Checkout Mandate across multiple Checkouts" ([1.2.6](#126-constraints)).
+
+- **Retry after rejection.** If a checkout is rejected before any PayPal object exists, or its
+  PayPal authorization is voided before capture (a gate failure, an expired authorization, or any
+  fail-closed outcome), Countersign issues a rejection receipt. The open mandate returns to
+  `unused` and the agent may retry under it with a new checkout. The rejection receipt must reach
+  the agent integrity-protected ([1.2.1](#121-roles-modes-and-agentic-rules)).
+- **After capture.** A successful capture consumes the open mandate permanently. A later refund
+  does not reopen it.
+- **Native constraints used.** Open Payment Mandates issued by Countersign carry
+  `payment.amount_range` (the ceiling), `payment.allowed_payees`, `payment.reference`, and
+  `payment.budget` with `payment.agent_recurrence` set to `ON_DEMAND` with `max_occurrences` of `1`.
+  This is a Countersign way to express "exactly one purchase" with native constraints only, so a
+  standard verifier also enforces it. It is a proposal that can be dropped if the single-use rule
+  alone is preferred.
+- **Verifier policy for foreign mandates.** `payment.agent_recurrence` is accepted only with
+  `max_occurrences` of `1`. Any other recurrence fails as `unresolved_constraint`, because
+  Countersign does not implement repeat use (see Future work). `payment.budget` is evaluated as
+  below.
+- **Budget unit (Countersign interpretation).** `payment.budget.max` is interpreted as an integer
+  count of minor units of the constraint `currency`. A value that is not a JSON integer (a
+  fraction, an exponent form, or a value outside +/-(2^53 - 1)) makes the mandate invalid. The spec
+  types `max` as a `number` without a unit, so this is our reading, chosen to match
+  `payment.amount_range` and `payment_amount`, which are integer minor units. A budget currency
+  that differs from the payment currency fails evaluation.
+- **Budget accounting is add-only, as the spec says.** The requested amount plus the sum already
+  spent under this open Payment Mandate must be `<= max`, and "After approval, the amount MUST be
+  added to the accumulated total" (`ap2/docs/payment_mandate.md`, "Budget"). In Countersign:
+  - An amount is **reserved** while a presentation is in flight. A reservation blocks concurrent
+    presentations.
+  - A reservation is **released** when a rejection receipt is issued, including a void before
+    capture. A voided authorization was never approved, so nothing is added to the total.
+  - An amount is **added** when the capture succeeds (the approval). It is never subtracted.
+  - A **refund after capture does not restore headroom.**
+    The spent amount is taken from PayPal capture and void outcomes and verified webhooks, not from
+    agent claims, and the capture gate re-evaluates it immediately before capture.
 - **Scope.** Spent amount is counted per open Payment Mandate (its digest), which is what the
-  spec's "total amount spent using this Payment Mandate" means. Customer-wide caps across mandates
-  are not a mandate concept and stay merchant policy.
-- **State source (what Countersign adds).** The spent amount is not accumulated from mandate
-  presentations alone. It is `reserved + authorized + captured - voided - refunded` for that open
-  mandate, reconciled from PayPal responses and verified webhooks, and checked again by the capture
-  gate immediately before capture. Subtracting voids and refunds is more permissive than the
-  spec's "amount MUST be added to the accumulated total", and is our interpretation: a voided
-  authorization is money that was never spent.
+  spec's "total amount spent using this Payment Mandate" means. With one purchase per mandate the
+  budget and the amount range are consistent ceilings. Customer-wide caps across mandates are not a
+  mandate concept and stay merchant policy.
 - **`ON_DEMAND` (Countersign interpretation).** The spec does not define the time separation for
-  `ON_DEMAND`. Countersign treats `ON_DEMAND` as "no minimum separation" and applies
-  `max_occurrences` when present. Other frequencies use the nominal period (`DAILY` one day,
-  `WEEKLY` seven days, and so on), measured between successful presentations.
-- **Repeat use (gap 13).** `checkout.line_items` "does not support splitting the open Checkout
-  Mandate across multiple Checkouts". Countersign reads that as forbidding division of one set of
-  line-item quantities between carts, not as forbidding repeat orders that the user approved by
-  signing a Payment Mandate with `payment.agent_recurrence`. With recurrence present, the same open
-  Checkout Mandate may back up to `max_occurrences` separate closed Checkout Mandates, one per
-  repeat, each of which must satisfy `checkout.line_items` on its own. Without recurrence, exactly
-  one closed checkout may be backed. Upstream confirmation is wanted.
+  `ON_DEMAND`. Countersign treats it as "no minimum separation". With `max_occurrences` of `1`
+  this has no practical effect.
 - **`exp`.** The native constraints have no window. The mandate `exp` claim bounds the time
   window. `payment.execution_date` is not used to bound use.
+- **Future work (not implemented).** A reading in which a Payment Mandate carrying
+  `payment.agent_recurrence` with a larger `max_occurrences` lets one open Checkout Mandate back
+  several closed checkouts, each satisfying `checkout.line_items` on its own, up to the budget.
+  This is not the strict reading, depends on how `payment.reference` and the "no splitting" note
+  interact, and would need upstream confirmation. Until then repeat use is refused.
 
 ### Decision 3: Line items in the mandate, categories in merchant policy
 

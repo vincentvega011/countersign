@@ -163,21 +163,21 @@ These hold across all modules. Any change to `merchant`, `cp`, `mpp`, `gate`, `l
 `constraints`, `canonical`, `ledger` or `evidence` needs property tests passing, no attack-suite
 regression and a decision record in `docs/adr/` if behavior changed.
 
-| ID     | Invariant                                                                                                                                                                                                                                                           |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| INV-1  | Deterministic verification only. Every check performed by the Merchant, Credential Provider, Payment Processor and Trusted Surface roles runs in deterministic code. No model output is ever an input to an allow decision.                                         |
-| INV-2  | The Trusted Surface is non-agentic. It renders constraints and checkouts from structured data with fixed templates. No model-generated text appears on it. The device private key is non-extractable and never leaves the browser.                                  |
-| INV-3  | No authorization without a valid Payment Mandate for any principal that is locked, and for any merchant configured to require AP2.                                                                                                                                  |
-| INV-4  | No capture without the gate. Capture is issued only after the gate passes on freshly fetched PayPal state, never from cache. Any gate failure voids the authorization.                                                                                              |
-| INV-5  | The lock follows the principal. Protection keys on (customer id, agent key thumbprint) and merchant policy, never on protocol or session. Policy code may not import protocol adapters, enforced by a test.                                                         |
-| INV-6  | Single use on the keys in [PROTOCOL.md](PROTOCOL.md) Decision 1: checkout hash (which equals `transaction_id`), closed mandate nonce, and one in-flight closed mandate per open mandate, across all protocols.                                                      |
-| INV-7  | Budgets come from PayPal state. Usage is reserved plus authorized plus captured minus voided minus refunded, reconciled from PayPal responses and verified webhooks, never from agent claims.                                                                       |
-| INV-8  | Canonical bytes are JCS. Everything Countersign signs or hashes as JSON uses RFC 8785 through one library. AP2 hashes are computed over compact serializations as specified. Inbound JSON with duplicate keys, NaN, Infinity or excess precision is rejected first. |
-| INV-9  | Integer minor units for money. No floats in money paths. Non-integer JSON numbers in a constraint make the mandate invalid.                                                                                                                                         |
-| INV-10 | Fail closed. Any exception, timeout, schema error, signature error, unknown `vct`, unknown constraint type, PayPal error or unverified webhook results in no authorization, no capture and a void of any outstanding authorization.                                 |
-| INV-11 | Idempotent PayPal calls. Every mutating PayPal call carries a `PayPal-Request-Id` derived from the checkout id and the operation. Retries never create a second order, authorization or capture.                                                                    |
-| INV-12 | Log before respond. Every decision, PayPal call, webhook and gate result is appended to the hash-chained log before the response returns. Log failure fails the operation.                                                                                          |
-| INV-13 | Honest claims. No claim about PayPal buyer or seller protection, dispute outcomes or production readiness. Countersign creates PayPal sandbox orders and keeps a verifiable authorization and evidence trail.                                                       |
+| ID     | Invariant                                                                                                                                                                                                                                                                     |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| INV-1  | Deterministic verification only. Every check performed by the Merchant, Credential Provider, Payment Processor and Trusted Surface roles runs in deterministic code. No model output is ever an input to an allow decision.                                                   |
+| INV-2  | The Trusted Surface is non-agentic. It renders constraints and checkouts from structured data with fixed templates. No model-generated text appears on it. The device private key is non-extractable and never leaves the browser.                                            |
+| INV-3  | No authorization without a valid Payment Mandate for any principal that is locked, and for any merchant configured to require AP2.                                                                                                                                            |
+| INV-4  | No capture without the gate. Capture is issued only after the gate passes on freshly fetched PayPal state, never from cache. Any gate failure voids the authorization.                                                                                                        |
+| INV-5  | The lock follows the principal. Protection keys on (customer id, agent key thumbprint) and merchant policy, never on protocol or session. Policy code may not import protocol adapters, enforced by a test.                                                                   |
+| INV-6  | Single use on the keys in [PROTOCOL.md](PROTOCOL.md) Decision 1: checkout hash (which equals `transaction_id`), closed mandate nonce, and one purchase per open mandate (one in-flight closed mandate at a time, and permanent consumption on capture), across all protocols. |
+| INV-7  | Budgets come from PayPal state and are add-only. Amounts are reserved while a presentation is in flight, released on a rejection receipt (including a void before capture), and added on capture. A refund never restores headroom. Never from agent claims.                  |
+| INV-8  | Canonical bytes are JCS. Everything Countersign signs or hashes as JSON uses RFC 8785 through one library. AP2 hashes are computed over compact serializations as specified. Inbound JSON with duplicate keys, NaN, Infinity or excess precision is rejected first.           |
+| INV-9  | Integer minor units for money. No floats in money paths. Non-integer JSON numbers in a constraint make the mandate invalid.                                                                                                                                                   |
+| INV-10 | Fail closed. Any exception, timeout, schema error, signature error, unknown `vct`, unknown constraint type, PayPal error or unverified webhook results in no authorization, no capture and a void of any outstanding authorization.                                           |
+| INV-11 | Idempotent PayPal calls. Every mutating PayPal call carries a `PayPal-Request-Id` derived from the checkout id and the operation. Retries never create a second order, authorization or capture.                                                                              |
+| INV-12 | Log before respond. Every decision, PayPal call, webhook and gate result is appended to the hash-chained log before the response returns. Log failure fails the operation.                                                                                                    |
+| INV-13 | Honest claims. No claim about PayPal buyer or seller protection, dispute outcomes or production readiness. Countersign creates PayPal sandbox orders and keeps a verifiable authorization and evidence trail.                                                                 |
 
 ## 4. Repository layout and make targets
 
@@ -316,29 +316,38 @@ Only native AP2 constraint types are used or evaluated ([PROTOCOL.md](PROTOCOL.m
 evaluators are pure functions of the closed mandate content and an explicit state view. They never
 read agent claims as facts.
 
-| Constraint                                                     | Evaluation                                                                                                                         |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `checkout.line_items`                                          | each item in the checkout matched to a revealed `acceptable_items` entry with exactly the approved quantities, no entry used twice |
-| `checkout.allowed_merchants`                                   | this merchant is among the revealed `allowed` entries                                                                              |
-| `payment.amount_range`                                         | integer `payment_amount` within `min` and `max`, same currency                                                                     |
-| `payment.allowed_payees`                                       | the `payee` is among `allowed`                                                                                                     |
-| `payment.allowed_payment_instruments`, `payment.allowed_pisps` | membership check when present                                                                                                      |
-| `payment.reference`                                            | the Checkout Mandate chain contains the open Checkout Mandate whose digest equals `conditional_transaction_id`                     |
-| `payment.agent_recurrence`                                     | frequency separation (`ON_DEMAND` means none) and `max_occurrences`, counted from successful presentations of that open mandate    |
-| `payment.budget`                                               | `spent + this amount <= max`, where `spent` comes from the spend view below, in minor units of the constraint currency             |
-| `payment.execution_date`                                       | `execution_date` within the window                                                                                                 |
-| any other `type`                                               | fails closed as `unresolved_constraint`                                                                                            |
+| Constraint                                                     | Evaluation                                                                                                                                                                                         |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `checkout.line_items`                                          | each item in the checkout matched to a revealed `acceptable_items` entry with exactly the approved quantities, no entry used twice                                                                 |
+| `checkout.allowed_merchants`                                   | this merchant is among the revealed `allowed` entries                                                                                                                                              |
+| `payment.amount_range`                                         | integer `payment_amount` within `min` and `max`, same currency                                                                                                                                     |
+| `payment.allowed_payees`                                       | the `payee` is among `allowed`                                                                                                                                                                     |
+| `payment.allowed_payment_instruments`, `payment.allowed_pisps` | membership check when present                                                                                                                                                                      |
+| `payment.reference`                                            | the Checkout Mandate chain contains the open Checkout Mandate whose digest equals `conditional_transaction_id`                                                                                     |
+| `payment.agent_recurrence`                                     | accepted only with `max_occurrences` of `1`, which is how Countersign expresses one purchase per open mandate; any other recurrence fails closed as `unresolved_constraint`                        |
+| `payment.budget`                                               | `spent + this amount <= max`, add-only, in minor units of the constraint currency, where `spent` is the sum of captured purchases under this open mandate and in-flight reservations count as well |
+| `payment.execution_date`                                       | `execution_date` within the window                                                                                                                                                                 |
+| any other `type`                                               | fails closed as `unresolved_constraint`                                                                                                                                                            |
 
-The spend view for an open Payment Mandate is `reserved + authorized + captured - voided -
-refunded`, built from PayPal responses and verified webhooks ([PROTOCOL.md](PROTOCOL.md) Decision 2).
-The gate re-evaluates the budget from a fresh view just before capture.
+The spend view for an open Payment Mandate follows the spec's add-only rule
+([PROTOCOL.md](PROTOCOL.md) Decision 2). It is the sum of captured amounts plus in-flight
+reservations. A reservation is released when a rejection receipt is issued, including a void before
+capture, and the open mandate can then be retried with a new checkout. Capture adds the amount for
+good. A refund after capture does not restore headroom. The view is built from PayPal responses and
+verified webhooks, and the gate re-evaluates it from fresh state just before capture.
+
+An open mandate backs exactly one successful purchase. Its states are `unused`, `in_flight`,
+`consumed` (a capture succeeded), and `revoked` or `expired`. Repeat use under a recurrence
+constraint is future work.
 
 Category and similar limits are merchant policy, evaluated by a policy function outside the mandates:
 allowed categories per agent, an unmandated purchase cap, velocity limits. Policy changes are
 versioned and hashed, and the policy hash is part of every log entry.
 
-Acceptance: boundary tests for every evaluated constraint; a split-purchase scenario where the
-purchase that would exceed the budget is denied; an unknown type fails closed.
+Acceptance: boundary tests for every evaluated constraint; a split-purchase scenario where a second
+and third purchase under one open mandate are denied by the single-use rule; after a void before
+capture the same open mandate can be retried; after a refund it cannot; an unknown type fails
+closed; a recurrence other than one occurrence fails closed.
 
 ### 5.7 lock
 
@@ -390,13 +399,14 @@ order object.
 | `G-BUDGET`  | the budget still holds under a freshly reconciled spend view                                                                         |
 | `G-LOCK`    | the principal lock requirements are still satisfied                                                                                  |
 
-On pass: capture, consume the keys, finalize the spend view and sign the Payment Receipt. On fail:
-void, release reservations and sign a rejection Payment Receipt. The `reference` of each receipt is
+On pass: capture, consume the keys and the open mandate, add the amount to the spend view and sign
+the Payment Receipt. On fail: void, release the reservations (the open mandate returns to `unused`
+and may be retried with a new checkout) and sign a rejection Payment Receipt. The `reference` of each receipt is
 the hash of the closed Payment Mandate.
 
 Acceptance: tests where the order is changed after authorization (by the mutation path confirmed in
 section 10), the mandate is revoked between authorization and capture, a concurrent purchase exhausts
-the budget, and two gates race on one checkout. Each must capture or void exactly once.
+a second purchase races the first under one open mandate, and two gates race on one checkout. Each must capture or void exactly once.
 
 ### 5.10 ledger (decision log)
 
@@ -488,7 +498,7 @@ themes, shared tokens and components.
   list, "Up to $80.00 in total", "Expires Sun 25 Oct, 18:00"), the merchant name and the agent
   fingerprint. Approve and Decline. Approve signs the consent record.
 - **Approve purchase:** for Human Present, the exact line items and totals, then consent.
-- **My agent activity:** purchases under each open mandate, remaining budget and a revoke button.
+- **My agent activity:** the state of each open mandate (unused, in flight or used), its ceiling and expiry, the purchase made under it, and a revoke button.
 
 ### 7.3 Demo storefront and agent console
 
@@ -530,7 +540,7 @@ model judge.
 Attack categories: `mandate_forged`, `alg_confusion`, `mandate_expired`, `mandate_revoked`,
 `nonce_replay`, `open_mandate_double_spend`, `checkout_swap`, `price_change_before_complete`,
 `order_changed_after_authorize`, `custom_id_tamper`, `protocol_downgrade_acp`, `new_session_escape`,
-`budget_split`, `category_escape` (a merchant policy test, since category limits are not in
+`budget_split` (expected denial through the single-use rule, the same defense as `open_mandate_double_spend`), `category_escape` (a merchant policy test, since category limits are not in
 mandates), `duplicate_json_keys`, `decimal_ambiguity`, `webhook_spoof`, `double_complete_retry`,
 `merchant_authorization_strip`, `consent_missing` (mandate issuance without a valid device
 consent).
@@ -547,14 +557,14 @@ ablation results are reported, including any ablation that reopens nothing. Repo
 What the specs already do is stated next to each item. Details of the underlying spec facts are in
 [PROTOCOL.md](PROTOCOL.md).
 
-| ID  | Contribution                                                                                                                                                                                                   | What the specs already cover                                                                                                                     |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| N1  | AP2 Credential Provider and Payment Processor roles implemented on PayPal Orders. The Payment Mandate is verified before a PayPal authorization, and the PayPal order is the credential scoped to the checkout | AP2 requires the processor to verify the credential is scoped to the checkout and leaves the mechanism open                                      |
-| N2  | Capture-time re-verification against live PayPal state. Immediately before capture, the live order and authorization are fetched and compared with the signed checkout                                         | UCP checks terms at `complete`. Between authorization and capture the order can still change                                                     |
-| N3  | Principal-scoped protection lock across protocols                                                                                                                                                              | The UCP lock is per session only                                                                                                                 |
-| N4  | Budget state reconciled from PayPal for the native `payment.budget` constraint, enforced at authorization and again at capture                                                                                 | AP2 defines `payment.budget` and `payment.agent_recurrence` but leaves the state source to the verifier                                          |
-| N5  | A dispute evidence bundle keyed by PayPal capture id, verifiable offline with the AP2 dispute steps and exportable as one file                                                                                 | AP2 says mandates and receipts can be dispute evidence and leaves retention and retrieval out of scope                                           |
-| N6  | A device consent signature from a non-extractable customer key over the exact terms, required before the platform signs any mandate, stored as independent evidence                                            | AP2 and UCP define the trusted platform provider and user credential models. A device consent record is additional and sits outside the mandates |
+| ID  | Contribution                                                                                                                                                                                                                 | What the specs already cover                                                                                                                     |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| N1  | AP2 Credential Provider and Payment Processor roles implemented on PayPal Orders. The Payment Mandate is verified before a PayPal authorization, and the PayPal order is the credential scoped to the checkout               | AP2 requires the processor to verify the credential is scoped to the checkout and leaves the mechanism open                                      |
+| N2  | Capture-time re-verification against live PayPal state. Immediately before capture, the live order and authorization are fetched and compared with the signed checkout                                                       | UCP checks terms at `complete`. Between authorization and capture the order can still change                                                     |
+| N3  | Principal-scoped protection lock across protocols                                                                                                                                                                            | The UCP lock is per session only                                                                                                                 |
+| N4  | Single-use and budget state derived from PayPal outcomes (captures and voids, never agent claims) for the native `payment.budget` and `payment.agent_recurrence` constraints, enforced at authorization and again at capture | AP2 defines `payment.budget` and `payment.agent_recurrence` and the add-only rule but leaves the state source to the verifier                    |
+| N5  | A dispute evidence bundle keyed by PayPal capture id, verifiable offline with the AP2 dispute steps and exportable as one file                                                                                               | AP2 says mandates and receipts can be dispute evidence and leaves retention and retrieval out of scope                                           |
+| N6  | A device consent signature from a non-extractable customer key over the exact terms, required before the platform signs any mandate, stored as independent evidence                                                          | AP2 and UCP define the trusted platform provider and user credential models. A device consent record is additional and sits outside the mandates |
 
 ## 10. Day 0 confirmations
 
@@ -605,7 +615,7 @@ fallback.
 - **LIMITATIONS:** sandbox only; a single merchant; Countersign plays Merchant, Credential
   Provider, Payment Processor and Trusted Surface together, so the mandate signer is also a verifier;
   the payer approval method; specs pinned to draft or dated versions; the interpretations in
-  [PROTOCOL.md](PROTOCOL.md) (budget units, `ON_DEMAND`, repeat use, `checkout_jwt`); the UCP
+  [PROTOCOL.md](PROTOCOL.md) (budget units, `ON_DEMAND`, the recurrence mapping, `checkout_jwt`); the UCP
   mandate pattern workaround; hostile-agent success rates are empirical; gate correctness is tested,
   not formally verified; no claim about PayPal protection programs; any `custom_id` truncation;
   principals that cannot be identified on non-AP2 protocols; every marked shortcut in the code.
