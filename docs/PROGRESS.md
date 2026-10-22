@@ -22,3 +22,16 @@ A phase starts only when the previous gate has passed.
 - The AP2 and UCP spec facts, gaps and design decisions are recorded in
   [PROTOCOL.md](PROTOCOL.md). The architecture is in [architecture.md](architecture.md).
 - Open: library selection, PayPal sandbox smoke test and behavior confirmations.
+
+## Definition of done
+
+- [ ] Public repository with the license detected by the host, a complete README, and a fresh clone that runs
+- [ ] Hosted demo live through the evaluation period with a working sandbox buyer login
+- [ ] Autonomous purchase from phone approval to a captured PayPal sandbox order to verified evidence
+- [ ] Downgrade, order-changed-after-authorization and replay attacks fail in full mode and succeed in baseline, shown in the dashboard
+- [ ] Zero unauthorized captures and zero duplicate PayPal objects in `eval/reports/latest`
+- [ ] Interop: merchant signatures and mandates verify with an independent implementation
+- [ ] Dashboard and Trusted Surface polished, the Trusted Surface at 375 px
+- [ ] Video under three minutes, public, with no third-party marks
+- [ ] Submission description in the required structure
+- [ ] Submitted with time to spare
