@@ -2,19 +2,22 @@
 
 How Countersign uses AP2, UCP and ACP, grounded in the pinned copies under `spec/vendor/`.
 This file is built up over time. This revision covers the AP2 and UCP facts confirmed by reading
-the vendored files. PayPal facts, library choices, constraint schemas, gate step codes, the
-evidence reference encoding and the PayPal field mapping are added by later work and are listed
-under [Still to be written](#still-to-be-written).
+the vendored files (including RFC 9901 and the Delegate SD-JWT draft), the gaps those files leave,
+and the design decisions Countersign makes to close them. PayPal facts, library choices, gate step
+codes, the evidence reference encoding and the PayPal field mapping are added by later work and
+are listed under [Still to be written](#4-still-to-be-written).
 
 ## Conventions
 
 - **Citations.** Every fact cites a vendored file and a section heading. Paths are relative to
   `spec/vendor/`. Pins are in `spec/vendor/SOURCES.md`: AP2 tag `v0.2.0`, UCP tag `v2026-08-25`,
-  ACP spec `2026-04-17`.
+  ACP spec `2026-04-17`, RFC 9901, and the Delegate SD-JWT draft (current `main` and the revision
+  contemporary with AP2 v0.2.0).
 - **Quoting.** Field names, claim names and strings are quoted exactly as written upstream.
-- **Status labels.** Each fact is either _confirmed_ (stated in a vendored file) or marked
-  _not specified_ or _ambiguous_ where the vendored files do not settle it. Countersign choices
-  made to fill a gap are labelled _Countersign decision_ and are never presented as spec.
+- **Status labels.** Each fact is either _confirmed_ (stated in a vendored file, or checked against
+  a worked example in a vendored file) or marked _not specified_ or _ambiguous_ where the vendored
+  files do not settle it. Choices made to fill a gap are labelled _Countersign decision_ and are
+  never presented as spec. All decisions are in [section 3](#3-design-decisions).
 - **Out of scope here.** ACP is used only as the weaker second protocol in attack scenarios and
   is not analysed in this revision.
 
@@ -27,18 +30,20 @@ under [Still to be written](#still-to-be-written).
 | Item                            | Answer                                                                                                                                                                                                                                                             | Detail                                      |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
 | Mandate `vct` strings           | `mandate.checkout.1`, `mandate.checkout.open.1`, `mandate.payment.1`, `mandate.payment.open.1`                                                                                                                                                                     | [1.2.2](#122-mandate-types-and-vct-strings) |
-| `checkout_hash`                 | base64url hash of the `checkout_jwt` value; algorithm is the SD-JWT `_sd_alg`, or `sha-256` if absent                                                                                                                                                              | [1.2.4](#124-hashes)                        |
-| `transaction_id`                | base64url hash of the `checkout_jwt` value. It is the same value as `checkout_hash`, not a separate unique id                                                                                                                                                      | [1.2.4](#124-hashes)                        |
+| `checkout_hash`                 | base64url(SHA-256) of the US-ASCII bytes of the `checkout_jwt` string; algorithm is the SD-JWT `_sd_alg`, or `sha-256` if absent                                                                                                                                   | [1.2.4](#124-hashes)                        |
+| `transaction_id`                | the same value as `checkout_hash`, not a separate unique id                                                                                                                                                                                                        | [1.2.4](#124-hashes)                        |
+| `sd_hash`                       | base64url(SHA-256) of the US-ASCII bytes of the preceding SD-JWT compact serialization including its trailing `~`                                                                                                                                                  | [1.2.4](#124-hashes)                        |
 | `cnf`                           | RFC 7800 confirmation claim, shape `{"jwk": {...}}`, required on open mandates, holds the agent public key                                                                                                                                                         | [1.2.5](#125-key-binding-and-the-cnf-claim) |
 | Constraint structure            | object with required string `type` plus type-specific fields; ten native types exist (none for expiry or category)                                                                                                                                                 | [1.2.6](#126-constraints)                   |
 | Receipt fields                  | Checkout Receipt and Payment Receipt schemas, `reference` is the hash of the closed mandate                                                                                                                                                                        | [1.2.7](#127-receipts)                      |
 | Hash for receipt `reference`    | same as `sd_hash`; algorithm is `_sd_alg`, or `sha-256`                                                                                                                                                                                                            | [1.2.4](#124-hashes)                        |
 | Native constraint types         | `checkout.allowed_merchants`, `checkout.line_items`, `payment.agent_recurrence`, `payment.allowed_payees`, `payment.allowed_payment_instruments`, `payment.allowed_pisps`, `payment.amount_range`, `payment.budget`, `payment.reference`, `payment.execution_date` | [1.2.6](#126-constraints)                   |
+| Chain serialization             | `<SD-JWT>~~<KB-SD-JWT>~<disclosures>~`, exactly one empty component between links                                                                                                                                                                                  | [1.2.3](#123-sd-jwt-structure-and-chains)   |
 | `merchant_authorization` format | detached JWS `<header>..<signature>` over JCS bytes of the checkout minus `ap2`; header claims `alg` and `kid`                                                                                                                                                     | [1.3.3](#133-merchant_authorization)        |
 | UCP AP2 error codes             | seven codes, listed in [1.3.5](#135-error-codes)                                                                                                                                                                                                                   | [1.3.5](#135-error-codes)                   |
-| Payment mandate in UCP          | `payment.instruments[*].credential.token`; internal format of the token is not specified                                                                                                                                                                           | [1.3.4](#134-carrying-the-mandates-in-ucp)  |
+| Payment mandate in UCP          | `payment.instruments[*].credential.token`; format defined by [Decision 8](#decision-8-payment-mandate-credentialtoken-format)                                                                                                                                      | [1.3.4](#134-carrying-the-mandates-in-ucp)  |
 | Profile keys format             | top-level `keys[]`, a JWK Set; each entry requires `kid` and `kty`, EC keys also `crv`, `x`, `y`                                                                                                                                                                   | [1.3.2](#132-profile-and-keys)              |
-| SD-JWT library choice           | Not answerable from the specs. The requirements it must meet are in [1.2.3](#123-sd-jwt-structure)                                                                                                                                                                 | library selection step                      |
+| SD-JWT library choice           | Not answerable from the specs. The requirements it must meet are in [1.2.3](#123-sd-jwt-structure-and-chains)                                                                                                                                                      | library selection step                      |
 
 ### 1.2 AP2 v0.2
 
@@ -83,7 +88,9 @@ Source: `ap2/docs/checkout_mandate.md`, "Type"; `ap2/docs/payment_mandate.md`, "
 `const` (`ap2/schemas/ap2/checkout_mandate.json`, `open_checkout_mandate.json`,
 `payment_mandate.json`, `open_payment_mandate.json`).
 
-#### 1.2.3 SD-JWT structure
+#### 1.2.3 SD-JWT structure and chains
+
+Mandates:
 
 - Mandates are SD-JWT credentials. "AP2 specifies the use of `SD-JWT`s for securing the Payment
   and Checkout Mandates." (`ap2/docs/specification.md`, "Verifiable Digital Credential Formats
@@ -91,27 +98,82 @@ Source: `ap2/docs/checkout_mandate.md`, "Type"; `ap2/docs/payment_mandate.md`, "
   (`ap2/docs/agent_authorization.md`, "Mandate Structure").
 - Mandate Content claims: `vct` (REQUIRED), `constraints` (OPTIONAL array), `cnf` (REQUIRED if
   the mandate is still open). `ap2/docs/agent_authorization.md`, "Mandates using SD-JWT VCs".
-- The worked examples show the chain shape. The issuer-signed JWT carries a `delegate_payload`
-  array of digest placeholders (`{"...": "<digest>"}`) and `_sd_alg`. A closed mandate is a
-  key-binding JWT with header `typ` `kb+sd-jwt` and payload claims `iat`, `aud`, `nonce`,
-  `sd_hash`, `_sd_alg`. Observed `aud` values: `merchant` for the checkout mandate,
-  `credential-provider` for the payment mandate. Source: `ap2/docs/checkout_mandate.md`
-  "Closed Checkout Mandate SD-JWT plus disclosures"; `ap2/docs/payment_mandate.md`, "Examples".
-  These are non-normative examples, so the exact required claims for the key-binding JWT come
-  from the external drafts below.
-- `sd_hash` binds a closed mandate to the open mandate it was presented with
-  (`ap2/docs/security_and_privacy_considerations.md`, "Manipulated Checkout";
-  `ap2/docs/flows.md`, "Phase 2: Payment (Human Not Present)").
 - Processing rules for a chain, in order: (1) verify and process the SD-JWT chain per Delegate
   SD-JWT, (2) check the closed mandate has the open mandate's claims unchanged, (3) evaluate
   every constraint against the closed mandate, where "Any unknown Constraints MUST be treated as
   failing evaluation". Source: `ap2/docs/agent_authorization.md`, "Verification and Processing
   Rules".
-- The normative references include an external individual draft, "Delegate SD-JWT", and RFC 9901
-  (SD-JWT). Neither is vendored (`ap2/docs/agent_authorization.md`, "References"). Chain
-  processing details beyond the examples therefore cannot be confirmed from this repository.
-  See [1.4](#14-not-specified-or-ambiguous-in-the-vendored-files).
-- The `exp` and `nbf` clock skew is not specified anywhere in the vendored AP2 or UCP files.
+- `sd_hash` binds a closed mandate to the open mandate it was presented with
+  (`ap2/docs/security_and_privacy_considerations.md`, "Manipulated Checkout";
+  `ap2/docs/flows.md`, "Phase 2: Payment (Human Not Present)").
+- The `exp` and `nbf` clock skew is not specified anywhere in the vendored files.
+
+Chain format. AP2 names "Delegate SD-JWT" as the normative chain format
+(`ap2/docs/agent_authorization.md`, "References"). The pinned draft is
+`delegate-sd-jwt/draft-ietf-oauth-delegate-sd-jwt.md`:
+
+- Compact serialization ("Formats > Compact Serialization"):
+  - dSD-JWT: `<SD-JWT>~~<KB-JWT>~<Delegated Disclosure 1>~...~<Delegated Disclosure M>~`
+  - dSD-JWT+KB: `<SD-JWT>~~<KB-SD-JWT>~<delegate KB-JWT>`
+  - longer chain: `<SD-JWT>~~<KB-SD-JWT 1>~~...~~<KB-SD-JWT n>~<delegate KB-JWT>`
+  - "The resulting array of components MUST have exactly one empty component between the last
+    component of each SD-JWT or KB-SD-JWT and the following KB-SD-JWT." A dSD-JWT is
+    distinguished from a dSD-JWT+KB by a trailing `~`.
+- A KB-SD-JWT is a key-binding JWT that is itself an SD-JWT ("KB-SD-JWT and KB-SD-JWT+KB"):
+  header `typ` is `kb+sd-jwt` (or `kb-sd-jwt+kb`, which requires a `cnf` claim in the delegate
+  payload). It adds the claim `delegate_payload`, "An array of JSON Objects", of which exactly one
+  must be disclosed when presented. `sd_hash` is OPTIONAL; when absent `issuer_jwt_hash` must be
+  present instead. All claims normally in an issuer-signed payload, except `_sd_alg`, move into the
+  delegate payload.
+- Verification ("Verification"): split into components; validate the first SD-JWT per RFC 9901
+  section 7.1; for each KB-SD-JWT validate it as an SD-JWT with the previous component's `cnf` key
+  as the issuer key, check exactly one disclosed `delegate_payload` element, check `sd_hash` (or
+  `issuer_jwt_hash`) against the preceding component, check the `typ`. For a dSD-JWT (no trailing
+  key-binding JWT) the final `typ` "MUST be 'kb+sd-jwt' or 'kb-sd-jwt+kb'". If key binding is
+  required and the credential is a plain dSD-JWT, "the Verifier MUST reject the presentation".
+- "Without verifying the binding in both directions a malicious Delegate Holder may mis-match
+  parts of the chain if the Holder `cnf` is reused" ("Security Considerations > Mandatory
+  verification of delegate SD-JWT Chain").
+- The draft history records that the `typ` value `kb+sd-jwt+kb` was renamed `kb-sd-jwt+kb`
+  ("Document History", -01). AP2 v0.2.0 examples use only `kb+sd-jwt`.
+
+Key binding JWT and hashing (RFC 9901):
+
+- Standard KB-JWT: header `typ` `kb+jwt`, payload `iat`, `aud`, `nonce`, `sd_hash` all REQUIRED
+  (`rfc9901/rfc9901.txt`, section 4.3). The AP2 and Delegate KB-SD-JWT uses `kb+sd-jwt` instead.
+- `_sd_alg` defaults to `sha-256`, and implementations MUST support `sha-256` (section 4.1.1).
+- A disclosure digest is "computed over the US-ASCII bytes of the base64url-encoded value that is
+  the Disclosure", not over the decoded bytes, and the digest bytes are then base64url encoded
+  (section 4.2.3).
+- `sd_hash` "MUST be computed over the US-ASCII bytes of the encoded SD-JWT, i.e., the
+  Issuer-signed JWT, a tilde character, and zero or more Disclosures selected for presentation to
+  the Verifier, each followed by a tilde character", with the same hash algorithm as the
+  disclosures (section 4.3.1).
+
+Checks against the vendored worked examples. The "Encoded Token" blocks in
+`ap2/docs/checkout_mandate.md` and `ap2/docs/payment_mandate.md` were decoded and checked with an
+ad hoc script (not committed). Results:
+
+- The chained token equals the open token, then `~`, then the closed token, and contains `~~`. The
+  open token ends with `~`.
+- The closed Checkout Mandate key-binding JWT verifies with ES256 against the `cnf` JWK in the open
+  Checkout Mandate. The same holds for the Payment Mandate pair.
+- The closed `sd_hash` equals base64url(SHA-256(US-ASCII(open token))), where the open token is
+  taken including its trailing `~`. Holds for both mandates.
+- `checkout_hash` equals base64url(SHA-256(US-ASCII(checkout_jwt string))), where `checkout_jwt` is
+  the compact JWS string stored in the `checkout_jwt` disclosure. The closed Payment Mandate
+  `transaction_id` is the same value.
+- The open Payment Mandate `payment.reference` `conditional_transaction_id` equals the same hash
+  taken over the open Checkout Mandate token.
+- The closed tokens end with `~`, so by the draft's definition they are dSD-JWTs without a trailing
+  delegate key-binding JWT. The transaction binding is carried in the `aud` and `nonce` of the final
+  `kb+sd-jwt` element.
+- The example `checkout_jwt` has header `{"alg": "ES256", "typ": "JWT", "kid": "merchant-key-1"}`
+  and a payload serialized with spaces after separators, so it is not JCS output, and it is not a
+  UCP checkout object.
+- In `ap2/docs/checkout_mandate.md` the decoded view of the closed example shows an `_sd` digest
+  that differs in two characters from the digest in the encoded token. The encoded token is
+  treated as authoritative and the decoded view as a documentation typo.
 
 #### 1.2.4 Hashes
 
@@ -119,25 +181,27 @@ Source: `ap2/docs/checkout_mandate.md`, "Type"; `ap2/docs/payment_mandate.md`, "
 | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `checkout_hash`                           | "base64url-encoded hash of the value of `checkout_jwt`. The algorithm used MUST be the same as the SD-JWT, as defined by the `_sd_alg` claim in the base payload, or `sha-256` if not present."                       | `ap2/docs/checkout_mandate.md`, "Mandate Schema"; `ap2/schemas/ap2/checkout_mandate.json`, property `checkout_hash` |
 | `transaction_id` (closed Payment Mandate) | "base64url-encoded hash of the checkout_jwt field value, uniquely identifying the checkout associated with this. The hash algorithm used MUST be the same as the sd_hash field for this sd-jwt, or sha256 if absent." | `ap2/schemas/ap2/payment_mandate.json`, property `transaction_id`                                                   |
+| `sd_hash`                                 | over the preceding SD-JWT string including its trailing `~`, US-ASCII bytes                                                                                                                                           | `rfc9901/rfc9901.txt`, section 4.3.1                                                                                |
 | Receipt `reference`                       | "The hash of the closed Mandate that this receipt is binding to", "calculated in the same manner as the `sd_hash` would be"                                                                                           | `ap2/schemas/ap2/checkout_receipt.json`, `payment_receipt.json`; `ap2/docs/specification.md`, "Dispute"             |
 | `payment.reference` constraint            | `conditional_transaction_id` is the "Digest of the associated Open Checkout Mandate"; algorithm is `_sd_alg` of the SD-JWT the constraint is in, or `sha-256`                                                         | `ap2/schemas/ap2/open_payment_mandate.json`, `payment_reference`; `ap2/docs/payment_mandate.md`, "Reference"        |
 
 Confirmed consequences:
 
 - `transaction_id` and `checkout_hash` are computed from the same input, so for one checkout they
-  are the same string. The examples show this: `NivWhuqfzcvZNapvIEJ2-3tsdQLkiuIcye2g46WVgX8`
-  is both the `checkout_hash` in `ap2/docs/checkout_mandate.md` (closed example) and the
-  `transaction_id` in `ap2/docs/payment_mandate.md` (closed example).
-- The security text calls this out: "The `checkout_hash` embedded in the `transaction_id`
-  securely links the payment to the associated Checkout Mandate"
-  (`ap2/docs/security_and_privacy_considerations.md`, "Manipulated Payment").
-- AP2 hashes are plain hashes with no domain-separation prefix. Domain separation applies only
-  to hashes Countersign defines itself (decision log, evidence reference).
-- The input bytes of the hash are described only as "the value of `checkout_jwt`" (a string, the
-  compact serialization). The files say to store compact serializations so hashes can be
-  recomputed (`ap2/docs/implementation_considerations.md`, "Hashes"). The byte encoding
-  (ASCII of the compact form, as RFC 9901 defines for `sd_hash`) is not spelled out in the
-  vendored files. See [1.4](#14-not-specified-or-ambiguous-in-the-vendored-files).
+  are the same string ([1.2.3](#123-sd-jwt-structure-and-chains), example checks). The security
+  text says: "The `checkout_hash` embedded in the `transaction_id` securely links the payment to
+  the associated Checkout Mandate" (`ap2/docs/security_and_privacy_considerations.md`,
+  "Manipulated Payment").
+- Hash input. For `checkout_hash` and `transaction_id` the input is the US-ASCII bytes of the
+  compact JWS string held in `checkout_jwt`. For `sd_hash`, receipt `reference` and the
+  `payment.reference` digest the input is the US-ASCII bytes of the full compact serialization of
+  the mandate presentation, including trailing `~`. Disclosure digests use the US-ASCII bytes of
+  the base64url disclosure string. Receipt `reference` for a chain is "a hash over the final SD-JWT
+  in the chain" (`ap2/docs/agent_authorization.md`, "Action Authorization"). The exact string a
+  receipt `reference` covers when a chain is presented (the whole chain, or only the final
+  element) is stated only by that sentence. See [Decision 7](#decision-7-checkout_jwt-and-merchant_authorization).
+- AP2 hashes are plain hashes with no domain-separation prefix. Domain separation applies only to
+  hashes Countersign defines itself (decision log, evidence reference).
 - The Checkout JWT must be signed with a non-deterministic scheme: "MUST be signed using a digital
   signature scheme (e.g., ECDSA) and not a deterministic signature (e.g., Ed25519)"
   (`ap2/docs/specification.md`, "Payment Mandate"). The security chapter instead states an
@@ -163,28 +227,27 @@ Confirmed consequences:
 
 Structure: every constraint is an object with a required string `type`, "A unique String
 identifying this constraint", plus properties defined by that type
-(`ap2/docs/agent_authorization.md`, "Mandates using SD-JWT VCs"). New constraints need "A uniquely
-defined `type`", "A Schema, including which fields are selectively disclosable" and "The
-evaluation algorithm" (`ap2/docs/specification.md`, "Mandate Constraints"). A collision-resistant
-name such as an rDNS prefix or URN is RECOMMENDED (`ap2/docs/agent_authorization.md`, same
-section).
+(`ap2/docs/agent_authorization.md`, "Mandates using SD-JWT VCs"). New constraints would need "A
+uniquely defined `type`", "A Schema, including which fields are selectively disclosable" and "The
+evaluation algorithm" (`ap2/docs/specification.md`, "Mandate Constraints"). Countersign defines
+none ([Decision 4](#decision-4-no-custom-constraint-types)).
 
 Native types in v0.2. Sources: `ap2/docs/checkout_mandate.md`, "Constraints";
 `ap2/docs/payment_mandate.md`, "Payment Mandate Constraints"; schemas in
 `ap2/schemas/ap2/open_checkout_mandate.json` and `open_payment_mandate.json`.
 
-| `type`                                | Mandate       | Fields                                                                                                                   | Evaluation (summary)                                                                                                                                                              |
-| ------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `checkout.allowed_merchants`          | open checkout | `allowed` (array of merchant objects `id`, `name`, `website`, selectively disclosable)                                   | merchant must be among the revealed `allowed`; if none revealed, invalid                                                                                                          |
-| `checkout.line_items`                 | open checkout | `items[]` each `id`, `acceptable_items[]` (`id`, `title`), `quantity`                                                    | each `items` entry matched by quantity, no entry or item used twice; maximal-flow formulation given. Does not support splitting one open mandate across several checkouts         |
-| `payment.allowed_payees`              | open payment  | `allowed` (merchant objects)                                                                                             | `payee` of the Payment Mandate must be in `allowed`                                                                                                                               |
-| `payment.allowed_payment_instruments` | open payment  | `allowed` (`id`, `type`, `description`)                                                                                  | `payment_instrument` must be in `allowed`                                                                                                                                         |
-| `payment.allowed_pisps`               | open payment  | `allowed` (`legal_name`, `brand_name`, `domain_name`)                                                                    | facilitating PISP must be in `allowed`                                                                                                                                            |
-| `payment.amount_range`                | open payment  | `currency`, `max` (integer minor units), optional `min` (integer minor units)                                            | `payment_amount` within `min` and `max`, currency must match                                                                                                                      |
-| `payment.budget`                      | open payment  | `max` (JSON `number`), `currency`                                                                                        | requested amount plus the sum of previously closed Payment Mandates must be `<= max`; amount added after approval. Described as "To be used with the Agent Recurrence constraint" |
-| `payment.agent_recurrence`            | open payment  | `frequency` (`ON_DEMAND`, `DAILY`, `WEEKLY`, `BIWEEKLY`, `MONTHLY`, `QUARTERLY`, `ANNUALLY`), optional `max_occurrences` | true if sufficiently separated in time from the previous presentation and `max_occurrences` not exceeded                                                                          |
-| `payment.reference`                   | open payment  | `conditional_transaction_id`                                                                                             | the Checkout Mandate must contain an open Checkout Mandate with a matching hash in its delegate chain                                                                             |
-| `payment.execution_date`              | open payment  | optional `not_before`, `not_after`                                                                                       | `execution_date` within the window                                                                                                                                                |
+| `type`                                | Mandate       | Fields                                                                                                                   | Evaluation (summary)                                                                                                                                                                                  |
+| ------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `checkout.allowed_merchants`          | open checkout | `allowed` (array of merchant objects `id`, `name`, `website`, selectively disclosable)                                   | merchant must be among the revealed `allowed`; if none revealed, invalid                                                                                                                              |
+| `checkout.line_items`                 | open checkout | `items[]` each `id`, `acceptable_items[]` (`id`, `title`), `quantity`                                                    | each `items` entry matched by quantity, no entry or item used twice; maximal-flow formulation given. "This evaluation does not support splitting the open Checkout Mandate across multiple Checkouts" |
+| `payment.allowed_payees`              | open payment  | `allowed` (merchant objects)                                                                                             | `payee` of the Payment Mandate must be in `allowed`                                                                                                                                                   |
+| `payment.allowed_payment_instruments` | open payment  | `allowed` (`id`, `type`, `description`)                                                                                  | `payment_instrument` must be in `allowed`                                                                                                                                                             |
+| `payment.allowed_pisps`               | open payment  | `allowed` (`legal_name`, `brand_name`, `domain_name`)                                                                    | facilitating PISP must be in `allowed`                                                                                                                                                                |
+| `payment.amount_range`                | open payment  | `currency`, `max` (integer minor units), optional `min` (integer minor units)                                            | `payment_amount` within `min` and `max`, currency must match                                                                                                                                          |
+| `payment.budget`                      | open payment  | `max` (JSON `number`), `currency`                                                                                        | requested amount plus the sum of previously closed Payment Mandates must be `<= max`; amount added after approval. Described as "To be used with the Agent Recurrence constraint"                     |
+| `payment.agent_recurrence`            | open payment  | `frequency` (`ON_DEMAND`, `DAILY`, `WEEKLY`, `BIWEEKLY`, `MONTHLY`, `QUARTERLY`, `ANNUALLY`), optional `max_occurrences` | true if sufficiently separated in time from the previous presentation and `max_occurrences` not exceeded                                                                                              |
+| `payment.reference`                   | open payment  | `conditional_transaction_id`                                                                                             | the Checkout Mandate must contain an open Checkout Mandate with a matching hash in its delegate chain                                                                                                 |
+| `payment.execution_date`              | open payment  | optional `not_before`, `not_after`                                                                                       | `execution_date` within the window                                                                                                                                                                    |
 
 Other confirmed constraint facts:
 
@@ -193,10 +256,7 @@ Other confirmed constraint facts:
 - There is no native category constraint.
 - The open Checkout Mandate schema requires a `checkout.line_items` constraint (`contains`), and
   the open Payment Mandate schema requires a `payment.reference` constraint (`contains`).
-- Both schemas list the allowed constraint types as a closed `anyOf` or `oneOf`. A custom type
-  such as `countersign.category.allow.1` is allowed by the extension rule but does not validate
-  against the vendored schemas, and a verifier without that extension must fail it ("Any unknown
-  Constraints MUST be treated as failing evaluation").
+- Both schemas list the allowed constraint types as a closed `anyOf` or `oneOf`.
 - Unknown constraints map to the AP2 error `unresolved_constraint`
   (`ap2/docs/agent_authorization.md`, "Errors").
 
@@ -223,7 +283,7 @@ Payment Receipt (`ap2/schemas/ap2/payment_receipt.json`). Required: `status`, `i
   Payment Receipt" (`ap2/docs/specification.md`, "Payment Mandate").
 - A generic Mandate Receipt in `ap2/docs/agent_authorization.md`, "Action Authorization", uses
   `result` with values `"success"` and `"error"` instead of `status` with `Success` and `Error`.
-  The mandate-specific schemas use `status`. See [1.4](#14-not-specified-or-ambiguous-in-the-vendored-files).
+  The mandate-specific schemas use `status`.
 - AP2 generic errors for action authorization: `invalid_credential` (terminal),
   `unresolved_constraint`, `invalid_mandate` (terminal), `mandates_not_supported`
   (`ap2/docs/agent_authorization.md`, "Errors").
@@ -262,7 +322,11 @@ Mandate `transaction_id` as the key to request it", but this is outside the scop
 Two delegation models are defined, "User Credential" and "Trusted Agent Provider"
 (`ap2/docs/agent_authorization.md`, "Mandate Delegation"). A directly trusted user key such as a
 passkey or hardware-attested key is mentioned only as a possible future model in a note in the
-same section.
+same section. In the Trusted Agent Provider model "The Agent Provider uses a securely stored
+signing key to create the Mandate" and "MUST ensure that the Agent is not able to access the Agent
+Provider signing key, or use it without the Trusted Surface". The worked example has the issuer
+JWT carry `iss` (the provider URL) and a header `kid` (`ap2/docs/agent_authorization.md`, "Trusted
+Agent Provider").
 
 ### 1.3 UCP (release v2026-08-25)
 
@@ -291,6 +355,11 @@ same section.
 - Signing keys: platform provider flow takes the key from the platform profile `keys`; user
   credential flow uses a key bound to the digital payment credential
   (`ap2-mandates.md`, "Signing Key Requirements").
+- Trusted platform provider option: "A trusted platform provider acts on the user's behalf to
+  generate the mandate credentials. The platform provider MUST ensure that mandates are not created
+  without explicit user consent from trusted, deterministic channels." The platform signs with a
+  server-side key and "the business trusts the platform's signature implies user consent"
+  (`ap2-mandates.md`, "Step 2: User Consent & Mandate Generation", "Option 1").
 
 #### 1.3.2 Profile and keys
 
@@ -343,17 +412,17 @@ Source: `ap2-mandates.md`, "Business Authorization"; schema `ucp/source/schemas/
 - Coverage is the complete checkout JSON, not a projection: "removing any member covered by
   `merchant_authorization` changes the JCS payload and invalidates the signature", and this
   includes `ucp` members present in the checkout. Only `ap2` is excluded ("Canonicalization").
-- JCS requires JSON integers within ±(2^53 - 1), and every UCP integer field is capped there
+- JCS requires JSON integers within +/-(2^53 - 1), and every UCP integer field is capped there
   (`ucp/docs/specification/overview/index.md`, "Integer range and ingestion").
 
 #### 1.3.4 Carrying the mandates in UCP
 
 Source: `ap2-mandates.md`, "Mandate Structure", "Step 3: Submission", and the schema file.
 
-| Mandate          | UCP placement                                                                                                                                                                      |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Checkout Mandate | `ap2.checkout_mandate`, a string matching `^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+(~[A-Za-z0-9_-]+)*$`. Request schema: omitted on create and update, required on complete |
-| Payment Mandate  | `payment.instruments[*].credential.token` ("Contains the payment mandate (composite token)")                                                                                       |
+| Mandate          | UCP placement                                                                                                                                                                                                                                                                                       |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Checkout Mandate | `ap2.checkout_mandate`, a string matching `^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+(~[A-Za-z0-9_-]+)*$`. Request schema: omitted on create and update, required on complete. This pattern does not match valid mandates, see [Decision 9](#decision-9-handling-the-checkout-mandate-pattern) |
+| Payment Mandate  | `payment.instruments[*].credential.token` ("Contains the payment mandate (composite token)")                                                                                                                                                                                                        |
 
 - Mandates are "SD-JWT credentials with Key Binding (`+kb`)".
 - "The checkout mandate MUST contain the full checkout response including the
@@ -361,9 +430,10 @@ Source: `ap2-mandates.md`, "Mandate Structure", "Step 3: Submission", and the sc
   covers the business signature.
 - The credential internals "(claims, selective disclosure, key binding) is defined by the AP2
   Protocol Specification".
-- UCP defines `token` for `token_credential` only as a string (`ucp/source/schemas/common/types/token_credential.json`),
-  while the prose calls the Payment Mandate token a "composite token" and "composite object". The
-  composite format is not specified.
+- UCP defines `token` for `token_credential` only as a string, with `type` an open string chosen by
+  the payment handler (`ucp/source/schemas/common/types/token_credential.json`), while the prose
+  calls the Payment Mandate token a "composite token" and "composite object". The composite format
+  is not specified.
 - Business verification on complete, in order: reject with `mandate_required` if
   `ap2.checkout_mandate` is missing; verify the SD-JWT signature, key binding and expiration per
   AP2; extract the embedded checkout; verify the embedded `ap2.merchant_authorization` is the
@@ -428,81 +498,45 @@ Status Lifecycle".
   not always a whole-item count (`ucp/docs/specification/overview/index.md`, "Quantities and
   units"). UCP "does not put floating-point numbers on the wire" and requires exact arithmetic.
 
-### 1.4 Not specified or ambiguous in the vendored files
+### 1.4 Gaps in the vendored files and how each is closed
 
-Each item is a gap that implementation work must resolve explicitly. The resolution chosen will be
-recorded here as a Countersign decision.
-
-1. **`checkout_jwt` versus `merchant_authorization`.** AP2 requires the Merchant to provide "a
-   merchant-signed JWT containing the Checkout" and binds mandates to its hash. UCP defines the
-   merchant signature as a detached JWS. The vendored files never say that `checkout_jwt` is the
-   detached JWS with the JCS payload re-attached, nor what the JWT header `typ` is (the AP2
-   example uses `"typ": "JWT"`). The AP2 example `checkout_jwt` payload is also not a UCP checkout
-   object (it has `order_id` and floating-point prices), while the UCP extension says the
-   `checkout_jwt` "MUST be the Checkout object". The exact bytes hashed for `checkout_hash` are
-   therefore unconfirmed.
-2. **Hash input encoding.** The hash is over "the value of `checkout_jwt`" and "calculated in the
-   same manner as `sd_hash`". The encoding rule lives in RFC 9901, which is not vendored.
-3. **Delegate SD-JWT details.** The chain format (`delegate_payload`, the `typ` values, how the
-   user-signed open mandate and the agent key-binding JWT are concatenated) is defined by an
-   external draft that is not vendored. The AP2 chained example token contains an empty element
-   (`~~`). The UCP schema for `ap2.checkout_mandate` only allows non-empty base64url elements
-   after the first `~`, with no dots. Tested against the pattern as written: a string with
-   disclosures only matches, but a string with a trailing key-binding JWT (which contains dots), a
-   trailing `~`, or an empty element does not. A standard SD-JWT with key binding therefore does not
-   match the vendored pattern. Do not rely on that pattern for validation without a conformance
-   test, and confirm the intended wire form with upstream (`ap2/docs/checkout_mandate.md`, "Open
-   Checkout Mandate chained with a Closed Checkout Mandate";
-   `ucp/source/schemas/common/payment_ap2_mandate.json`, `$defs.checkout_mandate`).
-4. **Receipt field naming.** Schemas use `status` (`Success`, `Error`); the generic Mandate Receipt
-   text uses `result` (`success`, `error`). Receipt signing format and header (`typ`, `alg`, `kid`)
-   are not specified beyond "signed JWT". How the Checkout Receipt travels back in a UCP response is
-   not specified.
-5. **Payment Mandate token format.** The "composite token" structure inside
-   `payment.instruments[*].credential.token` is not specified, and UCP types the token as a string.
-6. **Error transport.** HTTP status and message envelope for the seven AP2 error codes are not
-   specified ([1.3.5](#135-error-codes)).
-7. **Clock skew.** No skew for `exp` or `nbf` is stated.
-8. **Constraint number formats.** `payment.amount_range` fields are integers in minor units, but the
-   prose example shows `"max": 100.50`. `payment.budget.max` is typed as a JSON `number` with no
-   stated unit, and its prose example shows `1000.00`
-   (`ap2/schemas/ap2/open_payment_mandate.json`; `ap2/docs/payment_mandate.md`, "Amount Range" and
-   "Budget"). The example in the open Payment Mandate uses `"max": 20000` for a USD range, which
-   fits minor units. The unit of `payment.budget.max` is not settled.
-9. **Selective disclosure of whole constraints.** Which constraint fields are selectively
-   disclosable is defined per schema by `x-selectively-disclosable-field` and
-   `x-selectively-disclosable-array` markers. The mapping to concrete disclosures for each custom
-   constraint will be written alongside the constraint schemas.
-10. **Stale overview page.** `ucp/docs/documentation/ucp-and-ap2.md` uses older names
-    (`checkoutSignature`, `CheckoutMandate`, `PaymentMandate`) that differ from the extension
-    specification. The extension specification and its schema are treated as authoritative.
-11. **Version literal.** The UCP version string is a template variable in the docs
-    ([1.3.2](#132-profile-and-keys)).
-12. **Principal identity.** Neither AP2 nor UCP defines a customer id. UCP identifies the platform
-    by profile URI and `keys[]`; AP2 identifies the agent by the `cnf` key and the user by the
-    delegating credential or provider key.
+| #   | Gap                                                                                                                                                                                                                                                                                                                                                                                                                                               | Status                                                                                                                                                                                                                                               |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `checkout_jwt` versus `merchant_authorization`. AP2 requires "a merchant-signed JWT containing the Checkout"; UCP defines a detached JWS. No vendored file states that they are the same object. The AP2 example `checkout_jwt` uses `typ` `JWT`, a non-JCS payload and a non-UCP payload shape. The prose in `ucp/docs/documentation/ucp-and-ap2.md` calls the business signature "a detached JWT signing the checkout state" under stale names. | Not resolved by the files. Closed by [Decision 7](#decision-7-checkout_jwt-and-merchant_authorization), marked as a Countersign interpretation                                                                                                       |
+| 2   | Hash input encoding.                                                                                                                                                                                                                                                                                                                                                                                                                              | Resolved by RFC 9901 sections 4.2.3 and 4.3.1 and confirmed against the AP2 examples ([1.2.3](#123-sd-jwt-structure-and-chains), [1.2.4](#124-hashes))                                                                                               |
+| 3   | Chain format and processing details.                                                                                                                                                                                                                                                                                                                                                                                                              | Resolved by the Delegate SD-JWT draft ([1.2.3](#123-sd-jwt-structure-and-chains)). The `~~` in the AP2 chained example is required by the draft. The UCP pattern is the outlier, see [Decision 9](#decision-9-handling-the-checkout-mandate-pattern) |
+| 4   | Receipt field naming (`status` with `Success` and `Error` in schemas, `result` with `success` and `error` in the generic text). Receipt signing format and header (`typ`, `alg`, `kid`) are not specified beyond "signed JWT". How the Checkout Receipt travels back in a UCP response is not specified.                                                                                                                                          | Open. Follow the mandate schemas (`status`). Receipt transport is fixed when the merchant role is implemented                                                                                                                                        |
+| 5   | Payment Mandate token format inside `payment.instruments[*].credential.token`.                                                                                                                                                                                                                                                                                                                                                                    | Closed by [Decision 8](#decision-8-payment-mandate-credentialtoken-format)                                                                                                                                                                           |
+| 6   | Error transport: HTTP status and message envelope for the seven AP2 error codes.                                                                                                                                                                                                                                                                                                                                                                  | Open. Provisional rule in [Decision 10](#decision-10-provisional-rules-for-open-gaps)                                                                                                                                                                |
+| 7   | Clock skew for `exp` and `nbf`.                                                                                                                                                                                                                                                                                                                                                                                                                   | Open. Provisional rule in [Decision 10](#decision-10-provisional-rules-for-open-gaps)                                                                                                                                                                |
+| 8   | Constraint number formats: `payment.amount_range` fields are integers in minor units, but the prose example shows `"max": 100.50`. `payment.budget.max` is a JSON `number` with no stated unit and a prose example of `1000.00`.                                                                                                                                                                                                                  | Closed by [Decision 2](#decision-2-native-paymentbudget-with-minor-units)                                                                                                                                                                            |
+| 9   | Which fields of each native constraint are selectively disclosed in practice.                                                                                                                                                                                                                                                                                                                                                                     | Open. Fixed when the mandate issuer is implemented, following the `x-selectively-disclosable-*` markers in the vendored schemas                                                                                                                      |
+| 10  | `ucp/docs/documentation/ucp-and-ap2.md` uses older names (`checkoutSignature`, `CheckoutMandate`, `PaymentMandate`) that differ from the extension specification.                                                                                                                                                                                                                                                                                 | Closed. The extension specification and its schema are authoritative                                                                                                                                                                                 |
+| 11  | The UCP version string is a template variable in the docs.                                                                                                                                                                                                                                                                                                                                                                                        | Open. The release tag is `v2026-08-25`; the literal `ucp.version` value is confirmed when the profile endpoint is built                                                                                                                              |
+| 12  | Principal identity. Neither AP2 nor UCP defines a customer id. UCP identifies the platform by profile URI and `keys[]`; AP2 identifies the agent by the `cnf` key and the user by the delegating credential or provider key.                                                                                                                                                                                                                      | Open. Defined in the architecture document (principal lock)                                                                                                                                                                                          |
+| 13  | Repeat use of one open mandate. `checkout.line_items` "does not support splitting the open Checkout Mandate across multiple Checkouts", but `payment.budget` and `payment.agent_recurrence` assume several closed Payment Mandates, each of which `payment.reference` must tie to an open Checkout Mandate in its chain.                                                                                                                          | Closed by interpretation in [Decision 2](#decision-2-native-paymentbudget-with-minor-units)                                                                                                                                                          |
 
 ---
 
 ## 2. Deviations from the working design
 
 Places where the vendored specifications contradict or refine an assumption in the working design
-used to plan this project. Each lists the spec fact and the consequence.
+used to plan this project, with the decision that resolves each.
 
-| #   | Working design assumption                                                                                                 | What the spec says                                                                                                                                                                                                                                                                | Consequence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| --- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1  | The Payment Mandate `transaction_id` is a unique id whose single use can be enforced                                      | `transaction_id` is the base64url hash of `checkout_jwt` and equals `checkout_hash` for the same checkout ([1.2.4](#124-hashes))                                                                                                                                                  | Single-use enforcement is a Countersign rule keyed on this checkout hash plus the mandate nonce, not a property the spec gives. A checkout id and its hash identify the same thing, so "unused `transaction_id`" means "no earlier authorization for this checkout hash"                                                                                                                                                                                                                                                                      |
-| D2  | AP2 natively defines amount, merchant and expiry constraints                                                              | Natively defined: ten types ([1.2.6](#126-constraints)). Amount range and allowed merchants exist. Expiry is the `exp` claim, not a constraint. Allowed payees, line items, payment instruments, PISPs, recurrence, budget, reference and execution date also exist               | Reuse `payment.amount_range`, `checkout.allowed_merchants` and `payment.allowed_payees`, and enforce `exp` as a claim check                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| D3  | AP2 defines the extension mechanism but not a cumulative budget, so a custom cumulative budget constraint is entirely new | AP2 defines `payment.budget` with `payment.agent_recurrence`, where evaluation needs the verifier to track previously closed Payment Mandates ([1.2.6](#126-constraints))                                                                                                         | The innovation claim must be restated: AP2 has a budget constraint whose state source is left to the verifier. What Countersign adds is a state source reconciled from PayPal responses and webhooks, a window, and enforcement at capture time. Use `payment.budget` where it fits and document where `countersign.budget.cumulative.1` differs. The unit of `payment.budget.max` is unsettled ([1.4](#14-not-specified-or-ambiguous-in-the-vendored-files), item 8), so a Countersign budget constraint uses integer minor units explicitly |
-| D4  | Open mandates can express "headphones under $80 this week" with a plain amount and category                               | The open Checkout Mandate must contain a `checkout.line_items` constraint listing acceptable items, and the open Payment Mandate must contain `payment.reference`. There is no native category constraint ([1.2.6](#126-constraints))                                             | The intent screen must resolve a category into an explicit `acceptable_items` list drawn from the catalog, plus `payment.amount_range`. `countersign.category.allow.1` is an extra constraint on top, not a replacement                                                                                                                                                                                                                                                                                                                       |
-| D5  | Custom constraint types can be added and validated against the standard schemas                                           | The vendored open-mandate schemas enumerate only known types, and unknown constraints "MUST be treated as failing evaluation" ([1.2.6](#126-constraints))                                                                                                                         | Custom constraints validate against Countersign's own schemas only, and a third-party AP2 verifier will reject them. State this in the limitations. The error to return for an unknown type in our own verifier is `unresolved_constraint`                                                                                                                                                                                                                                                                                                    |
-| D6  | A device-bound customer key registered with Countersign signs the open mandates                                           | AP2 defines two trust models: User Credential and Trusted Agent Provider. A directly trusted user key is named only as a possible future model ([1.2.9](#129-who-can-be-trusted-to-sign-for-the-user)). UCP's two options are the same ([1.3.1](#131-capability-and-negotiation)) | The device-key flow is a Countersign trust model, outside the two defined ones. It must be documented as such, with the registration of the key as the trust anchor, and must not be presented as AP2 conformance of the user-credential kind. Because Countersign also plays Merchant, CP and MPP, the same party trusts the key it registered                                                                                                                                                                                               |
-| D7  | The Payment Mandate travels in `payment.instruments[*].credential.token`                                                  | Confirmed, but the token's internal format is not specified and UCP types it as a string ([1.3.4](#134-carrying-the-mandates-in-ucp))                                                                                                                                             | Countersign must define and document its own encoding of the token, and it is a Countersign decision, not spec                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| D8  | `vp_formats_supported` is a profile-level key next to `keys[]`                                                            | It sits under `config` in the AP2 capability entry; `keys[]` is a top-level profile member ([1.3.2](#132-profile-and-keys))                                                                                                                                                       | Place `vp_formats_supported` inside the capability `config` object                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| D9  | The UCP Security Lock may be strengthened to the principal                                                                | Confirmed that the lock in UCP is per session only ([1.3.1](#131-capability-and-negotiation))                                                                                                                                                                                     | No contradiction: the principal lock is an addition. Principal identity is not defined by either spec ([1.4](#14-not-specified-or-ambiguous-in-the-vendored-files), item 12), so how a principal is derived is a Countersign decision                                                                                                                                                                                                                                                                                                         |
-| D10 | Domain-separated hash helpers are used for every hash                                                                     | AP2 `checkout_hash`, `transaction_id`, `sd_hash` and receipt `reference` are plain unprefixed hashes with a spec-defined algorithm ([1.2.4](#124-hashes))                                                                                                                         | Domain separation must be limited to Countersign-internal hashes (decision log, evidence reference). AP2 hashes use the spec algorithm with no prefix                                                                                                                                                                                                                                                                                                                                                                                         |
-| D11 | Amounts are integer minor units everywhere                                                                                | True for UCP and for AP2 `payment_amount` and `amount_range`. `payment.budget.max` is a JSON `number` and prose examples show decimals ([1.4](#14-not-specified-or-ambiguous-in-the-vendored-files), item 8)                                                                      | Reject non-integer or ambiguous numbers in any constraint Countersign evaluates. UCP quantity may be a non-whole step count with a scale, so line total math must honour `quantity_unit.scale` or reject non-`each` items explicitly                                                                                                                                                                                                                                                                                                          |
-| D12 | Receipts use one field naming                                                                                             | Schemas use `status` with `Success` and `Error`; the generic receipt text uses `result` with `success` and `error` ([1.4](#14-not-specified-or-ambiguous-in-the-vendored-files), item 4)                                                                                          | Follow the mandate schemas (`status`) because they are the machine-readable definition                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| #   | Working design assumption                                                            | What the spec says                                                                               | Resolution                                                                                                                 |
+| --- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| D1  | The Payment Mandate `transaction_id` is a unique id whose single use can be enforced | `transaction_id` is the hash of `checkout_jwt` and equals `checkout_hash` ([1.2.4](#124-hashes)) | [Decision 1](#decision-1-single-use-keys)                                                                                  |
+| D2  | AP2 natively defines amount, merchant and expiry constraints                         | Ten native types; expiry is the `exp` claim, not a constraint ([1.2.6](#126-constraints))        | [Decision 4](#decision-4-no-custom-constraint-types)                                                                       |
+| D3  | A cumulative budget constraint is entirely new                                       | `payment.budget` with `payment.agent_recurrence` exists, with verifier-side state                | [Decision 2](#decision-2-native-paymentbudget-with-minor-units)                                                            |
+| D4  | Open mandates express "headphones under $80" with an amount and a category           | The open Checkout Mandate must contain `checkout.line_items`; no native category constraint      | [Decision 3](#decision-3-line-items-in-the-mandate-categories-in-merchant-policy)                                          |
+| D5  | Custom constraint types can be added and validated                                   | Schemas are closed; unknown constraints fail evaluation                                          | [Decision 4](#decision-4-no-custom-constraint-types)                                                                       |
+| D6  | A device-bound customer key registered with Countersign signs the mandates           | Two trust models are defined; a directly trusted user key is only a possible future model        | [Decision 5](#decision-5-trusted-platform-provider-with-a-device-consent-signature)                                        |
+| D7  | The Payment Mandate travels in `payment.instruments[*].credential.token`             | Confirmed; the token format is not specified                                                     | [Decision 8](#decision-8-payment-mandate-credentialtoken-format)                                                           |
+| D8  | `vp_formats_supported` is a profile-level key next to `keys[]`                       | It sits under `config` in the AP2 capability entry                                               | [Decision 6](#decision-6-vp_formats_supported-placement)                                                                   |
+| D9  | The UCP Security Lock may be strengthened to the principal                           | The lock is per session only                                                                     | No contradiction; the principal lock is an addition (architecture document)                                                |
+| D10 | Domain-separated hash helpers are used for every hash                                | AP2 hashes are plain hashes ([1.2.4](#124-hashes))                                               | Domain separation only for Countersign-internal hashes. AP2 hashes use the spec algorithm with no prefix                   |
+| D11 | Amounts are integer minor units everywhere                                           | True for UCP and most AP2 fields; `payment.budget.max` is a JSON `number`                        | [Decision 2](#decision-2-native-paymentbudget-with-minor-units). Non-`each` quantities need `quantity_unit.scale` handling |
+| D12 | Receipts use one field naming                                                        | Schemas and generic text differ ([1.2.7](#127-receipts))                                         | Follow the mandate schemas (`status`)                                                                                      |
 
 Facts confirmed with no deviation: the five roles and the non-agentic Trusted Surface rule, the
 exact `vct` strings, `cnf` as an RFC 7800 claim, JCS (RFC 8785) for `merchant_authorization`, the
@@ -513,14 +547,283 @@ checkout.
 
 ---
 
-## Still to be written
+## 3. Design decisions
+
+Each decision names the finding it resolves. These are Countersign decisions: where they interpret
+a spec, the interpretation is stated and must be revisited if upstream clarifies.
+
+### Decision 1: Single-use keys
+
+Resolves: D1; ambiguity of `transaction_id` (section [1.2.4](#124-hashes)).
+
+`transaction_id` equals `checkout_hash`, so it cannot serve as an independent payment identifier.
+Single use is a Countersign rule enforced on these keys, across every protocol:
+
+1. **Checkout hash.** At most one authorization may ever be started for a given `checkout_hash`.
+   The checkout id is also unique to one authorization.
+2. **Mandate nonce.** The `nonce` of each closed mandate key-binding JWT is accepted once, scoped
+   to the agent key thumbprint and the audience (`merchant` or `credential-provider`).
+3. **In-flight open mandate.** One open mandate backs at most one in-flight closed mandate. A new
+   closed mandate from the same open mandate (identified by the digest used in `sd_hash`) is
+   refused until the earlier presentation has a rejection receipt, matching "Shopping Agents MUST
+   NOT present any subsequent open ... Mandates without receiving a rejection receipt"
+   ([1.2.1](#121-roles-modes-and-agentic-rules)).
+4. **Consumption.** A successful presentation consumes the open mandate unless its Payment Mandate
+   carries `payment.agent_recurrence`. With recurrence, each success counts toward
+   `max_occurrences` and toward the budget ([Decision 2](#decision-2-native-paymentbudget-with-minor-units)).
+   AP2 says the agent "reduces the scope of the open mandate based on the receipt, often
+   preventing future presentations entirely" (`ap2/docs/agent_authorization.md`, "Action
+   Authorization"); this decision makes the verifier enforce it.
+
+The keys are enforced with database uniqueness constraints and row locks, not with in-memory
+state.
+
+### Decision 2: Native `payment.budget` with minor units
+
+Resolves: D3, D11; gap 8 and gap 13 ([1.4](#14-gaps-in-the-vendored-files-and-how-each-is-closed)).
+
+- Use the native `payment.budget` constraint, always together with `payment.agent_recurrence`, as
+  the spec says it is "To be used with the Agent Recurrence constraint".
+- **Unit (Countersign interpretation).** `payment.budget.max` is interpreted as an integer count
+  of minor units of the constraint `currency`. A value that is not a JSON integer (a fraction, an
+  exponent form, or a value outside +/-(2^53 - 1)) makes the mandate invalid. The spec types `max`
+  as a `number` without a unit, so this is our reading, chosen to match `payment.amount_range` and
+  `payment_amount`, which are integer minor units. A mandate whose budget currency differs from the
+  payment currency fails evaluation.
+- **Scope.** Spent amount is counted per open Payment Mandate (its digest), which is what the
+  spec's "total amount spent using this Payment Mandate" means. Customer-wide caps across mandates
+  are not a mandate concept and stay merchant policy.
+- **State source (what Countersign adds).** The spent amount is not accumulated from mandate
+  presentations alone. It is `reserved + authorized + captured - voided - refunded` for that open
+  mandate, reconciled from PayPal responses and verified webhooks, and checked again by the capture
+  gate immediately before capture. Subtracting voids and refunds is more permissive than the
+  spec's "amount MUST be added to the accumulated total", and is our interpretation: a voided
+  authorization is money that was never spent.
+- **`ON_DEMAND` (Countersign interpretation).** The spec does not define the time separation for
+  `ON_DEMAND`. Countersign treats `ON_DEMAND` as "no minimum separation" and applies
+  `max_occurrences` when present. Other frequencies use the nominal period (`DAILY` one day,
+  `WEEKLY` seven days, and so on), measured between successful presentations.
+- **Repeat use (gap 13).** `checkout.line_items` "does not support splitting the open Checkout
+  Mandate across multiple Checkouts". Countersign reads that as forbidding division of one set of
+  line-item quantities between carts, not as forbidding repeat orders that the user approved by
+  signing a Payment Mandate with `payment.agent_recurrence`. With recurrence present, the same open
+  Checkout Mandate may back up to `max_occurrences` separate closed Checkout Mandates, one per
+  repeat, each of which must satisfy `checkout.line_items` on its own. Without recurrence, exactly
+  one closed checkout may be backed. Upstream confirmation is wanted.
+- **`exp`.** The native constraints have no window. The mandate `exp` claim bounds the time
+  window. `payment.execution_date` is not used to bound use.
+
+### Decision 3: Line items in the mandate, categories in merchant policy
+
+Resolves: D4.
+
+- The open Checkout Mandate uses the native `checkout.line_items` constraint, listing explicit
+  `acceptable_items` that the customer approved on the Trusted Surface (item `id` and `title`).
+  It also carries `checkout.allowed_merchants` naming this merchant.
+- The spending ceiling is the native `payment.amount_range` (`max` in minor units) on the open
+  Payment Mandate, together with `payment.allowed_payees` and the required `payment.reference`.
+- A request such as "headphones under $80" is turned into a concrete item list by the Trusted
+  Surface backend from the catalog (items in the category, each priced within the ceiling), shown
+  to the customer as that exact list, and signed only as that list.
+- Category limits (for example "this agent may never buy from category X") remain merchant policy
+  enforced by Countersign outside mandates. They do not appear in any mandate.
+
+### Decision 4: No custom constraint types
+
+Resolves: D2, D5.
+
+Countersign defines no constraint types and adds no non-spec claims to mandates. Mandate content
+uses only the ten native types and the claims in the vendored schemas, so a standard verifier
+accepts it. Consequences:
+
+- The earlier idea of `countersign.budget.cumulative.1` and `countersign.category.allow.1` is
+  dropped. Their jobs are covered by Decisions 2 and 3.
+- Issued mandates are validated in tests against the vendored AP2 schemas.
+- On the verifying side an unknown constraint `type` fails evaluation and is reported as
+  `unresolved_constraint`, as the spec requires.
+- Expiry is the `exp` claim, checked as a claim.
+- Countersign's own additional evidence, such as the device consent signature in Decision 5, lives
+  outside the mandates.
+
+### Decision 5: Trusted platform provider with a device consent signature
+
+Resolves: D6.
+
+Countersign uses the UCP "trusted platform provider" option and the AP2 "Trusted Agent Provider"
+delegation model ([1.3.1](#131-capability-and-negotiation), [1.2.9](#129-who-can-be-trusted-to-sign-for-the-user)).
+
+- **Platform profile and key.** The Trusted Surface backend is the platform provider. It publishes a
+  platform profile whose top-level `keys[]` holds its mandate-signing ES256 public key with a
+  `kid`. The shopping agent sends that profile URI in `UCP-Agent`. The issuer-signed JWT of each
+  user-delegated mandate carries `iss` (the platform provider identifier) and the signing `kid` in
+  its header, as in the AP2 Trusted Agent Provider example. Verifiers trust only the configured
+  provider. Third-party platform providers are not supported.
+- **Mandates stay standard.** Open mandates (autonomous mode) are signed by the platform key with
+  the agent public key in `cnf`. Closed mandates in Human Not Present mode are signed by the agent
+  key. All of this follows the formats in [1.2.3](#123-sd-jwt-structure-and-chains).
+- **Consent before signing.** The platform key signs only after the backend has verified a
+  consent signature from the customer's non-extractable device key (WebCrypto ECDSA P-256) over the
+  exact constraints (for open mandates) or the exact checkout (for closed mandates).
+- **Consent signature format (to be refined when the Trusted Surface is built).** A JWS with
+  `alg` `ES256` and `kid` equal to the device key's JWK thumbprint, over the JCS bytes of a consent
+  record that contains: a version, the consent kind (open mandates or closed checkout), the
+  customer id, the exact mandate contents to be signed (the claims, before signing), a nonce and
+  issue and expiry times. WebCrypto produces the raw `r || s` form that JWS ES256 uses.
+- **Backend checks before signing.** (1) the device public key is registered to the customer; (2)
+  the signature verifies; (3) the backend independently rebuilds the mandate contents from the
+  structured data and the JCS bytes equal the signed record; (4) the consent record is unexpired
+  and its nonce unused. Any failure means no mandate is issued.
+- **Evidence.** The consent signature, the consent record and the registered device public key are
+  stored and included in the evidence bundle as additional evidence. They are not part of any
+  mandate. Their value is that a third party can verify them without trusting the platform key.
+- **What this changes.** The device key no longer signs mandates directly. A compromised platform
+  key could mint mandates without consent, and the consent signatures are the independent check on
+  that. Because Countersign also plays Merchant, Credential Provider and Payment Processor, the
+  party that signs mandates is also a verifier, and this must be stated in the limitations.
+  Customer private keys are never held by the server.
+- **Trusted Surface rules unchanged.** The surface renders from structured data with fixed
+  templates, no model-generated text, and is non-agentic.
+
+### Decision 6: `vp_formats_supported` placement
+
+Resolves: D8.
+
+`vp_formats_supported` is placed inside the `config` object of the
+`dev.ucp.common.payment.ap2_mandate` capability entry, exactly as in the spec example
+(`"config": {"vp_formats_supported": {"dc+sd-jwt": { }}}`). It is not a top-level profile member.
+The profile is validated against the vendored profile schema in tests.
+
+### Decision 7: `checkout_jwt` and `merchant_authorization`
+
+Resolves: gap 1.
+
+Files read for this decision: `ucp/docs/documentation/ucp-and-ap2.md`, `ap2/docs/checkout_mandate.md`
+and `ap2/docs/payment_mandate.md`, plus the AP2 example tokens. They do not state whether the two
+are the same object. What they do show:
+
+- AP2: `checkout_jwt` is "base64url-encoded serialized merchant-signed JWT of the Checkout payload"
+  (`ap2/schemas/ap2/checkout_mandate.json`), and with UCP "this MUST be the Checkout object"
+  (`ap2/docs/checkout_mandate.md`).
+- UCP: `merchant_authorization` is a detached JWS over the JCS-canonicalized checkout minus `ap2`.
+- The overview page describes the business signature as "a detached JWT signing the checkout
+  state" under older field names (`ucp/docs/documentation/ucp-and-ap2.md`, "Protocol flow").
+- The AP2 example `checkout_jwt` is not a UCP checkout and not JCS output, so it does not constrain
+  the UCP form.
+
+**Countersign interpretation (ours, not spec).** They are the same JWS over the same bytes.
+
+- Let `payload_bytes` be the JCS bytes of the checkout with the `ap2` member removed.
+- Let `header` be the protected header `{"alg": "ES256", "kid": "<merchant kid>"}` exactly as UCP
+  builds it, with no `typ`.
+- `merchant_authorization` is the detached form: `b64url(header) + ".." + b64url(signature)`.
+- `checkout_jwt` is the compact form with the payload attached:
+  `b64url(header) + "." + b64url(payload_bytes) + "." + b64url(signature)`.
+- Both carry the same signature, so one signing operation yields both. A verifier can rebuild
+  `checkout_jwt` from a checkout response by re-attaching the payload.
+- `checkout_hash` and `transaction_id` are then `b64url(SHA-256(US-ASCII(checkout_jwt)))` per
+  [1.2.4](#124-hashes).
+
+Reasoning. The merchant must sign the checkout once for UCP. If AP2's `checkout_jwt` were a
+different signature over different bytes, the UCP rule that the mandate embeds the checkout with its
+`merchant_authorization` would give two unrelated merchant signatures for the same checkout and no
+statement of which one the hash binds. The only form that keeps one merchant signature, satisfies
+"merchant-signed JWT containing the Checkout" (compact JWS with the checkout as payload) and
+satisfies "detached JWS over JCS" (same signature with the payload removed) is the one above. Using
+`typ` in the header would change the signed bytes and break equality with `merchant_authorization`,
+so the header carries no `typ`. A verifier that insists on `typ` `JWT` will not accept this form;
+that is a known interoperability risk to confirm upstream.
+
+The "full checkout including `ap2.merchant_authorization`" that UCP says the mandate contains is
+obtained by decoding the `checkout_jwt` payload and restoring
+`ap2.merchant_authorization = b64url(header) + ".." + b64url(signature)`. Receipt `reference` for a
+presented chain is taken over the final SD-JWT in the chain as `ap2/docs/agent_authorization.md`
+states ("Action Authorization"), computed like `sd_hash` over its full compact serialization.
+
+### Decision 8: Payment mandate `credential.token` format
+
+Resolves: gap 5; D7.
+
+Countersign plays the Credential Provider and the Merchant Payment Processor, so it defines the
+token it accepts. The format is chosen to keep the Payment Mandate itself standard.
+
+- **Placement.** In the `complete` request, `payment.instruments[*].credential` is
+  `{"type": "ap2_payment_mandate", "token": "<string>"}`. `type` is an open string chosen by the
+  handler (`token_credential.json`); `ap2_payment_mandate` is our value. The instrument `id`,
+  `handler_id` and `type` follow the UCP instrument schema and are fixed when the PayPal facts are
+  confirmed.
+- **Token value.** The token is exactly the compact serialization of the Payment Mandate
+  presentation, with no wrapper, envelope or extra field. In autonomous mode it is
+  `<open Payment Mandate SD-JWT>~~<closed Payment Mandate KB-SD-JWT>~<disclosures...>~`, the chain
+  form of [1.2.3](#123-sd-jwt-structure-and-chains). Any standard AP2 verifier can parse it.
+- **Claims.** The closed Payment Mandate has `vct` `mandate.payment.1`, `transaction_id` equal to
+  the checkout hash, `payee` (the merchant object), `payment_amount` (`amount` as integer minor
+  units and `currency`), and `payment_instrument`. The KB-SD-JWT `aud` is `credential-provider` as
+  in the AP2 example, and `nonce` is single use ([Decision 1](#decision-1-single-use-keys)).
+- **Encoding rules (Countersign limits).** US-ASCII only, no whitespace, at most 16 KiB, split on
+  `~` under the draft's rules (one empty component between chain links), and no duplicate
+  disclosures. Anything else is rejected before signature checks.
+- **Scoping to the checkout.** The payment is scoped to the checkout by `transaction_id` equal to
+  the session's `checkout_hash`, matching the MPP rule that the credential carry the closed
+  mandate ([1.2.8](#128-verification-and-dispute-steps)).
+- **Roles inside one process.** The Merchant role verifies `ap2.checkout_mandate`. The Credential
+  Provider role verifies the token against the same checkout hash, evaluates constraints, reserves
+  budget, then creates the PayPal order. The Payment Processor role authorizes and runs the capture
+  gate. Each role verifies independently from the same inputs. None trusts another role's result.
+- **Human Present mode.** The Direct flow has no worked example in the vendored AP2 files. The token
+  format for a closed mandate signed by the platform key without an open mandate is fixed when the
+  mandate issuer is built, and recorded here.
+- **Receipts.** The Payment Receipt is a JWT signed by the Payment Processor role with the fields in
+  [1.2.7](#127-receipts). Its transport back to the agent is fixed with gap 4.
+
+### Decision 9: Handling the checkout mandate pattern
+
+Resolves: the UCP `ap2.checkout_mandate` pattern mismatch (section [1.3.4](#134-carrying-the-mandates-in-ucp)).
+
+The vendored pattern `^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+(~[A-Za-z0-9_-]+)*$` rejects
+valid SD-JWT with key binding, because elements after the first `~` may contain neither dots nor be
+empty. A key-binding JWT contains dots, and the chain format requires an empty component. Tested
+against the pattern as written: a string with disclosures only matches, but a string with a
+trailing key-binding JWT, a trailing `~`, the AP2 chained example, or an empty element does not.
+
+Handling:
+
+- Countersign accepts mandates that are valid under AP2, RFC 9901 and the Delegate SD-JWT draft.
+- Countersign does not apply the UCP pattern. It validates the mandate string structurally itself:
+  character set (base64url, `.`, `~`), the `~` and `~~` splitting rules from the draft, component
+  counts, and then full cryptographic verification.
+- When request bodies are validated against the vendored UCP schemas in tests, the `pattern` of
+  `ap2.checkout_mandate` is removed from the schema copy used, with a comment pointing here.
+- A failing conformance test (expected failure, strict) records the mismatch:
+  `tests/conformance/test_ucp_mandate_pattern.py`.
+- An upstream issue text is drafted in `docs/upstream/ucp-mandate-pattern.md`. When upstream fixes
+  the schema and the vendored copy is updated, the strict expected failure will start failing and
+  must be removed, which signals that the workaround can be dropped.
+- Interoperability risk: a strict UCP schema validator on a third-party platform or business may
+  reject valid mandates until upstream is fixed.
+
+### Decision 10: Provisional rules for open gaps
+
+Resolves: gaps 6 and 7 provisionally.
+
+- **Error transport.** AP2 error codes are returned in the UCP `messages` array as an error
+  message (`type` `error`, `code` set to the code, `severity` `unrecoverable` for invalid or
+  expired mandates and `recoverable` where the platform can fix the request). The checkout
+  `status` stays unchanged, and no authorization is created. HTTP status follows the REST binding:
+  business outcomes use 200, and protocol-level failures (idempotency conflict) use 409. This is
+  provisional and recorded so tests and the attack suite share one behaviour.
+- **Clock skew.** `exp` and `nbf` are checked with a skew of 60 seconds. This is a Countersign
+  choice because the specs give none. Open mandates are issued with `exp` as short as the task
+  allows.
+
+---
+
+## 4. Still to be written
 
 Added by later work, not yet present in this file:
 
 - Confirmed PayPal facts (identifier lengths, idempotency, order changes after authorization,
   authorization validity, webhooks, vaulting).
 - Library choices for JCS, JWS and SD-JWT with key binding.
-- Countersign constraint schemas and evaluation algorithms.
-- Resolutions for each gap in [1.4](#14-not-specified-or-ambiguous-in-the-vendored-files).
+- Human Present token format and receipt transport (see Decisions 8 and gap 4).
 - Gate step codes, principal lock semantics, the evidence reference encoding and the PayPal field
   mapping in both directions.
