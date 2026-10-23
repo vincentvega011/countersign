@@ -15,7 +15,7 @@ demo:
 	@echo "not implemented yet"
 
 test:
-	@echo "not implemented yet"
+	uv run pytest
 
 test-safety:
 	@echo "not implemented yet"
@@ -33,7 +33,11 @@ tamper-demo:
 	@echo "not implemented yet"
 
 lint:
-	@echo "not implemented yet"
+	uv run ruff check .
+	uv run ruff format --check .
+	uv run mypy src
+	pnpm -r --if-present run lint
+	bash scripts/secret_scan.sh
 
 deploy:
 	@echo "not implemented yet"
