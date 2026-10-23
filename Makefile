@@ -1,4 +1,4 @@
-.PHONY: setup keys dev demo test test-safety sandbox-smoke eval interop tamper-demo lint deploy
+.PHONY: setup keys dev demo db test test-safety sandbox-smoke eval interop tamper-demo lint deploy
 
 setup:
 	uv sync
@@ -14,7 +14,10 @@ dev:
 demo:
 	@echo "not implemented yet"
 
-test:
+db:
+	docker compose up -d --wait postgres
+
+test: db
 	uv run pytest
 
 test-safety:
@@ -30,7 +33,7 @@ interop:
 	@echo "not implemented yet"
 
 tamper-demo:
-	@echo "not implemented yet"
+	uv run python scripts/tamper_demo.py
 
 lint:
 	uv run ruff check .

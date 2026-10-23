@@ -10,6 +10,22 @@ permissions:
 jobs:
   python:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql+psycopg://countersign:countersign@localhost:5432/countersign
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: countersign
+          POSTGRES_PASSWORD: countersign
+          POSTGRES_DB: countersign
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U countersign -d countersign"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.3.0
