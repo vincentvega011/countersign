@@ -116,7 +116,125 @@ Risks and how they are handled:
 - The `typ` of the issuer-signed JWT is unspecified (the AP2 examples use `example+sd-jwt`). It is
   recorded in [PROTOCOL.md](PROTOCOL.md) when the issuer is built.
 
-## 2. Running the spikes
+## 2. PayPal sandbox API reference notes
+
+Sources: PayPal's published OpenAPI documents for Orders v2 (spec version 2.32) and Payments v2,
+read as JSON schemas, plus the endpoint pages on developer.paypal.com. Each fact below is _from the
+schema_ (stated in the OpenAPI document) or _unconfirmed_ (not found in the schema; to be settled by
+a live run, see [2.5](#25-unconfirmed-until-a-live-run)). Nothing here has been observed against a
+live sandbox yet. The script `scripts/sandbox_smoke.py` is built only on this section.
+
+Sandbox base URL (from the `servers` block of the Payments v2 schema): `https://api-m.sandbox.paypal.com`.
+The script refuses any other host.
+
+### 2.1 Endpoints used
+
+| Step              | Method and path                                               | Success status (schema)        | Notes                                                                                          |
+| ----------------- | ------------------------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------- |
+| Token             | `POST /v1/oauth2/token`                                       | 200                            | HTTP Basic (client id, secret), form body `grant_type=client_credentials`                      |
+| Create order      | `POST /v2/checkout/orders`                                    | 201 (200 on idempotent replay) | `PayPal-Request-Id`, optional `Prefer`                                                         |
+| Get order         | `GET /v2/checkout/orders/{id}`                                | 200                            | Path `id` pattern `^[A-Z0-9]+$`, max 36                                                        |
+| Authorize order   | `POST /v2/checkout/orders/{id}/authorize`                     | 201 (200 idempotent replay)    | Body optional. Also lists 202, 207 and 409 (order or unit state)                               |
+| Get authorization | `GET /v2/payments/authorizations/{authorization_id}`          | 200                            | No idempotency header                                                                          |
+| Capture           | `POST /v2/payments/authorizations/{authorization_id}/capture` | 201 (200 idempotent replay)    | 409 `PREVIOUS_REQUEST_IN_PROGRESS`; 422 `MAX_CAPTURE_AMOUNT_EXCEEDED`, `AUTHORIZATION_EXPIRED` |
+| Get capture       | `GET /v2/payments/captures/{capture_id}`                      | 200                            |                                                                                                |
+| Refund            | `POST /v2/payments/captures/{capture_id}/refund`              | 201 (200 idempotent replay)    | Empty body is a full refund. 422 `REFUND_AMOUNT_EXCEEDED`, `TRANSACTION_DISPUTED`              |
+| Void              | `POST /v2/payments/authorizations/{authorization_id}/void`    | 200 (204 also listed)          | Returns the authorization with `status` `VOIDED`. 422 `PREVIOUSLY_CAPTURED`                    |
+
+Headers. `PayPal-Request-Id`: 1 to 108 characters; the server keeps keys for 6 hours (up to 72 hours
+by arrangement); mandatory for single-step create calls that carry a payment source with stored
+credentials, optional otherwise. `Prefer`: `return=minimal` (default; `id`, `status` and links only)
+or `return=representation` (full resource), at most 25 characters. The script sends
+`return=representation` so every field relevant to the design is visible.
+
+### 2.2 Request fields relied on
+
+Create order (`order_request`; required: `intent`, `purchase_units`):
+
+| Field                                                                | Constraint (schema)                                                                               |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `intent`                                                             | `AUTHORIZE` or `CAPTURE`                                                                          |
+| `purchase_units[].reference_id`                                      | 1 to 256 characters; defaults to `default` for a single unit                                      |
+| `purchase_units[].amount.currency_code`, `.value`                    | `amount` is the only required field of a purchase unit                                            |
+| `purchase_units[].amount.breakdown.item_total`, `.tax_total`         | `item_total` required when items carry `unit_amount`; `tax_total` required when items carry `tax` |
+| `purchase_units[].items[].name`                                      | required, 1 to 3000 characters (truncated to 127 in the response)                                 |
+| `purchase_units[].items[].quantity`                                  | required, string, pattern `^[1-9][0-9]{0,9}$`                                                     |
+| `purchase_units[].items[].unit_amount`                               | required; must equal `unit_amount * quantity` summed into `item_total`                            |
+| `purchase_units[].items[].tax`                                       | per unit; must sum to `tax_total` as `tax * quantity`                                             |
+| `purchase_units[].items[].sku`                                       | 0 to 127 characters                                                                               |
+| `purchase_units[].items[].category`                                  | `DIGITAL_GOODS`, `PHYSICAL_GOODS`, `DONATION`                                                     |
+| `purchase_units[].invoice_id`                                        | 1 to **127** characters; unique per merchant account by default                                   |
+| `purchase_units[].custom_id`                                         | 1 to **255** characters; "not visible to the payer"                                               |
+| `payment_source.paypal.experience_context.return_url`, `.cancel_url` | URLs the payer returns to                                                                         |
+| `payment_source.paypal.experience_context.user_action`               | `CONTINUE` or `PAY_NOW`                                                                           |
+| `payment_source.paypal.experience_context.shipping_preference`       | `GET_FROM_FILE`, `NO_SHIPPING`, `SET_PROVIDED_ADDRESS`                                            |
+| `payment_source.paypal.experience_context.payment_method_preference` | `UNRESTRICTED` or `IMMEDIATE_PAYMENT_REQUIRED`                                                    |
+
+Capture (`capture_request`, body optional): `amount`, `final_capture`, `invoice_id` (1 to 127),
+`note_to_payer`, `soft_descriptor`. Refund (`refund_request`): `amount` (omit for a full refund),
+`custom_id` (1 to 127), `invoice_id` (1 to 127), `note_to_payer` (1 to 255).
+
+### 2.3 Response fields relied on
+
+| Object                                  | Fields                                                                                                                                                                                                                    |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Token                                   | `access_token`, `token_type`, `expires_in` (never printed or stored)                                                                                                                                                      |
+| Order                                   | `id`, `status`, `intent`, `links[]` (`href`, `rel`, `method`), `purchase_units[]` (`reference_id`, `amount`, `invoice_id`, `custom_id`, `items`, `payee.merchant_id`, `payments.authorizations[]`, `payments.captures[]`) |
+| Authorization (in order and standalone) | `id`, `status`, `amount`, `invoice_id`, `custom_id`, `expiration_time`, `seller_protection`, `links[]`                                                                                                                    |
+| Capture                                 | `id`, `status`, `amount`, `final_capture`, `invoice_id`, `custom_id`, `links[]` (`up` to the authorization, `refund`)                                                                                                     |
+| Refund                                  | `id`, `status`, `amount`, `invoice_id`, `custom_id`, `links[]`                                                                                                                                                            |
+| Error body                              | `name`, `message`, `debug_id`, `details[]` (`issue`, `field`, `description`)                                                                                                                                              |
+
+Status enums (schema): order `CREATED`, `SAVED`, `APPROVED`, `VOIDED`, `COMPLETED`,
+`PAYER_ACTION_REQUIRED`; authorization `CREATED`, `CAPTURED`, `DENIED`, `PARTIALLY_CAPTURED`,
+`VOIDED`, `PENDING`; capture `COMPLETED`, `DECLINED`, `PARTIALLY_REFUNDED`, `PENDING`, `REFUNDED`,
+`FAILED`; refund `CANCELLED`, `FAILED`, `PENDING`, `COMPLETED`.
+
+Two points that matter to the gate design. The authorization status enum has **no `EXPIRED`**, so
+expiry has to be judged from `expiration_time`, not from `status`. The capture and refund response
+schemas include `custom_id` and `invoice_id`, so persistence on capture is checkable.
+
+Approval link: the order response carries a link with `rel` `approve` or `payer-action`. The script
+accepts either and prints whichever is present.
+
+### 2.4 Order PATCH (read only; exercised in the later behaviour checks)
+
+`PATCH /v2/checkout/orders/{id}` updates an order in `CREATED` or `APPROVED` status; a `COMPLETED`
+order cannot be updated. The schema does not state whether an order that has been authorized is still
+patchable, which is exactly what the attack depends on. That is settled by a live run, not here.
+
+### 2.5 Observed in the live sandbox run, and what is still unconfirmed
+
+Observed once, with `scripts/sandbox_smoke.py` against one sandbox account; both flows completed.
+Items marked _single run_ are not yet established as general rules.
+
+- **Order status versus authorization status.** After authorize, the order `status` was `COMPLETED`
+  while the embedded authorization `status` was `CREATED`. The order status says nothing about
+  whether money can still be captured, so the capture gate must evaluate the authorization object.
+- **Authorization lifetime.** `expiration_time` was 29 days after `create_time` (_single run_, not
+  confirmed as a general rule).
+- **Identifier persistence.** `invoice_id` and `custom_id` were returned unchanged on create,
+  authorize, GET order, GET authorization, capture, refund and the GET after void.
+- **Mutation response bodies are not reliable.** The void response body returned `custom_id` as
+  `null` and used a different timestamp format (a UTC offset instead of `Z`), while the GET that
+  followed returned both correctly. Rule: the gate and clients always re-fetch with GET and never
+  rely on the body of a mutation response.
+- **Refund.** After a full refund, GET capture shows status `REFUNDED`.
+- **`PayPal-Request-Id`.** The values used were accepted at the lengths used.
+- **`seller_protection.status`** appeared in sandbox output. Countersign makes no claims about it.
+
+Demo-setup note. The sandbox buyer and merchant accounts must be US-based. A buyer account based in
+Nepal could not approve the order.
+
+Still unconfirmed (not established by the run output):
+
+- Whether `PayPal-Debug-Id` is a response header.
+- Whether `payer-action` or `approve` is the link returned for a sandbox order created with
+  `payment_source`.
+- The exact error names for authorizing an unapproved order.
+- Behaviour of 204 versus 200 on void.
+
+## 3. Running the spikes
 
 ```text
 scripts/spikes/run_spikes.sh

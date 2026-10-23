@@ -24,7 +24,8 @@ A phase starts only when the previous gate has passed.
 - Libraries chosen and proven with spikes: `rfc8785`, `joserfc`, Node `jose` and `canonicalize`. SD-JWT
   chains are built in-house because no maintained library handles the chain format. See
   [ENV.md](ENV.md).
-- Open: PayPal sandbox smoke test and behavior confirmations.
+- PayPal sandbox smoke test passed (P0.7): both flows ran live; results in [ENV.md](ENV.md) section 2.5.
+- Open: PayPal behavior confirmations (P0.8).
 
 ## Definition of done
 
