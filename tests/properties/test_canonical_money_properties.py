@@ -43,7 +43,8 @@ def test_paypal_round_trip_is_exact_or_refused_never_rounded(currency, minor):
 
 @given(currencies, minors)
 def test_paypal_text_has_exactly_the_exponent_decimal_places(currency, minor):
-    minor -= minor % scale(currency)
+    step = scale(currency)
+    minor = (abs(minor) // step * step) * (1 if minor >= 0 else -1)  # toward zero, stays in range
     text = Money(currency, minor).to_paypal()
     exponent = paypal_exponent(currency)
     pattern = r"-?(0|[1-9][0-9]*)" + (rf"\.[0-9]{{{exponent}}}" if exponent else "")
