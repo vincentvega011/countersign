@@ -208,7 +208,8 @@ countersign/
 | `keys`          | generate the merchant, processor and platform signing keys into `secrets/` |
 | `dev`           | run the API and the web apps locally                                       |
 | `demo`          | run the scripted demo environment                                          |
-| `test`          | unit, conformance, property and integration tests                          |
+| `db`            | start the Postgres container and wait until it is healthy                  |
+| `test`          | unit, conformance, property and integration tests (starts Postgres first)  |
 | `test-safety`   | tests for the invariant modules plus the attack suite smoke run            |
 | `sandbox-smoke` | live PayPal sandbox smoke test                                             |
 | `eval`          | the full evaluation                                                        |
@@ -433,12 +434,19 @@ a second purchase races the first under one open mandate, and two gates race on 
 
 ### 5.10 ledger (decision log)
 
-- An append-only table. For each entry `entry_hash = SHA256("cs.log.v1" || prev || seq || ts ||
-payload_hash || policy_hash)`, with each component encoded with a fixed-width or length-prefixed
-  encoding so the concatenation is unambiguous.
+- An append-only table (`decision_log`, created by the Alembic migration in `migrations/`). For
+  each entry `entry_hash = SHA256("cs.log.v1" || prev || seq || ts || checkout_id || kind ||
+  payload_hash || policy_hash)`, with each component encoded with a fixed-width or length-prefixed
+  encoding so the concatenation is unambiguous ([PROTOCOL.md](PROTOCOL.md) Decision 15; `checkout_id`
+  and `kind` are added to the components listed earlier in this document).
 - Merkle roots per checkout and per day, inclusion proofs, and a verify function that reports the
-  first broken link. `/ledger/verify` exposes it.
-- The application database role has INSERT and SELECT only on the log table.
+  first broken link, with an optional anchor to expose removal or rewriting of the newest entries.
+  `/ledger/verify` will expose it. The construction is specified in Decision 15 for reimplementation.
+- The application database role has INSERT and SELECT only on the log table; the migration creates
+  the role `NOLOGIN`, revokes everything from PUBLIC and grants those two privileges. A test proves
+  UPDATE, DELETE and TRUNCATE fail for that role against the real Postgres.
+- Appends are serialized by a transaction-level advisory lock, and `seq`, `prev_hash` and
+  `entry_hash` are unique, so concurrent writers form one chain.
 - A tamper demo script modifies, deletes, inserts and reorders entries and shows detection. The log
   is tamper-evident. It is not a blockchain and is not described as one.
 - Log failure fails the operation (INV-12).

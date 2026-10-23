@@ -931,6 +931,91 @@ Resolves: which parts of a UCP checkout Countersign models, and the totals rules
 - **Lengths.** Item `id` and `title` are limited to 127 characters, the most PayPal returns
   unchanged for `sku` and `name`.
 
+### Decision 15: Decision log entries and Merkle trees
+
+Resolves: how log entries are hashed and how roots and inclusion proofs are built, so that a
+verifier (including a TypeScript one) can be written from this text. Reference vectors are in
+`tests/vectors/ledger_vectors.json` (regenerate with `uv run python -m tests.unit.test_ledger_merkle`;
+a test fails if the file and the code disagree). All hashes are SHA-256. `domain_hash(d, x)` is
+SHA-256 of the ASCII bytes of `d`, a `0x00` byte, then `x` (Decision 12). Integers are big-endian.
+
+**Entry encoding.** An entry has `seq` (from 1, no gaps), `ts_us` (microseconds since the Unix
+epoch, UTC), `checkout_id` (absent or 1 to 127 bytes of UTF-8), `kind` (1 to 64 characters of
+`[A-Za-z0-9._:-]`, starting with a letter or digit), `payload` (the JCS bytes of a JSON object),
+`policy_hash` (32 bytes), `prev_hash` and `entry_hash`.
+
+```text
+payload_hash = domain_hash("cs.log.payload.v1", payload)
+scope        = 0x00                                     if checkout_id is absent
+             = 0x01 || u32(len(checkout_id)) || checkout_id (UTF-8)   otherwise
+entry_hash   = domain_hash("cs.log.v1",
+                 prev_hash(32) || u64(seq) || u64(ts_us) || scope
+                 || u32(len(kind)) || kind (UTF-8) || payload_hash(32) || policy_hash(32))
+prev_hash of seq 1 = 32 zero bytes
+```
+
+`checkout_id` and `kind` are inside the hash (the architecture text lists five components; these
+two are added) so an entry cannot be moved between per-checkout trees without breaking the chain.
+
+**Verification** walks the entries in order and stops at the first of these, reporting its position
+and a code: `field_invalid`, `seq_unexpected` (not the previous `seq` plus one; this covers
+deletion, duplication, insertion and reordering), `prev_mismatch`, `payload_hash_mismatch`,
+`entry_hash_mismatch`. With an `Anchor` (newest `seq` and `entry_hash`, kept where the writer cannot
+change it) it also reports `truncated` (the log ends before the anchor) and `anchor_mismatch`.
+Without an anchor, removing the newest entries, rewriting the newest entry with a recomputed hash,
+or rewriting the whole chain is undetectable: the result is internally consistent.
+
+**Merkle tree.** The shape and proof algorithm are those of RFC 6962 and RFC 9162. The leaves of a
+tree are `entry_hash` values, in `seq` order.
+
+```text
+leaf(e)      = domain_hash("cs.merkle.leaf.v1", e)                 e is 32 bytes
+node(l, r)   = domain_hash("cs.merkle.node.v1", l || r)            l and r are 32 bytes
+tree([])     = domain_hash("cs.merkle.empty.v1", "")
+tree([e])    = leaf(e)
+tree(es)     = node(tree(es[0:k]), tree(es[k:n]))   n = len(es) >= 2,
+                                                    k = the largest power of two < n
+root(es)     = domain_hash("cs.merkle.root.v1", u64(len(es)) || tree(es))
+```
+
+- **Leaf and node separation.** Different domains, so an interior node cannot be passed off as a
+  leaf.
+- **Odd nodes.** There is no duplication and no padding: the split is at a power of two, so
+  `[a, b, c]` and `[a, b, c, c]` have different roots.
+- **Leaf count.** It is hashed into the root. A bare RFC 6962 tree hash does not authenticate its
+  size: a proof for index 6 of a 10-leaf tree also verifies when the size is claimed to be 11.
+- **Scopes.** A checkout tree holds the entries whose `checkout_id` equals the checkout, labelled
+  `checkout:<id>`. A day tree holds the entries whose `ts_us` falls in the UTC day
+  `[00:00:00, 24:00:00)`, labelled `day:YYYY-MM-DD`. Both are in `seq` order and may be empty
+  (size 0).
+
+**Inclusion proof.** For the leaf at `index` in a tree of `size` leaves: the sibling hashes from the
+leaf level up to the top, as in RFC 6962 `PATH`. Recomputation (the rightmost element of the path is
+the sibling nearest the root):
+
+```text
+root_from_path(index, size, leaf, path):
+  if size == 1:  return leaf if path is empty else FAIL
+  if path is empty: FAIL
+  k = largest power of two < size;  sibling = path[-1];  rest = path[:-1]
+  if index < k:  return node(root_from_path(index, k, leaf, rest), sibling)
+  else:          return node(sibling, root_from_path(index - k, size - k, leaf, rest))
+valid iff 0 <= index < size, the path has exactly the length the recursion uses, and
+  domain_hash("cs.merkle.root.v1", u64(size) || root_from_path(index, size, leaf(entry_hash), path)) == root
+```
+
+The iterative algorithm of RFC 9162 section 2.1.3.2 computes the same tree hash; a test checks the
+two agree for every index of every size up to 39.
+
+JSON form: `{"v": 1, "index": i, "size": n, "path": ["<base64url, no padding, 43 chars>", ...]}`,
+exactly those four members, `index` and `size` integers with `0 <= index < size`, `path` an array,
+each element the canonical unpadded base64url of 32 bytes.
+
+**Storage.** `payload` is kept as the exact JCS bytes (`bytea`, never `jsonb`). The application role
+has `INSERT` and `SELECT` on the table only. Appends are serialized by a transaction-level advisory
+lock; the primary key on `seq` and unique constraints on `prev_hash` and `entry_hash` refuse a fork
+even if the lock is skipped.
+
 ---
 
 ## 4. Confirmed PayPal facts

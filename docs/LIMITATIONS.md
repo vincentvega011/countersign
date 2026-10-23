@@ -70,3 +70,29 @@ checkout built differently could be refused.
 `default_catalog_path()` assumes a source checkout (`data/` next to `src/`) and is marked
 `# SHORTCUT:`; a packaged install would need the file shipped as package data. The catalog's brand
 names are invented but were not checked for trademark conflicts.
+
+## Decision log
+
+### L8. Tamper-evident, not tamper-proof
+
+The hash chain shows edits, deletions in the middle, insertions and reordering. Removing the newest
+entries, rewriting the newest entry with a recomputed hash, or rebuilding the whole chain leaves a
+log that is internally consistent; those are only visible against an anchor (the newest `seq` and
+`entry_hash`) or a Merkle root stored somewhere the writer cannot change. The demo and the tests show
+this. Until the anchors are published or stored off-database (for example in the evidence bundle
+exported at capture), a database administrator can rewrite history undetected. The log is not a
+blockchain and is not described as one.
+
+### L9. The application role on the hosted database
+
+The grants that stop the application rewriting history hold only if the deployed service connects as
+the restricted role. Whether the hosted Postgres allows a second, restricted login role was not
+checked ([ENV.md](ENV.md) section 4 does not say). Check at the Render deploy that the service uses
+the restricted role; if it cannot, record the fallback here and rely on the anchors in L8.
+
+### L10. Throughput and clocks
+
+All appends take one advisory lock, so the log is a single-writer bottleneck by design; at demo scale
+(tens of entries per purchase) this is irrelevant. Timestamps come from the writer's clock and are
+not required to be monotonic, so a day tree is defined by `ts_us` and ordered by `seq`. A log
+`append` joins the caller's transaction, so INV-12 callers must commit it before responding.

@@ -451,3 +451,17 @@ subclass that rejects duplicate mapping keys, because PyYAML otherwise keeps the
 Prices are integers (`price_minor`); a YAML float is an error. The brand names are invented and were
 not checked against trademark registers, so check them before showing the catalog in a video.
 `types-pyyaml` is a development dependency for type checking.
+
+## 10. Postgres and migrations
+
+The decision log needs the real Postgres from `docker-compose.yml` (PostgreSQL 16). `make db` starts
+it and waits for the health check; `make test` depends on it, so the tests need Docker running. The
+integration tests create a scratch database per test session, apply the Alembic migration to it
+with the real migration code, set a password on the application role the migration created, and
+drop everything afterwards. They connect as that role to prove what it cannot do. They fail, rather
+than skip, when Postgres is unreachable. In CI a Postgres 16 service container provides it.
+
+- `alembic.ini` and `migrations/` hold the schema; the URL comes from `DATABASE_URL` and the
+  application role name from `LEDGER_APP_ROLE` (default `countersign_app`).
+- The migration creates the role `NOLOGIN` if it is missing. Giving it a login and password is an
+  operator step, not part of the migration, so no secret is stored in the repository.
