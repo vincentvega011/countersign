@@ -21,7 +21,7 @@ test-safety:
 	@echo "not implemented yet"
 
 sandbox-smoke:
-	@echo "not implemented yet"
+	uv run python scripts/sandbox_smoke.py
 
 eval:
 	@echo "not implemented yet"
