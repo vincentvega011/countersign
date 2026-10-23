@@ -443,3 +443,11 @@ number of units raises `InexactAmountError` rather than being rounded.
 zeros): an optional minus, then `0` or a number without leading zeros, then optionally a dot and
 digits, ASCII only, at most 32 characters. At most the currency's PayPal exponent of fractional
 digits are accepted, so zero-decimal currencies accept no dot at all.
+
+## 9. Catalog data
+
+The seeded catalog is `data/catalog.yaml`, read with PyYAML 6.0.3 (MIT) through a `SafeLoader`
+subclass that rejects duplicate mapping keys, because PyYAML otherwise keeps the last one silently.
+Prices are integers (`price_minor`); a YAML float is an error. The brand names are invented and were
+not checked against trademark registers, so check them before showing the catalog in a video.
+`types-pyyaml` is a development dependency for type checking.

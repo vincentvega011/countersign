@@ -904,6 +904,33 @@ Resolves: INV-9 for the PayPal boundary, and a mismatch between UCP and PayPal f
 - **Sign.** Negative amounts are refused unless the caller opts in (`allow_negative`); UCP amounts
   are never negative.
 
+### Decision 14: Canonical checkout model
+
+Resolves: which parts of a UCP checkout Countersign models, and the totals rules it enforces.
+
+- **Fields.** `id`, `currency`, `line_items` (`id`, `item` {`id`, `title`, `price`, optional
+  `quantity_unit`}, `quantity`, `totals`) and `totals` (`type`, `amount`, optional `display_text`).
+  Other top-level members are ignored by `from_ucp`; unknown members inside line items, items and
+  totals are errors. Sub-lines (`lines`), `parent_id`, `unit_price` and `image_url` are not modelled.
+- **Total types.** The seven well-known types only: `subtotal`, `items_discount`, `discount`,
+  `fulfillment`, `tax`, `fee`, `total`. UCP allows other types with a `display_text`; Countersign has
+  no PayPal breakdown for them and rejects them. `items_discount` and `discount` must be negative
+  (UCP: `exclusiveMaximum 0`); the others must not be negative.
+- **Consistency.** Exactly one `subtotal` and one `total` at both levels (UCP). The `total` equals
+  the sum of every other entry (the UCP verification rule). A line subtotal equals unit price times
+  quantity. The order subtotal equals the sum of the line subtotals. The order `items_discount`
+  entries sum to the line `items_discount` entries ("rollup of line-item discounts"). All three
+  consistency rules are Countersign's reading of the UCP text, which does not state the line-level
+  and rollup rules as formulas.
+- **Units.** `quantity_unit` is accepted only as the `each` identity (`C62`, scale absent or 0);
+  `display_text` and `increment` are ignored for identity, as UCP says. Anything else is rejected
+  rather than priced.
+- **Terms.** `terms()` omits `display_text` and an explicit `each` unit, because PayPal cannot return
+  the first and the second does not change the money. Totals and line items keep their order. Every
+  amount carries the checkout currency by construction, so the currency is bound once, in `currency`.
+- **Lengths.** Item `id` and `title` are limited to 127 characters, the most PayPal returns
+  unchanged for `sku` and `name`.
+
 ---
 
 ## 4. Confirmed PayPal facts

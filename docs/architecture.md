@@ -246,10 +246,13 @@ entry in this document. Stack: Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, 
   `currency`, line items (item id, title, unit price, integer quantity of whole items, line totals),
   and totals by type with exactly one `subtotal` and one `total`. Items with a non-`each`
   `quantity_unit` are rejected rather than priced, so quantity is always a whole-item count.
-  Models are frozen with extra fields forbidden. Line totals and order totals are validated for
-  consistency.
+  Models (`models.py`) are frozen and strict with extra fields forbidden. Line totals and order
+  totals are validated for consistency, and every amount must use the checkout currency
+  ([PROTOCOL.md](PROTOCOL.md) Decision 14).
 - `terms` are the subset the gate compares: id, currency, line items, totals, payee, `invoice_id`,
-  `custom_id`. `terms_hash` is a domain-separated SHA-256 over the JCS bytes of the terms.
+  `custom_id`. `terms_hash` is a domain-separated SHA-256 over the JCS bytes of the terms. The
+  checkout model's `terms()` covers id, currency, line items and totals; the PayPal mapping adds the
+  other three.
 - Acceptance: RFC 8785 vectors; property tests that key order and whitespace never change bytes and
   that any change to a bound field changes the hash.
 
@@ -466,8 +469,11 @@ log proofs. Tampering with any byte makes verification fail at the correct step 
 - `llm`: one interface for model calls with structured output, timeouts, logging and record and
   replay for deterministic tests. It is used by the shopping agent, the assistant and the hostile
   agent. No verification module imports it.
-- `catalog`: a seeded fictional catalog with fictional brands and several categories, used by the
-  demo store and the agent.
+- `catalog`: a seeded fictional catalog (`data/catalog.yaml`: 45 items, 5 categories, 6 invented
+  brands, USD only, prices in integer minor units) used by the demo store and the agent. It is
+  validated when loaded: duplicate YAML keys, float prices, unsorted or duplicate items, undeclared
+  brands or categories, and non-ASCII text are errors, and `catalog_hash` is the same for the same
+  file. Every item converts to a canonical checkout `Item`.
 
 ## 6. Runtime modes
 

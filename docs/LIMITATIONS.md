@@ -54,3 +54,19 @@ in a given sandbox or account was not tested. HUF and TWD amounts must be whole 
 PayPal rejects decimals for them even though UCP minor units for those currencies have two decimals
 ([PROTOCOL.md](PROTOCOL.md) Decision 13); a checkout with fractional HUF or TWD cannot be sent to
 PayPal and is refused.
+
+## Checkout model and catalog
+
+### L6. What the canonical checkout can express
+
+Only whole-item (`each`) quantities, the seven well-known total types, and no sub-lines, parent
+line items or unit pricing ([PROTOCOL.md](PROTOCOL.md) Decision 14). A UCP checkout using any of
+those is rejected rather than approximated. The line-level and discount rollup consistency rules
+are Countersign's reading of the UCP text, not quoted formulas, so a standards-compliant merchant
+checkout built differently could be refused.
+
+### L7. Catalog location and names
+
+`default_catalog_path()` assumes a source checkout (`data/` next to `src/`) and is marked
+`# SHORTCUT:`; a packaged install would need the file shipped as package data. The catalog's brand
+names are invented but were not checked for trademark conflicts.
