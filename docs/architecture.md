@@ -227,10 +227,13 @@ entry in this document. Stack: Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, 
 
 ### 5.1 canonical
 
-- A strict JSON loader that rejects duplicate keys, NaN, Infinity, non-UTF-8 input and excess
-  decimal precision, with typed errors. All inbound JSON passes through it first.
-- One JCS function (RFC 8785) used for everything Countersign signs or hashes as JSON.
-- Hashing helpers. Countersign-internal hashes are domain separated (a fixed ASCII prefix before the
+- A strict JSON loader (`jsonstrict.py`) that rejects duplicate keys, NaN, Infinity, non-UTF-8
+  input, a byte order mark, lone surrogate escapes, numbers beyond +/-(2^53 - 1) and excess decimal
+  precision, with typed errors that each carry a stable `code`. All inbound JSON passes through it
+  first. The number rules are [PROTOCOL.md](PROTOCOL.md) Decision 12.
+- One JCS function (`jcs.py`, `canonicalize`, RFC 8785 via the pinned `rfc8785`) used for
+  everything Countersign signs or hashes as JSON.
+- Hashing helpers (`hashing.py`). Countersign-internal hashes are domain separated (a fixed ASCII prefix before the
   bytes). AP2 hashes (`checkout_hash`, `sd_hash`, receipt `reference`) are plain SHA-256 over the
   exact strings the spec names, with no prefix.
 - Money: an ISO 4217 exponent table and an integer minor-unit `Money` type. Parsing from UCP

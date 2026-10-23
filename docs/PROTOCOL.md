@@ -862,6 +862,29 @@ D13).
   it set, a patched-up order is authorized and the capture gate must void it; without it, the order is
   never authorized. Like the other ablations it is refused when `APP_ENV=demo`.
 
+### Decision 12: Strict JSON number rules
+
+Resolves: the "excess decimal precision" rule of INV-8 and the `decimal_ambiguity` attack, which no
+vendored file defines.
+
+- **Integers and floats.** Any number of magnitude above 2^53 - 1 is rejected, whether it is
+  written as an integer or as a float (`1e20`). This is the RFC 8785 and UCP integer cap. A float
+  that large canonicalizes to integer digits that the loader would refuse on re-parse.
+- **Excess precision.** A number with a fraction or an exponent is accepted only if its decimal
+  value equals the shortest decimal that round-trips the binary64 value it parses to. So `0.1`,
+  `1.50`, `15e-1` and `0.30000000000000004` are accepted, while `0.1000000000000000055`,
+  `333333333.33333329` (the RFC 8785 sample number) and `1e-400` are rejected, because two different
+  texts would otherwise denote one number. Trailing zeros and exponent spelling are not precision.
+- **Overflow.** A number that overflows binary64 (`1e999`) is rejected as non-finite.
+- **Not a money rule.** Money is never a JSON float (INV-9). Amounts are integer minor units or
+  decimal strings, which this loader treats as ordinary integers and strings.
+- **Consequence for vectors.** The RFC 8785 sample input is rejected by the strict loader (it
+  contains `333333333.33333329` and `1E30`); the JCS function itself reproduces the RFC bytes from
+  the parsed values, and the tests cover both.
+- **Hash domains.** Countersign-internal hashes are SHA-256 over a validated ASCII domain name
+  (`cs.<words>.v<N>`), a NUL byte, then the data. The NUL separator is a Countersign choice. AP2
+  hashes never use it.
+
 ---
 
 ## 4. Confirmed PayPal facts
