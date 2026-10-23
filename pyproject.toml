@@ -18,10 +18,19 @@ dependencies = [
   "joserfc==1.7.5",
   "structlog",
   "slowapi",
+  "pyyaml>=6.0.3",
 ]
 
 [dependency-groups]
-dev = ["pytest", "hypothesis", "respx", "ruff", "mypy", "cryptography"]
+dev = [
+    "pytest",
+    "hypothesis",
+    "respx",
+    "ruff",
+    "mypy",
+    "cryptography",
+    "types-pyyaml>=6.0.12.20260906",
+]
 
 [build-system]
 requires = ["hatchling"]
