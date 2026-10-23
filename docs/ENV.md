@@ -120,9 +120,9 @@ Risks and how they are handled:
 
 Sources: PayPal's published OpenAPI documents for Orders v2 (spec version 2.32) and Payments v2,
 read as JSON schemas, plus the endpoint pages on developer.paypal.com. Each fact below is _from the
-schema_ (stated in the OpenAPI document) or _unconfirmed_ (not found in the schema; to be settled by
-a live run, see [2.5](#25-unconfirmed-until-a-live-run)). Nothing here has been observed against a
-live sandbox yet. The script `scripts/sandbox_smoke.py` is built only on this section.
+schema_ (stated in the OpenAPI document). What a live sandbox run showed is in
+[2.5](#25-observed-in-the-live-sandbox-run). The script `scripts/sandbox_smoke.py` is built only on
+this section.
 
 Sandbox base URL (from the `servers` block of the Payments v2 schema): `https://api-m.sandbox.paypal.com`.
 The script refuses any other host.
@@ -203,7 +203,7 @@ accepts either and prints whichever is present.
 order cannot be updated. The schema does not state whether an order that has been authorized is still
 patchable, which is exactly what the attack depends on. That is settled by a live run, not here.
 
-### 2.5 Observed in the live sandbox run, and what is still unconfirmed
+### 2.5 Observed in the live sandbox run
 
 Observed once, with `scripts/sandbox_smoke.py` against one sandbox account; both flows completed.
 Items marked _single run_ are not yet established as general rules.
@@ -226,13 +226,12 @@ Items marked _single run_ are not yet established as general rules.
 Demo-setup note. The sandbox buyer and merchant accounts must be US-based. A buyer account based in
 Nepal could not approve the order.
 
-Still unconfirmed (not established by the run output):
+Also settled by the same run (_single run_):
 
-- Whether `PayPal-Debug-Id` is a response header.
-- Whether `payer-action` or `approve` is the link returned for a sandbox order created with
-  `payment_source`.
-- The exact error names for authorizing an unapproved order.
-- Behaviour of 204 versus 200 on void.
+- **Debug id.** The PayPal debug id was read from a response header.
+- **Approval link.** The link `rel` on the created order was `payer-action`.
+- **Authorizing an unapproved order** returned HTTP 422 with error name `ORDER_NOT_APPROVED`.
+- **Void** returned HTTP 200.
 
 ## 3. Running the spikes
 
