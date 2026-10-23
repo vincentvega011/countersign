@@ -62,7 +62,9 @@ decision.
    and creates a PayPal order with `intent: AUTHORIZE`.
 8. **Payer approval and authorization.** The method is decided by the PayPal confirmations in
    section 10 (a vaulted sandbox wallet for fully autonomous charges, or a one-time customer
-   approval on PayPal sandbox). Then the order is authorized.
+   approval on PayPal sandbox). In redirect-approval mode, the live order is first fetched and
+   compared with the signed checkout, and authorize is called only on an exact match
+   ([PROTOCOL.md](PROTOCOL.md) Decision 11). Then the order is authorized.
 9. **Capture gate.** Fresh PayPal state is fetched and compared with the signed checkout. If it
    passes, Countersign captures and issues a Payment Receipt. If it fails, the authorization is
    voided and reservations are released.
@@ -307,8 +309,14 @@ Checkout Mandate. Receipts use the schema in [PROTOCOL.md](PROTOCOL.md) section 
 - In one database transaction with row locking it reserves budget and the single-use keys.
 - Creates the PayPal order with `intent: AUTHORIZE`, `invoice_id` equal to the checkout id,
   `custom_id` carrying the evidence reference, and a deterministic `PayPal-Request-Id`.
+- **Pre-authorize check** ([PROTOCOL.md](PROTOCOL.md) Decision 11). In redirect-approval mode,
+  after payer approval and before calling authorize, fetches the live order, re-derives the
+  canonical terms, compares them with the signed checkout, and calls authorize only on an exact
+  match. On a mismatch it never authorizes, so there is nothing to void; it records a rejection
+  receipt and releases the reservations. In vault mode create and authorize are one call, so there
+  is no such window. `ABL_NO_PREAUTH_CHECK` disables this check for evaluation.
 - Acceptance: the happy path against recorded cassettes; 20 parallel `complete` calls with one
-  mandate yield exactly one PayPal order.
+  mandate yield exactly one PayPal order; an order patched after approval is not authorized.
 
 ### 5.6 constraints
 
@@ -404,8 +412,14 @@ the Payment Receipt. On fail: void, release the reservations (the open mandate r
 and may be retried with a new checkout) and sign a rejection Payment Receipt. The `reference` of each receipt is
 the hash of the closed Payment Mandate.
 
+The gate is the second layer behind the pre-authorize check in the Credential Provider role. The
+sandbox rejects a PATCH after authorization, so the gate is not what stops an order raised after
+approval in `full` mode; it covers mandate revocation, budget state, evidence assembly and any path
+in which the pre-check was skipped (`ABL_NO_PREAUTH_CHECK`).
+
 Acceptance: tests where the order is changed after payer approval and before authorization (the
-mutation window confirmed in PROTOCOL.md, Confirmed PayPal facts), the mandate is revoked between authorization and capture, a concurrent purchase exhausts
+mutation window confirmed in PROTOCOL.md, Confirmed PayPal facts; in `full` mode nothing is
+authorized, and with `ABL_NO_PREAUTH_CHECK` the order is authorized and the gate voids it), the mandate is revoked between authorization and capture, a concurrent purchase exhausts
 a second purchase races the first under one open mandate, and two gates race on one checkout. Each must capture or void exactly once.
 
 ### 5.10 ledger (decision log)
@@ -458,7 +472,8 @@ log proofs. Tampering with any byte makes verification fail at the correct step 
   per-session nonce memory. It exists so comparisons are fair and the value of the gate and lock is
   visible.
 - Ablations in `full`: `ABL_NO_GATE`, `ABL_NO_PRINCIPAL_LOCK`, `ABL_NO_BUDGET_RECON`,
-  `ABL_NO_GLOBAL_NONCE`, `ABL_NO_STRICT_JSON`. They are refused when `APP_ENV=demo`.
+  `ABL_NO_GLOBAL_NONCE`, `ABL_NO_STRICT_JSON`, `ABL_NO_PREAUTH_CHECK`. They are refused when
+  `APP_ENV=demo`.
 
 ## 7. Product surfaces
 
@@ -539,7 +554,10 @@ model judge.
 
 Attack categories: `mandate_forged`, `alg_confusion`, `mandate_expired`, `mandate_revoked`,
 `nonce_replay`, `open_mandate_double_spend`, `checkout_swap`, `price_change_before_complete`,
-`order_changed_after_approval`, `custom_id_tamper`, `protocol_downgrade_acp`, `new_session_escape`,
+`order_changed_after_approval` (the order amount is raised after payer approval and before
+authorize; success condition: money authorized or captured outside the signed checkout. In `full`
+mode nothing is authorized. With `ABL_NO_PREAUTH_CHECK` it is authorized and then voided by the
+gate. In baseline it is authorized and captured), `custom_id_tamper`, `protocol_downgrade_acp`, `new_session_escape`,
 `budget_split` (expected denial through the single-use rule, the same defense as `open_mandate_double_spend`), `category_escape` (a merchant policy test, since category limits are not in
 mandates), `duplicate_json_keys`, `decimal_ambiguity`, `webhook_spoof`, `double_complete_retry`,
 `merchant_authorization_strip`, `consent_missing` (mandate issuance without a valid device

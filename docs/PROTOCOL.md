@@ -538,7 +538,7 @@ resolves each.
 | D10 | Domain-separated hash helpers are used for every hash                                | AP2 hashes are plain hashes ([1.2.4](#124-hashes))                                               | Domain separation only for Countersign-internal hashes. AP2 hashes use the spec algorithm with no prefix                   |
 | D11 | Amounts are integer minor units everywhere                                           | True for UCP and most AP2 fields; `payment.budget.max` is a JSON `number`                        | [Decision 2](#decision-2-strict-single-use-and-add-only-budget). Non-`each` quantities need `quantity_unit.scale` handling |
 | D12 | Receipts use one field naming                                                        | Schemas and generic text differ ([1.2.7](#127-receipts))                                         | Follow the mandate schemas (`status`)                                                                                      |
-| D13 | An order can be changed at PayPal after authorization (attack `order_changed_after_authorize`) | PayPal rejects every tried change after authorization with 422 `ORDER_ALREADY_COMPLETED`; changes are accepted while the order is `APPROVED` ([4.3](#43-patch)) | The attack is renamed `order_changed_after_approval`. The mutation window is between payer approval and authorization |
+| D13 | An order can be changed at PayPal after authorization (attack `order_changed_after_authorize`) | PayPal rejects every tried change after authorization with 422 `ORDER_ALREADY_COMPLETED`; changes are accepted while the order is `APPROVED` ([4.3](#43-patch)) | The attack is renamed `order_changed_after_approval`. The mutation window is between payer approval and authorization; [Decision 11](#decision-11-pre-authorize-check) |
 
 Facts confirmed with no deviation: the five roles and the non-agentic Trusted Surface rule, the
 exact `vct` strings, `cnf` as an RFC 7800 claim, JCS (RFC 8785) for `merchant_authorization`, the
@@ -839,6 +839,29 @@ Resolves: gaps 6 and 7 provisionally.
   choice because the specs give none. Open mandates are issued with `exp` as short as the task
   allows.
 
+### Decision 11: Pre-authorize check
+
+Resolves: the mutation window between payer approval and authorization ([4.3](#43-patch), deviation
+D13).
+
+- **Check.** In redirect-approval mode, after payer approval and before calling authorize, the
+  Credential Provider role fetches the live order, re-derives the canonical terms, compares them
+  with the signed checkout, and calls authorize only on an exact match.
+- **Mismatch.** The order is never authorized, so there is nothing to void. The role records a
+  rejection receipt and releases the reservations.
+- **Second layer.** The capture gate stays. Post-authorization amounts cannot be patched (observed),
+  but the gate still covers mandate revocation, budget state and evidence assembly, and it covers
+  any path in which the pre-check was skipped.
+- **Vault mode.** Create and authorize happen in one call, so there is no PATCH window (observed in
+  the sandbox, [4.7](#47-vaulting-a-sandbox-wallet)).
+- **Who can patch.** Per the documentation the update operation needs the merchant app's API
+  credentials ([4.3](#43-patch)). The modeled actor is a compromised or buggy merchant-side
+  component, or a confused deputy using those credentials, not the buyer or the agent.
+  Countersign does not claim that the agent can alter orders.
+- **Ablation.** `ABL_NO_PREAUTH_CHECK` disables the pre-check in `full` mode, for evaluation. With
+  it set, a patched-up order is authorized and the capture gate must void it; without it, the order is
+  never authorized. Like the other ablations it is refused when `APP_ENV=demo`.
+
 ---
 
 ## 4. Confirmed PayPal facts
@@ -889,8 +912,20 @@ Authorizing an order that was already authorized, with a new Request-Id: HTTP 42
   - PATCH of items and amount together (74.00 to 27.00) returned 204, the order stayed `APPROVED`,
     and authorize then authorized 27.00.
 - **Consequence for the gate.** The mutation window is between payer approval and authorization.
-- **Not yet recorded.** Script section `o4` (PATCH of `invoice_id`, and of items and amount up to
-  100.00, while `APPROVED`) has not been run. Its results are added when it has.
+- **Raising the amount while `APPROVED`** (script section `o4`, a fresh order approved at 74.00 and
+  left `APPROVED`):
+  - PATCH of `invoice_id` returned 204, and GET showed the patched value.
+  - PATCH of items and amount together from 74.00 up to 100.00 (items 92.00 plus tax 8.00,
+    consistent) returned 204. GET showed amount 100.00 with status `APPROVED`.
+  - Authorize then returned 201 with an authorization of 100.00 in `CREATED` status, with no new
+    payer approval. The authorization was voided afterwards (200, `VOIDED`).
+- **Consequence.** Between payer approval and authorize, the order amount can be raised or lowered
+  using the merchant app credentials, and PayPal authorizes the patched amount. The response is
+  [Decision 11](#decision-11-pre-authorize-check).
+- **Credentials (from documentation, not tested with other credentials).** In PayPal's Orders v2
+  schema the update order operation lists only OAuth 2.0 bearer authentication. The PATCH calls in
+  the runs were made with the merchant app's access token. Whether any other party can PATCH an
+  order was not tested.
 
 ### 4.4 Authorization lifetime
 
@@ -968,8 +1003,7 @@ delivery delay) was not read and is not assumed.
 
 Added by later work, not yet present in this file:
 
-- Live webhook confirmation (deferred to the Render deploy) and the sandbox run of the order
-  changes while approved (script section `o4`, results not yet recorded).
+- Live webhook confirmation (deferred to the Render deploy).
 - Human Present token format and receipt transport (see Decisions 8 and gap 4).
 - Gate step codes, principal lock semantics, the evidence reference encoding and the PayPal field
   mapping in both directions.

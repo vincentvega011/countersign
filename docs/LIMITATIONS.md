@@ -25,12 +25,19 @@ Request-Ids that stay under it.
 
 ### L3. Orders can be changed between payer approval and authorization
 
-In the redirect approval mode, the sandbox accepted a PATCH of items and amount while the order was
-`APPROVED`, and authorize then authorized the patched amount. After authorization every tried PATCH
-was rejected. The window is therefore between approval and authorization, and the protection is the
-gate re-deriving the terms from the live order and comparing them with the signed checkout. The gate
-is not built yet, so this mitigation is a design, not a tested result; the PATCH behavior above is
-from one sandbox account.
+In the redirect approval mode, the sandbox accepted a PATCH of items and amount (74.00 up to 100.00)
+while the order was `APPROVED`, and authorize then authorized the patched amount with no new payer
+approval. After authorization every tried PATCH was rejected. The window is therefore between approval
+and authorization.
+
+- _Who_: per PayPal's documentation the update operation needs the merchant app's API credentials, so
+  the modeled actor is a compromised or buggy merchant-side component or a confused deputy, not the
+  buyer or the agent. Countersign does not claim the agent can alter orders. Whether any other party
+  can PATCH an order was not tested.
+- _Mitigation_ ([PROTOCOL.md](PROTOCOL.md) Decision 11): the Credential Provider role re-reads and
+  compares the live order before authorizing, and the capture gate is the second layer. Neither is
+  built yet, so this is a design, not a tested result. The PATCH behavior is from one sandbox account.
+- Vault mode has no such window because create and authorize are one call (observed in the sandbox).
 
 ### L4. Partial captures are possible
 

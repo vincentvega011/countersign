@@ -8,7 +8,7 @@ A phase starts only when the previous gate has passed.
 | ----- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
 | P0    | Foundations: repository, CI, vendored specs, spec notes, library selection, PayPal sandbox confirmations                               | `make sandbox-smoke` passes and every Day 0 confirmation in [architecture.md](architecture.md) has an answer or a written fallback                 | In progress |
 | P1    | Canonical core, UCP checkout and profile, `merchant_authorization`, PayPal client, decision log                                        | A UCP checkout is signed and verified by the independent Node verifier, and canonical terms round-trip through a real sandbox order                | Not started |
-| P2    | Mandates, Merchant and Credential Provider roles, constraints, capture gate, principal lock, ACP adapter, baseline mode, first attacks | Downgrade, order-changed-after-approval and replay attacks succeed in baseline and fail in full with nothing captured; concurrency tests pass | Not started |
+| P2    | Mandates, Merchant and Credential Provider roles, constraints, capture gate, principal lock, ACP adapter, baseline mode, first attacks | Downgrade, order-changed-after-approval (nothing is authorized in full; authorized, then voided by the gate with `ABL_NO_PREAUTH_CHECK`) and replay attacks succeed in baseline and fail in full with nothing captured; concurrency tests pass | Not started |
 | P3    | Trusted Surface with device keys and consent, shopping agent, evidence bundles and verifiers                                           | An autonomous purchase runs from phone approval to a captured sandbox order to a verified evidence bundle, with no server-held customer key        | Not started |
 | P4    | Dashboard, assistant, hostile agent, full evaluation                                                                                   | The whole demo runs from the dashboard locally and the evaluation numbers are frozen                                                               | Not started |
 | P5    | Deployment, design polish, documentation, fresh-clone test                                                                             | A stranger can use the hosted demo end to end and can run it locally from the README alone                                                         | Not started |
@@ -25,9 +25,9 @@ A phase starts only when the previous gate has passed.
   chains are built in-house because no maintained library handles the chain format. See
   [ENV.md](ENV.md).
 - PayPal sandbox smoke test passed (P0.7): both flows ran live; results in [ENV.md](ENV.md) section 2.5.
-- PayPal behavior confirmations (P0.8) are recorded in [PROTOCOL.md](PROTOCOL.md) section 4 and
-  [LIMITATIONS.md](LIMITATIONS.md). Pending: the `o4` run (PATCH of `invoice_id`, and of items and
-  amount up to 100.00, while `APPROVED`), then P0.9.
+- PayPal behavior confirmations (P0.8) are complete and recorded in [PROTOCOL.md](PROTOCOL.md)
+  section 4 and [LIMITATIONS.md](LIMITATIONS.md). The raised-amount result led to the pre-authorize
+  check ([PROTOCOL.md](PROTOCOL.md) Decision 11). Next: P0.9, the gate.
 - Deferred: live webhook confirmation (delivery and `verify-webhook-signature` against a real
   notification), to the Render deploy. The event list and verification flow are recorded from
   documentation only.
