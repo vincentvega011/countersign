@@ -402,3 +402,44 @@ uv run --with sd-jwt python scripts/spikes/sdjwt_library_probe.py
 
 The first command needs no network after `make setup`. Each line beginning `OK` is a verified
 result, and the script exits non-zero on the first failure.
+
+## 8. Currencies and money
+
+Checked 2026-10-23.
+
+**Supported currencies.** PayPal's REST currency page,
+<https://developer.paypal.com/api/rest/reference/currency-codes/> ("Last updated: August 17,
+2026" on the page), lists 25 codes: AUD, BRL, CAD, CNY, CZK, DKK, EUR, HKD, HUF, ILS, JPY, MYR, MXN,
+TWD, NZD, NOK, PHP, PLN, GBP, RUB, SGD, SEK, CHF, THB, USD. That is the supported set in
+`countersign.canonical.money`. The reports page,
+<https://developer.paypal.com/docs/reports/reference/paypal-supported-currencies/>, lists the same
+codes without RUB. The page footnotes are:
+
+- HUF, JPY and TWD: "This currency does not support decimals. If you pass a decimal amount, an
+  error occurs."
+- BRL, CNY and MYR: supported "for in-country PayPal accounts only". This is an account matter and
+  does not change how amounts are parsed.
+- No three-decimal currency, and in particular not KWD, appears on either page. The Orders v2 money
+  schema (`value` is a string of at most 32 characters matching `^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$`)
+  mentions `TND` as an example of thousandths, but TND is not on the lists. Silence on the pages
+  is not proof that PayPal rejects such a currency, so the supported set follows the lists only.
+- Not verified: whether RUB has a country or account restriction, and whether the two lists apply
+  to every REST endpoint.
+
+**Exponents.** UCP amounts are "ISO 4217 minor units" (`amount.json`, `item.json` in the vendored
+UCP schemas). The ISO 4217 exponents come from the maintenance agency's current list one,
+<https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/lists/list-one.xml>
+(published 2026-09-17): 165 currencies with a minor unit, of which 17 have exponent 0, 139 have 2,
+7 (BHD, IQD, JOD, KWD, LYD, OMR, TND) have 3 and 2 (CLF, UYW) have 4. Thirteen codes with no minor unit
+(precious metals, XDR, XXX and similar) are excluded. Within the PayPal set every currency has ISO
+exponent 2 except JPY (0).
+
+**HUF and TWD differ.** ISO 4217 gives HUF and TWD two decimals, so a UCP amount of 1050 is 10.50
+HUF, while PayPal accepts whole units only. `Money` therefore keeps ISO minor units and converts
+with a second, PayPal exponent (0 for HUF, JPY and TWD); a HUF or TWD amount that is not a whole
+number of units raises `InexactAmountError` rather than being rounded.
+
+**Decimal string grammar** (stricter than PayPal's schema pattern, which allows `.5` and leading
+zeros): an optional minus, then `0` or a number without leading zeros, then optionally a dot and
+digits, ASCII only, at most 32 characters. At most the currency's PayPal exponent of fractional
+digits are accepted, so zero-decimal currencies accept no dot at all.

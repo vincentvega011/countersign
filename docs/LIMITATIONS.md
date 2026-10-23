@@ -45,3 +45,12 @@ PayPal allows several partial captures against one authorization. Countersign al
 full checkout total with `final_capture` set to true, and budget accounting is designed to sum every
 capture on the authorization, so a partial capture made outside Countersign still counts against the
 budget.
+
+### L5. Supported currencies
+
+Only the 25 currencies on PayPal's REST currency page are accepted ([ENV.md](ENV.md) section 8).
+BRL, CNY and MYR are in-country only per PayPal, and RUB carried no note; whether any of them works
+in a given sandbox or account was not tested. HUF and TWD amounts must be whole units, because
+PayPal rejects decimals for them even though UCP minor units for those currencies have two decimals
+([PROTOCOL.md](PROTOCOL.md) Decision 13); a checkout with fractional HUF or TWD cannot be sent to
+PayPal and is refused.

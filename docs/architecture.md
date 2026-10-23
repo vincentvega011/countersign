@@ -236,9 +236,12 @@ entry in this document. Stack: Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, 
 - Hashing helpers (`hashing.py`). Countersign-internal hashes are domain separated (a fixed ASCII prefix before the
   bytes). AP2 hashes (`checkout_hash`, `sd_hash`, receipt `reference`) are plain SHA-256 over the
   exact strings the spec names, with no prefix.
-- Money: an ISO 4217 exponent table and an integer minor-unit `Money` type. Parsing from UCP
-  integers and PayPal decimal strings, formatting to PayPal strings with exactly the currency's
-  exponent. Any inexact conversion is a typed error. Rounding is forbidden.
+- Money (`money.py`): an ISO 4217 exponent table and an integer minor-unit `Money` type, limited to
+  the currencies PayPal lists ([ENV.md](ENV.md) section 8). Parsing from UCP integers and PayPal
+  decimal strings, formatting to PayPal strings with exactly the currency's exponent. UCP uses ISO
+  minor units and PayPal takes whole units for HUF, JPY and TWD, so two exponents are kept
+  ([PROTOCOL.md](PROTOCOL.md) Decision 13). Any inexact conversion is a typed error. Rounding is
+  forbidden, and no float, `Decimal` or true division appears in the module.
 - The canonical checkout model mirrors the UCP checkout fields Countersign supports: `id`,
   `currency`, line items (item id, title, unit price, integer quantity of whole items, line totals),
   and totals by type with exactly one `subtotal` and one `total`. Items with a non-`each`

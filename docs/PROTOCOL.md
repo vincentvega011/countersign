@@ -885,6 +885,25 @@ vendored file defines.
   (`cs.<words>.v<N>`), a NUL byte, then the data. The NUL separator is a Countersign choice. AP2
   hashes never use it.
 
+### Decision 13: Money exponents and decimal strings
+
+Resolves: INV-9 for the PayPal boundary, and a mismatch between UCP and PayPal for HUF and TWD.
+
+- **Two exponents.** UCP amounts are integers in ISO 4217 minor units. PayPal says HUF, JPY and
+  TWD do not support decimals, while ISO 4217 gives HUF and TWD two decimals ([ENV.md](ENV.md)
+  section 8). `Money` stores ISO minor units; converting to a PayPal string requires the amount to be
+  a whole number of units for those currencies, and raises otherwise. There is no rounding.
+- **Supported set.** The 25 currencies on PayPal's REST currency page. KWD and the other
+  three-decimal currencies are not on it, so a `Money` in one is refused. The exponent-3 path exists
+  in the decimal core and is tested there.
+- **Grammar.** PayPal decimal strings are parsed as text, never through the JSON float path (the
+  strict loader never sees them as numbers). Rejected: floats, `bool`, exponent notation, a leading
+  plus, thousands separators, whitespace, a leading or trailing dot, leading zeros, negative zero,
+  non-ASCII digits, more than 32 characters, and more fractional digits than the PayPal exponent even
+  when the extra digits are zero. Fewer fractional digits are accepted because the value is exact.
+- **Sign.** Negative amounts are refused unless the caller opts in (`allow_negative`); UCP amounts
+  are never negative.
+
 ---
 
 ## 4. Confirmed PayPal facts
