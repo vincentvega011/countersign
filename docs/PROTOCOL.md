@@ -5,7 +5,7 @@ This file is built up over time. This revision covers the AP2 and UCP facts conf
 the vendored files (including RFC 9901 and the Delegate SD-JWT draft), the gaps those files leave,
 and the design decisions Countersign makes to close them. PayPal facts, gate step
 codes, the evidence reference encoding and the PayPal field mapping are added by later work and
-are listed under [Still to be written](#4-still-to-be-written).
+are listed under [Still to be written](#5-still-to-be-written).
 
 ## Conventions
 
@@ -520,8 +520,9 @@ Status Lifecycle".
 
 ## 2. Deviations from the working design
 
-Places where the vendored specifications contradict or refine an assumption in the working design
-used to plan this project, with the decision that resolves each.
+Places where the vendored specifications, or behavior observed in the PayPal sandbox, contradict or
+refine an assumption in the working design used to plan this project, with the decision that
+resolves each.
 
 | #   | Working design assumption                                                            | What the spec says                                                                               | Resolution                                                                                                                 |
 | --- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
@@ -537,6 +538,7 @@ used to plan this project, with the decision that resolves each.
 | D10 | Domain-separated hash helpers are used for every hash                                | AP2 hashes are plain hashes ([1.2.4](#124-hashes))                                               | Domain separation only for Countersign-internal hashes. AP2 hashes use the spec algorithm with no prefix                   |
 | D11 | Amounts are integer minor units everywhere                                           | True for UCP and most AP2 fields; `payment.budget.max` is a JSON `number`                        | [Decision 2](#decision-2-strict-single-use-and-add-only-budget). Non-`each` quantities need `quantity_unit.scale` handling |
 | D12 | Receipts use one field naming                                                        | Schemas and generic text differ ([1.2.7](#127-receipts))                                         | Follow the mandate schemas (`status`)                                                                                      |
+| D13 | An order can be changed at PayPal after authorization (attack `order_changed_after_authorize`) | PayPal rejects every tried change after authorization with 422 `ORDER_ALREADY_COMPLETED`; changes are accepted while the order is `APPROVED` ([4.3](#43-patch)) | The attack is renamed `order_changed_after_approval`. The mutation window is between payer approval and authorization |
 
 Facts confirmed with no deviation: the five roles and the non-agentic Trusted Surface rule, the
 exact `vct` strings, `cnf` as an RFC 7800 claim, JCS (RFC 8785) for `merchant_authorization`, the
@@ -839,12 +841,135 @@ Resolves: gaps 6 and 7 provisionally.
 
 ---
 
-## 4. Still to be written
+## 4. Confirmed PayPal facts
+
+Observed in the PayPal sandbox with `scripts/sandbox_smoke.py` and `scripts/sandbox_confirm.py`
+(request and field reference in [ENV.md](ENV.md) section 2). Everything here was observed against the
+sandbox only, in runs by the maintainer, unless it is labelled as from documentation. Each result is
+one observation; none is a guarantee about production. Section 4.8 is documentation, not observation.
+
+### 4.1 Identifier and header limits
+
+| Probe                                              | Result                                                          |
+| -------------------------------------------------- | --------------------------------------------------------------- |
+| `custom_id` of 255 characters                      | accepted, returned unchanged                                    |
+| `custom_id` of 256 characters                      | rejected, HTTP 400 `INVALID_STRING_LENGTH`                      |
+| `invoice_id` of 127 characters                     | accepted, returned unchanged                                    |
+| `invoice_id` of 128 characters                     | rejected, HTTP 400 `INVALID_STRING_LENGTH`                      |
+| `PayPal-Request-Id` of 108 characters              | accepted                                                        |
+| `PayPal-Request-Id` of 109 characters              | HTTP 500 `INTERNAL_SERVICE_ERROR`                               |
+| `PayPal-Request-Id` containing colons              | accepted                                                        |
+| A second create with an `invoice_id` already used  | accepted at create                                              |
+
+Across the runs, returned `custom_id` and `invoice_id` values were unchanged. A Request-Id over the
+limit fails with a server error rather than a validation error, so the client must enforce the limit
+itself. A duplicate `invoice_id` was not rejected at create; whether it is rejected later was not
+tested.
+
+### 4.2 Idempotent replay
+
+| Call replayed with the same `PayPal-Request-Id` | Result                                                                                  |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Create order                                    | the same order was returned                                                             |
+| Create order, different amount in the body      | the original order was returned, with the original 74.00 amount                         |
+| Authorize                                       | HTTP 200 with the same authorization                                                    |
+| Capture                                         | the same capture                                                                        |
+| Refund                                          | the same refund                                                                         |
+| Void                                            | the same void result                                                                    |
+
+Authorizing an order that was already authorized, with a new Request-Id: HTTP 422
+`ORDER_ALREADY_AUTHORIZED`.
+
+### 4.3 PATCH
+
+- **After authorization**, every field tried (`custom_id`, `invoice_id`, `description`, `amount`)
+  returned HTTP 422 `ORDER_ALREADY_COMPLETED`, and the authorization was unchanged.
+- **While the order was `APPROVED`** (payer approved, not yet authorized):
+  - PATCH of `custom_id` returned 204 and was reflected on the next GET.
+  - PATCH of items and amount together (74.00 to 27.00) returned 204, the order stayed `APPROVED`,
+    and authorize then authorized 27.00.
+- **Consequence for the gate.** The mutation window is between payer approval and authorization.
+- **Not yet recorded.** Script section `o4` (PATCH of `invoice_id`, and of items and amount up to
+  100.00, while `APPROVED`) has not been run. Its results are added when it has.
+
+### 4.4 Authorization lifetime
+
+`expiration_time` was 29 days after the authorization was created, in this run and in the earlier
+smoke run. The event documentation (4.8) describes a 30 day validity period. Both are noted; the
+gate reads `expiration_time` from the fetched authorization and does not assume a period.
+
+### 4.5 Capture and void
+
+| Step                                                   | Result                                                        |
+| ------------------------------------------------------ | ------------------------------------------------------------- |
+| Capture 30.00 with `final_capture` false               | accepted; authorization status `PARTIALLY_CAPTURED`           |
+| Second partial capture 20.00                           | accepted                                                      |
+| Capture 40.00 when 24.00 remained                      | HTTP 422 `MAX_CAPTURE_AMOUNT_EXCEEDED`                        |
+| Final capture 24.00                                    | accepted; authorization status `CAPTURED`                     |
+| Capture after the final capture                        | HTTP 422 `AUTHORIZATION_ALREADY_CAPTURED`                     |
+| Void after capture                                     | HTTP 422 `PREVIOUSLY_CAPTURED`                                |
+| Capture of a voided authorization                      | HTTP 422 `AUTHORIZATION_VOIDED`                               |
+| Second void of a voided authorization                  | HTTP 422 `PREVIOUSLY_VOIDED`                                  |
+
+Also observed: a later GET of the first capture (requested with `final_capture` false) showed
+`final_capture` true.
+
+### 4.6 Refund
+
+| Step                                                   | Result                                                        |
+| ------------------------------------------------------ | ------------------------------------------------------------- |
+| Partial refund 10.00 of a 30.00 capture                | accepted; capture status `PARTIALLY_REFUNDED`                 |
+| Refund 25.00 when 20.00 remained                       | HTTP 422 `REFUND_AMOUNT_EXCEEDED`                             |
+| Refund with an empty body after the partial refund     | accepted; capture status `REFUNDED`                           |
+| Refund of a fully refunded capture                     | HTTP 422 `CAPTURE_FULLY_REFUNDED`                             |
+
+The amount refunded by the empty-body call was not printed, so it is not recorded.
+
+### 4.7 Vaulting a sandbox wallet
+
+- An order created with `payment_source.paypal.attributes.vault` (`store_in_vault` `ON_SUCCESS`),
+  approved by the payer and authorized, returned a vault status of `VAULTED`.
+- A second order created from the vault id with no payer approval (`payment_initiator` `MERCHANT`,
+  `payment_type` `UNSCHEDULED`, `usage` `SUBSEQUENT`) returned HTTP 201 with order status
+  `COMPLETED` and an authorization in `CREATED` status for 74.00, with `custom_id` and `invoice_id`
+  intact.
+- Sandbox only. Production availability is unverified.
+
+### 4.8 Webhooks (from PayPal's documentation, not observed)
+
+No webhook was received in any run. Live confirmation is deferred to the Render deploy, where a
+public HTTPS URL exists (see [PROGRESS.md](PROGRESS.md)).
+
+Events the documentation lists for the calls Countersign makes:
+
+| Event                           | Documentation description                                                                                           |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `CHECKOUT.ORDER.APPROVED`       | a buyer approved a checkout order                                                                                   |
+| `PAYMENT.AUTHORIZATION.CREATED` | a payment authorization is created, approved, executed, or a future payment authorization is created                |
+| `PAYMENT.AUTHORIZATION.VOIDED`  | an authorization is voided, either on reaching its 30 day validity period or by the void authorized payment API     |
+| `PAYMENT.CAPTURE.COMPLETED`     | a payment capture completes                                                                                         |
+| `PAYMENT.CAPTURE.REFUNDED`      | a merchant refunds a payment capture                                                                                |
+
+The same documentation also lists `PAYMENT.CAPTURE.PENDING`, `PAYMENT.CAPTURE.DENIED`,
+`PAYMENT.CAPTURE.DECLINED`, `PAYMENT.CAPTURE.REVERSED` and `CHECKOUT.ORDER.COMPLETED`.
+
+Signature verification, per the Notifications API schema: the receiver calls
+`POST /v1/notifications/verify-webhook-signature` with `auth_algo`, `cert_url`, `transmission_id`,
+`transmission_sig`, `transmission_time`, `webhook_id` and `webhook_event`. The first five come from the
+notification's `PAYPAL-AUTH-ALGO`, `PAYPAL-CERT-URL`, `PAYPAL-TRANSMISSION-ID`,
+`PAYPAL-TRANSMISSION-SIG` and `PAYPAL-TRANSMISSION-TIME` headers; `webhook_id` is the id configured in
+the developer portal; `webhook_event` is the received body. The response carries
+`verification_status`, either `SUCCESS` or `FAILURE`. Behavior beyond this (retries, ordering,
+delivery delay) was not read and is not assumed.
+
+---
+
+## 5. Still to be written
 
 Added by later work, not yet present in this file:
 
-- Confirmed PayPal facts (identifier lengths, idempotency, order changes after authorization,
-  authorization validity, webhooks, vaulting).
+- Live webhook confirmation (deferred to the Render deploy) and the sandbox run of the order
+  changes while approved (script section `o4`, results not yet recorded).
 - Human Present token format and receipt transport (see Decisions 8 and gap 4).
 - Gate step codes, principal lock semantics, the evidence reference encoding and the PayPal field
   mapping in both directions.

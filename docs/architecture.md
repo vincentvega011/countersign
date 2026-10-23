@@ -404,8 +404,8 @@ the Payment Receipt. On fail: void, release the reservations (the open mandate r
 and may be retried with a new checkout) and sign a rejection Payment Receipt. The `reference` of each receipt is
 the hash of the closed Payment Mandate.
 
-Acceptance: tests where the order is changed after authorization (by the mutation path confirmed in
-section 10), the mandate is revoked between authorization and capture, a concurrent purchase exhausts
+Acceptance: tests where the order is changed after payer approval and before authorization (the
+mutation window confirmed in PROTOCOL.md, Confirmed PayPal facts), the mandate is revoked between authorization and capture, a concurrent purchase exhausts
 a second purchase races the first under one open mandate, and two gates race on one checkout. Each must capture or void exactly once.
 
 ### 5.10 ledger (decision log)
@@ -539,7 +539,7 @@ model judge.
 
 Attack categories: `mandate_forged`, `alg_confusion`, `mandate_expired`, `mandate_revoked`,
 `nonce_replay`, `open_mandate_double_spend`, `checkout_swap`, `price_change_before_complete`,
-`order_changed_after_authorize`, `custom_id_tamper`, `protocol_downgrade_acp`, `new_session_escape`,
+`order_changed_after_approval`, `custom_id_tamper`, `protocol_downgrade_acp`, `new_session_escape`,
 `budget_split` (expected denial through the single-use rule, the same defense as `open_mandate_double_spend`), `category_escape` (a merchant policy test, since category limits are not in
 mandates), `duplicate_json_keys`, `decimal_ambiguity`, `webhook_spoof`, `double_complete_retry`,
 `merchant_authorization_strip`, `consent_missing` (mandate issuance without a valid device
@@ -636,7 +636,7 @@ platform, a fictional store brand, no music or royalty-free music, and captions 
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 0:00 - 0:20 | The problem in two sentences, the one-line pitch, the PayPal sandbox visible on screen                                                                                         |
 | 0:20 - 1:05 | The customer approves on the phone; the agent shops on its own; the dashboard row appears with mandate verified, order authorized, gate passed, captured                       |
-| 1:05 - 1:55 | Attacks side by side, baseline versus Countersign: a protocol downgrade, an order changed after authorization, a mandate reuse; each with its reason code and "no money moved" |
+| 1:05 - 1:55 | Attacks side by side, baseline versus Countersign: a protocol downgrade, an order changed after approval, a mandate reuse; each with its reason code and "no money moved" |
 | 1:55 - 2:20 | "I never bought this": the merchant verifies the evidence and each dispute step passes; the assistant answers a question with citations                                        |
 | 2:20 - 2:45 | Results and what is new, then the pitch line                                                                                                                                   |
 
