@@ -1,8 +1,8 @@
 # ENV
 
-Environment facts and technology choices, each with the reason. Sections for the PayPal sandbox
-reference notes, the grid library license, hosting and the model provider are added when those
-are confirmed (see the Day 0 list in [architecture.md](architecture.md)).
+Environment facts and technology choices, each with the reason: cryptography libraries (1), the
+PayPal sandbox (2), the grid library license (3), hosting (4), the Devpost submission form (5) and
+the model provider (6). Web facts carry the source URL and the date they were checked.
 
 ## 1. Cryptography and canonicalization libraries
 
@@ -233,7 +233,167 @@ Also settled by the same run (_single run_):
 - **Authorizing an unapproved order** returned HTTP 422 with error name `ORDER_NOT_APPROVED`.
 - **Void** returned HTTP 200.
 
-## 3. Running the spikes
+## 3. AG Grid licensing
+
+Checked 2026-10-23 on the official AG Grid pages (AG Grid docs 36.2.0, AG Charts docs 14.2.0).
+Sources: <https://www.ag-grid.com/license-pricing/>, <https://www.ag-grid.com/react-data-grid/community-vs-enterprise/>,
+<https://www.ag-grid.com/react-data-grid/license-install/>, <https://www.ag-grid.com/charts/>,
+<https://www.ag-grid.com/charts/javascript/community-vs-enterprise/>,
+<https://www.ag-grid.com/javascript-data-grid/ai-toolkit/>, <https://www.ag-grid.com/studio/>.
+Not fetched: the AG Grid EULA, the AG Charts and AG Studio pricing pages, the MCP server page and the
+watermark and dev-validation pages.
+
+### 3.1 Community versus Enterprise (from the pricing feature table)
+
+| Edition                       | Features relevant to the dashboard                                                                                                                                  |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Community (free, MIT)         | Column pinning, text, number and date filters, quick filter, external filter, CSV export, sorting, selection, pagination, custom components (cell renderers), column groups and sizing |
+| Enterprise (licence required) | Row grouping, aggregation, pivoting, tree data, master detail, Excel and PDF export, clipboard, set filter, multi filter, advanced filter, status bar, context menu, column menu, tool panels, range selection, sparklines, AI Toolkit |
+
+Unverified or conflicting:
+
+- **Integrated charts.** The pricing table marks it as not Community and not Enterprise, with a
+  tick only for the Bundle, while the Community versus Enterprise page says that without an
+  Enterprise Bundle licence only Integrated Community charts are available. The two statements
+  conflict. Do not rely on either until checked.
+- **Pinned totals row.** No fetched page names it. Aggregation is Enterprise. Whether a pinned row
+  that we fill ourselves is Community was not verified (check the row pinning page).
+- **AG Charts.** Community is described as free for everyone including production use and MIT
+  licensed (bar, line, area, scatter, bubble, pie, doughnut, combination). Enterprise adds, among
+  others, heatmap, treemap, waterfall, gauges, zoom, navigator and annotations.
+
+### 3.2 Without a licence key
+
+- Local testing: "You can test AG Grid Enterprise features locally without a licence key" by
+  installing `ag-grid-enterprise`. The same is stated for `ag-charts-enterprise`.
+- With no key, Enterprise "will display a watermark and an error message in the console".
+- Enterprise "Requires a licence to use in production", per developer and per deployment.
+- A free 30 day trial licence is offered for AG Grid and AG Charts, removing watermarks and console
+  messages, usable "in a production environment". AG Studio has a separate 45 day trial. What the
+  grid does after a trial key expires was not verified, and the EULA was not read.
+- Key setup (36.2.0): `AgGridProvider` with a `licenseKey` prop; before 35.1,
+  `LicenseManager.setLicenseKey`.
+- Prices shown: AG Grid Enterprise $999, AG Charts Enterprise $499, bundle $1,498 per developer.
+
+### 3.3 AI features
+
+- **AI Toolkit** is Enterprise: it lets end users query and change grid state in natural language
+  through `getStructuredSchema` and `setState`, using your own LLM API key. It supports filtering,
+  sorting, aggregation, pivoting, row grouping, column visibility and sizing.
+- **MCP server** is ticked for Community in the pricing table. Its page was not fetched.
+- **AG Studio** is a separate Enterprise product with an AI agent playground; pricing was not shown.
+
+### 3.4 Hackathon terms
+
+Read 2026-10-23 on the official rules, <https://paypalaihackathon.devpost.com/rules>, section 8.
+The AG Grid prizes are 1st $5,000, 2nd $2,000 and three at $1,000, and the eligibility column
+reads: "All Eligible Submissions that use any AG Grid tools". No further requirement for the AG Grid
+prize and no judging criteria specific to it appear in the rules or on the overview page
+(<https://paypalaihackathon.devpost.com/>). The general criteria apply (rules section 6). By the
+wording, using the free Community grid qualifies as using an AG Grid tool; how "best use" is
+weighed is not stated. PayPal's blog
+(<https://developer.paypal.com/community/blog/PayPal_AI_Hackathon>) describes the AG Grid partner as
+offering AG Studio for dashboards, charts and an AI assistant; that is a partner blurb, not a
+term. Per the rules, a project can win one Sponsor Prize alongside one Grand Prize or one
+Honorable Mention.
+
+### 3.5 Recommendation
+
+- **Free-tier-safe set (build this first):** AG Grid Community for the orders grid (sorting,
+  filters, quick filter, column pinning, CSV export, custom cell renderers for status, and a
+  separate in-page detail panel instead of master detail) and AG Charts Community for protection
+  activity charts. This needs no licence and runs in the hosted demo for the whole judging period.
+- **Needs a licence:** row grouping, aggregation, master detail, set filter, status bar, context
+  menu, Excel export, clipboard, the AI Toolkit and any integrated charts. Using them in the hosted
+  demo without a key shows a watermark and console errors.
+- **Timing risk.** A 30 day trial started at the P4 or P5 build would lapse before the judging
+  period ends on 15 Dec, and behavior after expiry was not verified. Use trial features in the
+  recorded video only if a long enough key exists.
+- **Manual checks for the maintainer:** (1) whether AG Grid offers hackathon participants an
+  evaluation licence (ask AG Grid or the hackathon organisers); (2) the row pinning page for the
+  totals row; (3) the integrated charts conflict above; (4) the EULA terms on trial expiry.
+
+## 4. Render hosting
+
+Checked 2026-10-23 on official Render pages: <https://render.com/docs/free>,
+<https://render.com/docs/web-services>, <https://render.com/docs/static-sites>,
+<https://render.com/docs/blueprint-spec>, <https://render.com/docs/deploys>. The pricing page
+<https://render.com/pricing> loaded without its plan table, so prices and per-tier allowances are
+unverified.
+
+| Item                | Fact                                                                                                                                   |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Free web service    | Spins down after 15 minutes without inbound traffic; the restart "takes about one minute". 750 free instance hours per workspace per month, spun-down time not counted |
+| Web service limits  | Ephemeral filesystem (lost on redeploy, restart or spin down), no persistent disk, one instance, no shell access, outbound ports 25, 465 and 587 blocked, may restart at any time |
+| Free static sites   | Free to deploy, managed TLS, HTTP redirects to HTTPS, custom domains; bandwidth and pipeline minutes count against the workspace allowance (numbers not on the fetched pages) |
+| Free Postgres       | Expires 30 days after creation, then 14 days to upgrade to a paid plan, after which the database and its data are deleted. 1 GB storage, 100 connections, no backups, one free database per workspace |
+| Blueprint (`render.yaml`) | `plan: free` is accepted for web services and databases. Static sites have no compute plan and are declared as `type: web` with `runtime: static` |
+| Build minutes       | An included monthly amount exists but no number was on the fetched pages; the build command timeout is 120 minutes. Check <https://render.com/docs/build-pipeline> |
+| Credits             | No hackathon credit program on these pages. Render credits are a hackathon sponsor prize (rules section 8)                              |
+
+Fit. The free tier covers an API web service, the three static sites and a Postgres database, with
+three constraints that matter for the judging period (1 Dec to 15 Dec 2026):
+
+1. **Postgres expiry.** A free database created at the P5 deploy (7 to 9 Nov) becomes inaccessible
+   30 days later (7 to 9 Dec), inside the judging period, and is deleted 14 days after that.
+2. **Cold start.** The first request after 15 idle minutes takes about a minute. A judge may see
+   this; the README must say so and the demo must be warmed before recording.
+3. **Ephemeral disk.** Nothing may be stored on the web service disk. The ledger and evidence live
+   in Postgres only.
+
+Fallback if Postgres expires: create a new free database on or after 16 Nov (so it lasts past 15
+Dec; delete the old one first, as only one is allowed), run `scripts/demo_reset.sh` to re-seed, and
+repoint the service; or upgrade the existing database to a paid plan (price unverified). The new
+database is empty, so evidence bundles are exported to files before the switch.
+
+## 5. Devpost submission form
+
+Checked 2026-10-23. Sources: the official rules <https://paypalaihackathon.devpost.com/rules> and
+overview <https://paypalaihackathon.devpost.com/> (opened in a browser, because the fetch tool got
+HTTP 403), and Devpost's help center, mainly
+<https://help.devpost.com/article/126-know-your-submission-steps>,
+<https://help.devpost.com/article/85-uploading-a-demo-video> and
+<https://help.devpost.com/article/123-how-to-edit-a-submission>.
+
+**The live "Enter a Submission" form is only reachable after joining the hackathon and starting a
+project, and was not seen.** Hackathon-specific questions (the help center's step 4) and several
+limits are therefore unknown; see the manual checks in [submission/checklist.md](submission/checklist.md).
+
+Dates (rules section 1): submission 1 Oct 2026 9:15 am PT to 12 Nov 2026 12:00 pm PT; judging 1 Dec
+2026 2:00 pm PT to 15 Dec 2026 8:00 am PT; winners on or around 21 Dec 2026 2:00 pm PT.
+
+Required by the rules (section 4 and the overview): a text description of features and
+functionality; a functional demo (either complete setup and run instructions in the repository, or a
+hosted URL; a mockup or static prototype does not count); a public repository on GitHub, GitLab or
+Bitbucket containing all source and a detectable open source licence in the About section; a demo
+video under 3 minutes, public on YouTube, showing the project working, with no third party
+trademarks or copyrighted material; the AI tools used and how (overview, "Tools"); English
+materials; test credentials in the testing instructions if the project is private; the project free
+to use for testing until the judging period ends. Judges need not test it and may judge from the
+text, images and video alone. Drafts can be saved; after the submission period nothing can be
+changed except material the sponsor allows to be removed or replaced (rules section 5).
+
+Form fields (help center article 126; the asterisk means required): project name*, tagline*,
+thumbnail (JPG, PNG or GIF, 5 MB maximum, 3:2 recommended), project story* (Markdown and LaTeX
+supported), built-with tags* (25 maximum), try-it-out links (may be required), image gallery
+(optional), video demo link* ("usually required"; the help center names YouTube, Vimeo or Youku
+but this hackathon requires YouTube), optional file upload (35 MB, zip, pdf, word or apk), and
+hackathon-defined additional fields. Not stated on any official page read: tagline length, story
+length, gallery image limits and count.
+
+## 6. Model provider
+
+Fallback, written because no provider is chosen yet:
+
+- The LLM provider and model ids are chosen at P3.5, when the shopping agent and assistant are
+  built. They are not chosen now.
+- The gateway is provider-agnostic: no verification, gate or lock code depends on a model
+  (INV-1), and model calls sit behind the `llm` module interface.
+- `.env.example` keeps `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_MODEL_AGENT` and `LLM_MODEL_ASSISTANT`
+  as empty placeholders.
+- Record and replay for model calls is built and checked at P3.5 with the provider chosen then.
+
+## 7. Running the spikes
 
 ```text
 scripts/spikes/run_spikes.sh

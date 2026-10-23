@@ -621,10 +621,16 @@ PayPal sandbox:
 
 Other:
 
-- [ ] Grid vendor license terms and which features are free versus paid.
-- [ ] Hosting plan fit for the API, static sites and Postgres for the evaluation period.
-- [ ] Model provider and model ids confirmed, and record and replay working.
-- [ ] Submission form fields reviewed.
+- [x] Grid vendor license terms and which features are free versus paid
+      ([ENV.md](ENV.md) section 3). Open manual checks are listed there.
+- [x] Hosting plan fit for the API, static sites and Postgres for the evaluation period
+      ([ENV.md](ENV.md) section 4). The free Postgres expires inside the judging period; the
+      fallback is written there.
+- [x] Model provider and model ids: written fallback, chosen at P3.5 behind a provider-agnostic
+      interface ([ENV.md](ENV.md) section 6). Record and replay is built at P3.5.
+- [x] Submission form fields reviewed, from the rules and the help center
+      ([ENV.md](ENV.md) section 5). The live form is only visible after starting a submission; the
+      manual checks are in [submission/checklist.md](submission/checklist.md).
 
 Gate: `make sandbox-smoke` passes (create an AUTHORIZE order, approve, authorize, get, capture,
 refund; a second order authorized then voided), and every item above has an answer or a written

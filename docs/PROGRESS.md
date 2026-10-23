@@ -6,7 +6,7 @@ A phase starts only when the previous gate has passed.
 
 | Phase | Scope                                                                                                                                  | Gate                                                                                                                                               | Status      |
 | ----- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| P0    | Foundations: repository, CI, vendored specs, spec notes, library selection, PayPal sandbox confirmations                               | `make sandbox-smoke` passes and every Day 0 confirmation in [architecture.md](architecture.md) has an answer or a written fallback                 | In progress |
+| P0    | Foundations: repository, CI, vendored specs, spec notes, library selection, PayPal sandbox confirmations                               | `make sandbox-smoke` passes and every Day 0 confirmation in [architecture.md](architecture.md) has an answer or a written fallback                 | Passed      |
 | P1    | Canonical core, UCP checkout and profile, `merchant_authorization`, PayPal client, decision log                                        | A UCP checkout is signed and verified by the independent Node verifier, and canonical terms round-trip through a real sandbox order                | Not started |
 | P2    | Mandates, Merchant and Credential Provider roles, constraints, capture gate, principal lock, ACP adapter, baseline mode, first attacks | Downgrade, order-changed-after-approval (nothing is authorized in full; authorized, then voided by the gate with `ABL_NO_PREAUTH_CHECK`) and replay attacks succeed in baseline and fail in full with nothing captured; concurrency tests pass | Not started |
 | P3    | Trusted Surface with device keys and consent, shopping agent, evidence bundles and verifiers                                           | An autonomous purchase runs from phone approval to a captured sandbox order to a verified evidence bundle, with no server-held customer key        | Not started |
@@ -32,22 +32,27 @@ A phase starts only when the previous gate has passed.
   notification), to the Render deploy. The event list and verification flow are recorded from
   documentation only.
 
-## P0 gate (run 2026-10-23): not passed
+## P0 gate (run 2026-10-23): passed
 
-Checks that hold: the smoke test and confirmation runs are recorded
-([ENV.md](ENV.md) section 2.5, [PROTOCOL.md](PROTOCOL.md) section 4); CI is green on the latest
-pushed commit; `ruff`, `mypy` and `pytest` (the CI steps) and the secret scan pass locally. The
-`make test` target is still a stub, so the CI steps were run directly.
+The gate in the phase table holds:
 
-Unresolved Day 0 items (no recorded answer or fallback yet, see [architecture.md](architecture.md)
-section 10):
+- `make sandbox-smoke` passed against the sandbox; the smoke and confirmation runs are recorded
+  ([ENV.md](ENV.md) section 2.5, [PROTOCOL.md](PROTOCOL.md) section 4).
+- Every Day 0 item in [architecture.md](architecture.md) section 10 has a recorded answer or a
+  written fallback, with two exceptions that are an accepted deferred risk: the webhook id and live
+  webhook confirmation (documentation-sourced events and flow are recorded; confirmation moves to
+  the Render deploy).
+- CI is green on the latest pushed commit at the time of the check.
+- `make lint` (ruff, ruff format check, mypy, web lint, secret scan) and `make test` (pytest) pass
+  locally and match the CI steps.
 
-- Grid library license terms and which features are free versus paid.
-- Hosting plan fit for the API, static sites and Postgres for the evaluation period.
-- Model provider and model ids, and record and replay working.
-- Submission form fields reviewed.
+Items closed on 2026-10-23: grid licensing ([ENV.md](ENV.md) section 3), Render hosting (section 4),
+the Devpost form (section 5, checklist in [submission/checklist.md](submission/checklist.md)) and
+the model provider fallback (section 6).
 
-Accepted deferral: live webhook confirmation and the webhook id, planned at the Render deploy.
+Manual checks still owed by the maintainer, none blocking: an AG Grid hackathon or evaluation
+licence, the row pinning and integrated charts questions ([ENV.md](ENV.md) section 3.5), and the
+live Devpost form fields ([submission/checklist.md](submission/checklist.md)).
 
 ## Open risks
 
@@ -56,6 +61,8 @@ Accepted deferral: live webhook confirmation and the webhook id, planned at the 
 | Live webhook delivery and signature verification unconfirmed | Create the webhook and confirm a real notification at the Render deploy. Until then the event list and flow are from documentation only        |
 | Vaulting verified in the sandbox only                        | Fallback is a fresh payer approval per purchase ([LIMITATIONS.md](LIMITATIONS.md) L1)                                                         |
 | A `PayPal-Request-Id` above 108 characters returns HTTP 500  | The client enforces the limit ([LIMITATIONS.md](LIMITATIONS.md) L2)                                                                           |
+| The free Render Postgres expires 30 days after creation, inside the judging period | Create a fresh database on or after 16 Nov, re-seed, repoint ([ENV.md](ENV.md) section 4) |
+| AG Grid Enterprise features need a licence for the hosted demo; a 30 day trial would lapse before 15 Dec | Build on Community first; ask about a hackathon licence ([ENV.md](ENV.md) section 3.5) |
 | SD-JWT chain handling is in-house, security-critical code    | Mutation tests and the TypeScript cross-check are mandatory before it is relied on ([ENV.md](ENV.md) section 1.5)                              |
 
 ## Definition of done
