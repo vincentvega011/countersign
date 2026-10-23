@@ -599,17 +599,25 @@ Specs and libraries:
 
 PayPal sandbox:
 
-- [ ] App, merchant and buyer accounts, and webhook id.
-- [ ] `custom_id` and `invoice_id` maximum lengths, and that both survive on get order, authorization
-      and capture.
-- [ ] `PayPal-Request-Id` length limit and idempotent replay behavior.
-- [ ] Whether an order can be changed after authorization and with which fields. If not, the
-      order-changed attack uses another mutation path, which is documented.
-- [ ] Authorization validity in sandbox, void and refund behavior.
+- [ ] App, merchant and buyer accounts, and webhook id. Accounts exist and were used in the runs
+      (the buyer and merchant must be US-based, [ENV.md](ENV.md) section 2.5). The webhook id does not
+      exist yet: a webhook needs a public URL, so it is created at the Render deploy.
+- [x] `custom_id` and `invoice_id` maximum lengths, and that both survive on get order, authorization
+      and capture ([PROTOCOL.md](PROTOCOL.md) section 4.1; [ENV.md](ENV.md) section 2.5).
+- [x] `PayPal-Request-Id` length limit and idempotent replay behavior
+      ([PROTOCOL.md](PROTOCOL.md) sections 4.1 and 4.2; [LIMITATIONS.md](LIMITATIONS.md) L2).
+- [x] Whether an order can be changed after authorization and with which fields. If not, the
+      order-changed attack uses another mutation path, which is documented. Answered: not after
+      authorization, but yes while `APPROVED`; the attack is `order_changed_after_approval`
+      ([PROTOCOL.md](PROTOCOL.md) section 4.3, Decision 11).
+- [x] Authorization validity in sandbox, void and refund behavior
+      ([PROTOCOL.md](PROTOCOL.md) sections 4.4 to 4.6).
 - [ ] Webhook events for authorize, capture, void and refund, and how signature verification works.
-- [ ] Payer approval method: whether a sandbox wallet can be vaulted for later merchant-initiated
-      orders in this app. If not, the customer approves on PayPal sandbox once per purchase from the
-      Trusted Surface, documented honestly.
+      Recorded from documentation ([PROTOCOL.md](PROTOCOL.md) section 4.8); live confirmation is
+      deferred to the Render deploy.
+- [x] Payer approval method: whether a sandbox wallet can be vaulted for later merchant-initiated
+      orders in this app. Yes in the sandbox; fallback is a fresh payer approval per purchase
+      ([PROTOCOL.md](PROTOCOL.md) section 4.7; [LIMITATIONS.md](LIMITATIONS.md) L1).
 
 Other:
 

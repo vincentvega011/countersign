@@ -32,6 +32,32 @@ A phase starts only when the previous gate has passed.
   notification), to the Render deploy. The event list and verification flow are recorded from
   documentation only.
 
+## P0 gate (run 2026-10-23): not passed
+
+Checks that hold: the smoke test and confirmation runs are recorded
+([ENV.md](ENV.md) section 2.5, [PROTOCOL.md](PROTOCOL.md) section 4); CI is green on the latest
+pushed commit; `ruff`, `mypy` and `pytest` (the CI steps) and the secret scan pass locally. The
+`make test` target is still a stub, so the CI steps were run directly.
+
+Unresolved Day 0 items (no recorded answer or fallback yet, see [architecture.md](architecture.md)
+section 10):
+
+- Grid library license terms and which features are free versus paid.
+- Hosting plan fit for the API, static sites and Postgres for the evaluation period.
+- Model provider and model ids, and record and replay working.
+- Submission form fields reviewed.
+
+Accepted deferral: live webhook confirmation and the webhook id, planned at the Render deploy.
+
+## Open risks
+
+| Risk                                                         | Plan                                                                                                                                           |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Live webhook delivery and signature verification unconfirmed | Create the webhook and confirm a real notification at the Render deploy. Until then the event list and flow are from documentation only        |
+| Vaulting verified in the sandbox only                        | Fallback is a fresh payer approval per purchase ([LIMITATIONS.md](LIMITATIONS.md) L1)                                                         |
+| A `PayPal-Request-Id` above 108 characters returns HTTP 500  | The client enforces the limit ([LIMITATIONS.md](LIMITATIONS.md) L2)                                                                           |
+| SD-JWT chain handling is in-house, security-critical code    | Mutation tests and the TypeScript cross-check are mandatory before it is relied on ([ENV.md](ENV.md) section 1.5)                              |
+
 ## Definition of done
 
 - [ ] Public repository with the license detected by the host, a complete README, and a fresh clone that runs
