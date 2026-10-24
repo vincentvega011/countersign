@@ -9,6 +9,9 @@ required); a missing or malformed one is `invalid_profile_url` (HTTP 400). The p
 fetched yet, so no capability negotiation happens here and AP2 protection is enforced for every
 session (docs/PROTOCOL.md Decision 17).
 
+Every response that carries a checkout is signed (`ap2.merchant_authorization`, Decision 18) after
+its warnings are attached; error responses with no checkout are not.
+
 Protocol failures answer with an HTTP 4xx or 5xx and a `{code, content}` body. Business outcomes
 (including a missing checkout) answer 200 with the UCP envelope. Any unexpected exception answers
 500 with no detail (INV-10).
@@ -25,6 +28,8 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
+from countersign.merchant.authorization import sign_checkout
+from countersign.merchant.keys import MerchantKey
 from countersign.protocols.ucp import messages as m
 from countersign.protocols.ucp.requests import (
     check_content_type,
@@ -56,7 +61,9 @@ def _json(status: int, body: dict[str, Any]) -> JSONResponse:
     return JSONResponse(body, status_code=status, headers=_NO_STORE)
 
 
-def _respond(result: Result, request_body: dict[str, Any] | None = None) -> JSONResponse:
+def _respond(
+    result: Result, key: MerchantKey, request_body: dict[str, Any] | None = None
+) -> JSONResponse:
     body = result.body()
     if request_body is not None and result.record is not None:
         ignored = ignored_members(request_body, body)
@@ -70,10 +77,13 @@ def _respond(result: Result, request_body: dict[str, Any] | None = None) -> JSON
                 for path, member in ignored
             ]
             body["messages"] = [*body.get("messages", []), *extra]
+    if result.record is not None:
+        # Signed last: the signature covers every member of the response except `ap2`.
+        body = sign_checkout(body, key)
     return _json(result.http_status, body)
 
 
-def install(app: FastAPI, service: UcpService, base_path: str) -> None:
+def install(app: FastAPI, service: UcpService, base_path: str, key: MerchantKey) -> None:
     """Mount the checkout routes and the error handlers on `app`."""
     router = APIRouter(prefix=base_path)
 
@@ -91,29 +101,29 @@ def install(app: FastAPI, service: UcpService, base_path: str) -> None:
     async def create(request: Request) -> JSONResponse:
         data = await prepare(request, body="required")
         req = parse_checkout_request(data, update=False)
-        return _respond(await run_in_threadpool(service.create, req), data)
+        return _respond(await run_in_threadpool(service.create, req), key, data)
 
     @router.get("/checkout-sessions/{checkout_id}")
     async def get(checkout_id: str, request: Request) -> JSONResponse:
         await prepare(request, body="none")
-        return _respond(await run_in_threadpool(service.get, checkout_id))
+        return _respond(await run_in_threadpool(service.get, checkout_id), key)
 
     @router.put("/checkout-sessions/{checkout_id}")
     async def update(checkout_id: str, request: Request) -> JSONResponse:
         data = await prepare(request, body="required")
         req = parse_checkout_request(data, update=True)
         result = await run_in_threadpool(service.update, checkout_id, req)
-        return _respond(result, data)
+        return _respond(result, key, data)
 
     @router.post("/checkout-sessions/{checkout_id}/complete")
     async def complete(checkout_id: str, request: Request) -> JSONResponse:
         await prepare(request, body="required")
-        return _respond(await run_in_threadpool(service.complete, checkout_id))
+        return _respond(await run_in_threadpool(service.complete, checkout_id), key)
 
     @router.post("/checkout-sessions/{checkout_id}/cancel")
     async def cancel(checkout_id: str, request: Request) -> JSONResponse:
         await prepare(request, body="optional")
-        return _respond(await run_in_threadpool(service.cancel, checkout_id))
+        return _respond(await run_in_threadpool(service.cancel, checkout_id), key)
 
     app.include_router(router)
 

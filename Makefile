@@ -30,7 +30,7 @@ eval:
 	@echo "not implemented yet"
 
 interop:
-	@echo "not implemented yet"
+	bash scripts/interop.sh
 
 tamper-demo:
 	uv run python scripts/tamper_demo.py

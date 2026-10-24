@@ -58,5 +58,5 @@ def create_app(
         policy_hash=policy_hash(),
         clock_us=clock_us or now_us,
     )
-    install_ucp(app, service, REST_BASE_PATH)
+    install_ucp(app, service, REST_BASE_PATH, key)
     return app

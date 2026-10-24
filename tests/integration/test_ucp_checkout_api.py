@@ -67,6 +67,11 @@ def create(client: TestClient, lines: list[dict[str, Any]] | None = None, **top:
     return client.post(ROOT, json=body, headers=AGENT)
 
 
+def bare(body: dict[str, Any]) -> dict[str, Any]:
+    """A checkout without its signature: ECDSA is randomized, so equal checkouts differ in `ap2`."""
+    return {k: v for k, v in body.items() if k != "ap2"}
+
+
 def valid_checkout(body: dict[str, Any]) -> None:
     assert list(CHECKOUT_V.iter_errors(body)) == [], body
 
@@ -290,7 +295,7 @@ def test_get_returns_the_same_checkout(client: TestClient) -> None:
     c = new(client)
     r = client.get(f"{ROOT}/{c['id']}", headers=AGENT)
     assert r.status_code == 200
-    assert r.json() == c
+    assert bare(r.json()) == bare(c)
     valid_checkout(r.json())
 
 
@@ -360,7 +365,7 @@ def test_update_with_an_unknown_line_id_changes_nothing(
     assert codes(body) == ["line_item_not_found"]
     assert body["messages"][0]["severity"] == "recoverable"
     assert body["line_items"] == c["line_items"] and body["totals"] == c["totals"]
-    assert client.get(f"{ROOT}/{c['id']}", headers=AGENT).json() == c
+    assert bare(client.get(f"{ROOT}/{c['id']}", headers=AGENT).json()) == bare(c)
     assert log_kinds(admin_engine, c["id"]) == ["checkout.created", "checkout.update_rejected"]
 
 
@@ -374,7 +379,7 @@ def test_update_repeating_a_line_id_is_refused(client: TestClient) -> None:
     }
     body = client.put(f"{ROOT}/{c['id']}", json=sent, headers=AGENT).json()
     assert codes(body) == ["line_item_not_found"]
-    assert client.get(f"{ROOT}/{c['id']}", headers=AGENT).json() == c
+    assert bare(client.get(f"{ROOT}/{c['id']}", headers=AGENT).json()) == bare(c)
 
 
 def test_update_with_an_unknown_item_changes_nothing(client: TestClient) -> None:
@@ -424,7 +429,7 @@ def test_complete_returns_mandate_required_and_changes_nothing(
     (msg,) = body["messages"]
     assert msg["code"] == "mandate_required" and msg["severity"] == "recoverable"
     assert msg["path"] == "$.ap2.checkout_mandate"
-    assert {k: v for k, v in body.items() if k != "messages"} == c
+    assert bare({k: v for k, v in body.items() if k != "messages"}) == bare(c)
     assert "order" not in body
     assert log_kinds(admin_engine, c["id"]) == ["checkout.created", "checkout.complete_rejected"]
 
