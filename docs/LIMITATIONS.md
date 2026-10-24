@@ -96,3 +96,15 @@ All appends take one advisory lock, so the log is a single-writer bottleneck by 
 (tens of entries per purchase) this is irrelevant. Timestamps come from the writer's clock and are
 not required to be monotonic, so a day tree is defined by `ts_us` and ordered by `seq`. A log
 `append` joins the caller's transaction, so INV-12 callers must commit it before responding.
+
+## UCP checkout binding
+
+### L11. What the checkout endpoints do not do yet
+
+The binding ([PROTOCOL.md](PROTOCOL.md) Decision 17) accepts only line items and quantities. It
+collects no buyer, address or fulfillment data, charges no tax or shipping, and returns an empty
+`links` array because there are no legal pages to link. It does not support `Idempotency-Key`, so a
+retried create makes a second checkout; it does not verify request signatures or fetch the platform
+profile in `UCP-Agent`, so it cannot tell which agent is calling and cannot negotiate capabilities.
+Complete is a stub that always answers `mandate_required`. Per-checkout line items are limited to 20
+and quantities to 99, which are Countersign choices, not UCP limits.

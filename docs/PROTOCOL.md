@@ -1045,6 +1045,77 @@ Resolves: D8 (placement); the `kid` rule for the merchant key, which the specs l
 - **Version.** `2026-08-25`, the pinned release. The profile validates against the vendored
   `profile.json#/$defs/business_schema` in a test.
 
+### Decision 17: UCP checkout REST binding
+
+Resolves: how the checkout operations treat request members, status, errors and expiry where the
+specs leave room. Sources: `ucp/docs/specification/shopping/checkout/rest.md` ("Operations",
+"Protocol Mechanics") and `index.md` ("Checkout Status Lifecycle", "Status Values", "Error
+Handling", the operation sections); `ucp/source/schemas/shopping/checkout.json`,
+`types/line_item.json`, `types/item.json`; `ucp/docs/specification/overview/index.md` ("Schema
+processing").
+
+- **Paths.** Under the advertised REST endpoint (`<base>/ucp/v1`): `POST /checkout-sessions`,
+  `GET` and `PUT /checkout-sessions/{id}`, `POST /checkout-sessions/{id}/complete` and `/cancel`.
+  Create answers 201, the others 200. A `UCP-Agent` header with a `profile="<URL>"` member is
+  required on every request (the spec marks it required); absent or malformed is
+  `invalid_profile_url`, HTTP 400. The profile is not fetched yet, so there is no capability
+  negotiation and AP2 protection is enforced for every session (fail closed).
+- **What a request controls.** Only `line_items`: per line `item.id` and `quantity`, and on update
+  the line `id` and an optional `item.quantity_unit` assertion. The schemas mark these members
+  `ucp_request: omit` for create and update: `id`, `status`, `currency`, `totals`, `links`,
+  `expires_at`, `order`, line `totals`, `item.title`, `item.price`, and on create the line `id`. The
+  published schemas are open (no `additionalProperties: false`), and the overview says conformance
+  to the request direction is defined by the processing rules, not by rejecting extra members, so
+  Countersign **ignores** them and never reads their values. When a value differs from what the
+  business computed, the response carries a warning (`type` `warning`, `code` `field_ignored`,
+  `path` the member); an echoed value equal to the business's own produces none, because the spec's
+  full-replacement rule makes platforms send the whole resource back. `buyer`, `context`,
+  `signals`, `attribution` and `payment` are accepted by the schema and are not modelled: they are
+  discarded, not stored and not echoed.
+- **Prices.** `item.price` and `item.title` come from the catalog when a checkout is written and are
+  stored in the checkout; reads never re-price. Totals are the sum of line totals: there is no tax,
+  fulfillment or discount.
+- **Update** is full replacement of `line_items`. A line `id` on update must name an existing line
+  and appear once; new lines get `li_<n>` from a per-checkout counter that never reuses a number.
+  Lines are limited to 20 per checkout and quantity to 99 per line (Countersign limits, reported as
+  `line_limit` and `quantity_limit`). An `item.quantity_unit` other than `C62` with scale 0 is
+  `quantity_unit_mismatch` (the spec allows rejection with a recoverable outcome).
+- **Status.** All six values and the edges of the lifecycle diagram are defined in
+  `protocols/ucp/checkout_state.py`; every change goes through `transition`. Countersign collects no
+  buyer, address or fulfillment data, so a valid checkout is `ready_for_complete` from creation and
+  never `incomplete` or `requires_escalation` (there is no buyer handoff and no `continue_url`).
+  `complete_in_progress` and `completed` are reached only by Complete, which is a stub until the
+  mandate verification exists. Stays in one status on update.
+- **Expiry.** `expires_at` is creation plus 6 hours (the spec's default TTL). It is applied when the
+  checkout is next touched: a non-final checkout at or past `expires_at` becomes `canceled` and the
+  change is logged.
+- **Complete (stub).** From `ready_for_complete` it returns the unchanged checkout with an error
+  message `mandate_required` (`severity` `recoverable`, `path` `$.ap2.checkout_mandate`), whatever
+  the body carries: nothing is verified yet, so no mandate is accepted (INV-3, INV-10). From any other
+  status it returns `checkout_not_ready`.
+- **Errors** follow [Decision 10](#decision-10-provisional-rules-for-open-gaps). Business outcomes
+  are HTTP 200: with no resource (unknown id, a create that cannot succeed) the body is an error
+  response (`ucp.status` `error`, no checkout); otherwise it is the current checkout with an error
+  message. Codes: `not_found`, `item_unavailable`, `mandate_required` (UCP); `checkout_not_modifiable`,
+  `checkout_not_cancelable`, `checkout_not_ready`, `complete_in_progress`, `line_item_not_found`,
+  `quantity_limit`, `line_limit`, `quantity_unit_mismatch`, `field_ignored` (Countersign, free-form
+  as `error_code.json` permits). A refusal because the checkout is final is `unrecoverable`; one
+  that the platform can fix (or wait out) is `recoverable`. A create with any unavailable line
+  creates nothing, because dropping lines silently would change what the platform asked for.
+  Protocol failures are 4xx or 5xx with a `{code, content}` body: 400 for a bad body (the strict
+  JSON loader's codes `json_syntax`, `json_duplicate_key`, `json_non_finite`, `json_encoding`,
+  `json_too_large`, or `invalid_request` for a wrong shape, content type or non-object body) and
+  500 `internal_error` for anything unexpected, with no detail.
+- **Storage and log.** One Postgres row per checkout holds the JCS bytes of the canonical checkout,
+  status, version and times. Each operation changes the row under its lock and appends to the decision
+  log in the same transaction (`checkout.created`, `.updated`, `.canceled`, `.expired`, and
+  `.update_rejected`, `.complete_rejected`, `.cancel_rejected` for refusals), so a log failure rolls
+  the change back. Reads are not logged. A row that no longer validates is never served (500).
+  Migration `0002` also makes a final checkout immutable and requires each update to advance the
+  version by one.
+- **Not implemented.** `Idempotency-Key` (the spec says SHOULD; a retried create makes a second
+  checkout), request and response message signatures, and the cart-to-checkout conversion.
+
 ---
 
 ## 4. Confirmed PayPal facts
