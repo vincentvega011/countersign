@@ -6,7 +6,7 @@ setup:
 	docker compose up -d --wait postgres
 
 keys:
-	@echo "not implemented yet"
+	uv run python scripts/generate_keys.py
 
 dev:
 	@echo "not implemented yet"

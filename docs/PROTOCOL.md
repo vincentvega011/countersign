@@ -1016,6 +1016,35 @@ has `INSERT` and `SELECT` on the table only. Appends are serialized by a transac
 lock; the primary key on `seq` and unique constraints on `prev_hash` and `entry_hash` refuse a fork
 even if the lock is skipped.
 
+### Decision 16: Merchant signing key and profile
+
+Resolves: D8 (placement); the `kid` rule for the merchant key, which the specs leave open.
+
+- **Key.** One ES256 key: JWK `kty` `EC`, `crv` `P-256`, `alg` `ES256` (required, not inferred),
+  `use` `sig`. The service refuses to start if the file is missing, is a link, is readable by group
+  or others, has duplicate JSON keys, holds members outside `kty crv x y d alg use kid`, has another
+  type, curve or algorithm, has public members that do not match the private scalar, or has a `kid`
+  that is not the thumbprint below. AP2 requires a non-deterministic scheme such as ECDSA for the Checkout JWT
+  ([1.2.4](#124-hashes)); Ed25519 is therefore refused.
+- **`kid`.** The RFC 7638 JWK SHA-256 thumbprint of the public key: SHA-256 over the JSON of the
+  members `crv kty x y` in lexicographic order with no whitespace, written as unpadded base64url.
+  It is derived, never chosen, so two different keys cannot share an identifier and the value is
+  also valid for Web Bot Auth interop, where the UCP schema requires it.
+- **Storage.** `secrets/merchant_es256.jwk.json` (`MERCHANT_KEY_PATH`), mode 600, created by
+  `make keys` with exclusive creation: an existing file is never overwritten, because replacing the
+  key invalidates every outstanding Checkout JWT, mandate binding and receipt. Rotation is
+  deleting the file on purpose. The key is never printed or logged.
+- **Profile.** `/.well-known/ucp` serves the business profile: service `dev.ucp.shopping` over
+  `rest` with endpoint `<PUBLIC_BASE_URL>/ucp/v1`, capability `dev.ucp.shopping.checkout`, and
+  `dev.ucp.common.payment.ap2_mandate` with `extends` and
+  `config.vp_formats_supported = {"dc+sd-jwt": {}}`, as in the vendored example
+  ([Decision 6](#decision-6-vp_formats_supported-placement)). `keys[]` is a top-level member holding
+  the public JWK only, copied from an allowlist (`kty crv x y alg use kid`); the builder fails if any
+  of `d p q dp dq qi oth k` is present. `payment_handlers` is an empty object because the schema
+  requires the member and Countersign advertises no UCP payment handler at this stage.
+- **Version.** `2026-08-25`, the pinned release. The profile validates against the vendored
+  `profile.json#/$defs/business_schema` in a test.
+
 ---
 
 ## 4. Confirmed PayPal facts
