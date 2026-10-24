@@ -1116,6 +1116,54 @@ processing").
 - **Not implemented.** `Idempotency-Key` (the spec says SHOULD; a retried create makes a second
   checkout), request and response message signatures, and the cart-to-checkout conversion.
 
+### Decision 18: `merchant_authorization` signing and verification
+
+Resolves: details of [1.3.3](#133-merchant_authorization) that the spec leaves open. Sources:
+`ucp/docs/specification/payment/extensions/ap2-mandates.md` ("Business Authorization", "Signature
+Computation", "Canonicalization", "Business Verification"); `ucp/source/schemas/common/payment_ap2_mandate.json`
+(`merchant_authorization` pattern). Implemented in `countersign.merchant.authorization`; the
+relationship to `checkout_jwt` is [Decision 7](#decision-7-checkout_jwt-and-merchant_authorization).
+
+What the spec states and the code follows: the value is a detached JWS `<header>..<signature>`; the
+header holds `alg` and `kid`; the signature is over `b64url(header) "." b64url(JCS bytes)` where the
+payload is the checkout without its `ap2` member; coverage is the complete checkout JSON, including
+`ucp` members. Interpretations that are ours:
+
+- **Everything but `ap2` is covered, so a response is signed last.** `messages`, `expires_at`,
+  `links` and `status` are inside the signature. Two responses for the same checkout therefore
+  carry different signatures when anything in them differs, and, because ECDSA is randomized (AP2
+  requires a non-deterministic scheme), even identical content signs differently each time. A
+  platform builds its mandate from the exact response it verified. The Merchant role compares terms
+  (id, totals, line items) with the session, not messages.
+- **Header bytes.** The spec's pseudocode says `json_encode(header)` without fixing the encoding.
+  Countersign signs the compact JSON `{"alg":"ES256","kid":"<kid>"}` (member order `alg`, `kid`, no
+  whitespace, no `typ`). A verifier signs over the header segment it received, so any encoding of
+  those two members verifies; the member set must be exactly `alg` and `kid`.
+- **ES256 only.** The schema allows ES256, ES384 and ES512. Countersign signs ES256 and refuses the
+  others when verifying, as it does `none` and every MAC algorithm. This narrows what the spec
+  accepts and is deliberate: one algorithm, one key type (the merchant key,
+  [Decision 16](#decision-16-merchant-signing-key-and-profile)).
+- **Verification rules** (an unverifiable value is `merchant_authorization_invalid`; an absent one is
+  `merchant_authorization_missing`, both UCP codes): the value matches the schema pattern; the header
+  is a strict JSON object with exactly `alg` and `kid`; `alg` is `ES256`; header and signature are
+  canonical unpadded base64url; the signature is 64 bytes; `kid` names exactly one entry of the
+  published `keys[]`, which must be an EC P-256 public key (any `alg` it names is ES256, any `use` is
+  `sig`, no private member); the payload is rebuilt from the response being verified.
+- **Signature malleability.** ECDSA accepts both `(r, s)` and `(r, n - s)`. A copy with the other
+  `s` verifies and has a different `checkout_hash`, because the hash is over the whole JWT string.
+  This does not let anyone change terms, and a mandate binds the hash of the string its signer
+  verified; it matters only if something expects one signature per checkout, which nothing does.
+- **Scope.** Every response that carries a checkout is signed, whether or not AP2 was negotiated,
+  because capability negotiation is not implemented yet ([Decision 17](#decision-17-ucp-checkout-rest-binding)).
+  A response with no checkout (an error response) carries no `ap2`. A request that carries an `ap2`
+  member on create or update is ignored, as the schema marks it `omit`; it is not reported as an
+  ignored field, because an echoed `ap2` is always stale.
+- **Interop.** `scripts/interop_verify.mjs` verifies a response with `jose` and `canonicalize`
+  using only the public JWK from the profile, and prints the `checkout_hash` of the rebuilt
+  `checkout_jwt`, which a test compares with the Python value. `make interop` starts the server with
+  uvicorn, creates, updates, reads, completes and cancels a checkout over HTTP, and verifies each
+  response with that script.
+
 ---
 
 ## 4. Confirmed PayPal facts

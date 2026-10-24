@@ -106,5 +106,7 @@ collects no buyer, address or fulfillment data, charges no tax or shipping, and 
 `links` array because there are no legal pages to link. It does not support `Idempotency-Key`, so a
 retried create makes a second checkout; it does not verify request signatures or fetch the platform
 profile in `UCP-Agent`, so it cannot tell which agent is calling and cannot negotiate capabilities.
-Complete is a stub that always answers `mandate_required`. Per-checkout line items are limited to 20
+Complete is a stub that always answers `mandate_required`. Every checkout response is signed with
+`ap2.merchant_authorization` whether or not the platform negotiated AP2 ([PROTOCOL.md](PROTOCOL.md)
+Decision 18). Per-checkout line items are limited to 20
 and quantities to 99, which are Countersign choices, not UCP limits.
