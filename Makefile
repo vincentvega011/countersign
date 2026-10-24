@@ -1,9 +1,12 @@
-.PHONY: setup keys dev demo db test test-safety sandbox-smoke eval interop tamper-demo lint deploy
+.PHONY: setup node-deps keys dev demo db test test-safety sandbox-smoke eval interop tamper-demo lint deploy
 
-setup:
+setup: node-deps
 	uv sync
-	pnpm install
 	docker compose up -d --wait postgres
+
+# The Node packages the interop verifier needs (jose, canonicalize), installed from the lockfile.
+node-deps:
+	pnpm install --frozen-lockfile
 
 keys:
 	uv run python scripts/generate_keys.py

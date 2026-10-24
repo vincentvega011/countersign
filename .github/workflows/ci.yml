@@ -28,6 +28,14 @@ jobs:
           --health-retries 20
     steps:
       - uses: actions/checkout@v7
+      # The interop tests run scripts/interop_verify.mjs, which resolves jose and canonicalize from the
+      # root node_modules, so the Node packages must be installed before pytest.
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - uses: astral-sh/setup-uv@v10.3.0
       - run: uv sync --locked
       - run: uv run ruff check .

@@ -280,6 +280,9 @@ def node(
 ) -> subprocess.CompletedProcess[str]:
     if shutil.which("node") is None:
         pytest.fail("node is not installed; the interop verifier needs Node 22 (see docs/ENV.md)")
+    for package in ("jose", "canonicalize"):
+        if not (SCRIPT.parents[1] / "node_modules" / package).is_dir():
+            pytest.fail(f"the Node package {package} is not installed; run `make node-deps`")
     (tmp_path / "profile.json").write_text(json.dumps(profile))
     (tmp_path / f"{name}.json").write_text(json.dumps(body))
     return subprocess.run(

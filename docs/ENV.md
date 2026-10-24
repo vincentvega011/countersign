@@ -35,6 +35,13 @@ Every requirement traces to [PROTOCOL.md](PROTOCOL.md).
 | Node interop verifier              | `jose`                                                                        | 6.2.12          | MIT        | Verifies the detached JWS produced by Python.                                                                                                                                                                                                 |
 | Node JCS                           | `canonicalize`                                                                | 5.1.0           | Apache-2.0 | An independent RFC 8785 implementation, so the Node check does not share code with the Python signer.                                                                                                                                         |
 
+Node packages and where they resolve from. `jose` and `canonicalize` are devDependencies of the root
+`package.json` and are pinned in `pnpm-lock.yaml` under the root importer. `scripts/interop_verify.mjs`
+imports them by bare name, so Node finds them in the repository's root `node_modules`, locally and in
+CI alike. Install them with `make node-deps` (`pnpm install --frozen-lockfile`); `make setup` does this
+first. The tests that run the Node verifier fail, with that instruction, if they are missing, and the CI
+`python` job installs them before `pytest`.
+
 Pinning policy. The Python cryptographic and canonicalization libraries are pinned with `==` in
 `pyproject.toml` and locked in `uv.lock`. The Node ones are pinned exactly in `package.json` and
 locked in `pnpm-lock.yaml`. Where a choice exists, a release at least two weeks old is preferred.
