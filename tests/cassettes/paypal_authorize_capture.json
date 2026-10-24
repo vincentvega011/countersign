@@ -1,0 +1,1063 @@
+{
+  "interactions": [
+    {
+      "request": {
+        "body": null,
+        "method": "POST",
+        "path": "/v1/oauth2/token",
+        "request_id": null
+      },
+      "response": {
+        "body": {
+          "access_token": "SCRUBBED_ACCESS_TOKEN",
+          "app_id": "SCRUBBED_APP_ID",
+          "expires_in": 32400,
+          "nonce": "SCRUBBED_NONCE",
+          "scope": "SCRUBBED_SCOPE",
+          "token_type": "Bearer"
+        },
+        "headers": {
+          "content-type": "application/json",
+          "paypal-debug-id": "f1656523c929b"
+        },
+        "status": 200
+      }
+    },
+    {
+      "request": {
+        "body": {
+          "intent": "AUTHORIZE",
+          "payment_source": {
+            "paypal": {
+              "experience_context": {
+                "cancel_url": "https://example.com/cancel",
+                "payment_method_preference": "IMMEDIATE_PAYMENT_REQUIRED",
+                "return_url": "https://example.com/return",
+                "shipping_preference": "NO_SHIPPING",
+                "user_action": "PAY_NOW"
+              }
+            }
+          },
+          "purchase_units": [
+            {
+              "amount": {
+                "breakdown": {
+                  "item_total": {
+                    "currency_code": "USD",
+                    "value": "29.00"
+                  }
+                },
+                "currency_code": "USD",
+                "value": "29.00"
+              },
+              "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+              "description": "Countersign sandbox cassette",
+              "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+              "items": [
+                {
+                  "category": "DIGITAL_GOODS",
+                  "name": "Brindlewick Cable Organizer",
+                  "quantity": "1",
+                  "sku": "ac-brindlewick-cable-organizer",
+                  "unit_amount": {
+                    "currency_code": "USD",
+                    "value": "11.00"
+                  }
+                },
+                {
+                  "category": "DIGITAL_GOODS",
+                  "name": "Ostrander Trail Earbud Pouch",
+                  "quantity": "2",
+                  "sku": "ac-ostrander-trail-earbud-pouch",
+                  "unit_amount": {
+                    "currency_code": "USD",
+                    "value": "9.00"
+                  }
+                }
+              ],
+              "reference_id": "default"
+            }
+          ]
+        },
+        "method": "POST",
+        "path": "/v2/checkout/orders",
+        "request_id": "cs1.create_order.Z8LixtuBGNmCD4izsI06wvzOi1CzV31YCM9NrctrzXc"
+      },
+      "response": {
+        "body": {
+          "id": "38099976HV4093935",
+          "intent": "AUTHORIZE",
+          "links": [
+            {
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+              "method": "GET",
+              "rel": "self"
+            },
+            {
+              "href": "https://www.sandbox.paypal.com/checkoutnow?token=38099976HV4093935",
+              "method": "GET",
+              "rel": "payer-action"
+            }
+          ],
+          "payment_source": {},
+          "purchase_units": [
+            {
+              "amount": {
+                "breakdown": {
+                  "item_total": {
+                    "currency_code": "USD",
+                    "value": "29.00"
+                  }
+                },
+                "currency_code": "USD",
+                "value": "29.00"
+              },
+              "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+              "description": "Countersign sandbox cassette",
+              "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+              "items": [
+                {
+                  "category": "DIGITAL_GOODS",
+                  "name": "Brindlewick Cable Organizer",
+                  "quantity": "1",
+                  "sku": "ac-brindlewick-cable-organizer",
+                  "unit_amount": {
+                    "currency_code": "USD",
+                    "value": "11.00"
+                  }
+                },
+                {
+                  "category": "DIGITAL_GOODS",
+                  "name": "Ostrander Trail Earbud Pouch",
+                  "quantity": "2",
+                  "sku": "ac-ostrander-trail-earbud-pouch",
+                  "unit_amount": {
+                    "currency_code": "USD",
+                    "value": "9.00"
+                  }
+                }
+              ],
+              "payee": {
+                "email_address": "SCRUBBED_EMAIL_ADDRESS",
+                "merchant_id": "SCRUBBED_MERCHANT_ID"
+              },
+              "reference_id": "default"
+            }
+          ],
+          "status": "PAYER_ACTION_REQUIRED"
+        },
+        "headers": {
+          "content-type": "application/json",
+          "paypal-debug-id": "f898951a558ec"
+        },
+        "status": 200
+      }
+    },
+    {
+      "request": {
+        "body": null,
+        "method": "GET",
+        "path": "/v2/checkout/orders/38099976HV4093935",
+        "request_id": null
+      },
+      "response": {
+        "body": {
+          "create_time": "2026-10-24T07:23:54Z",
+          "id": "38099976HV4093935",
+          "intent": "AUTHORIZE",
+          "links": [
+            {
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+              "method": "GET",
+              "rel": "self"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+              "method": "PATCH",
+              "rel": "update"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935/authorize",
+              "method": "POST",
+              "rel": "authorize"
+            }
+          ],
+          "payer": {},
+          "payment_source": {},
+          "purchase_units": [
+            {
+              "amount": {
+                "breakdown": {
+                  "item_total": {
+                    "currency_code": "USD",
+                    "value": "29.00"
+                  }
+                },
+                "currency_code": "USD",
+                "value": "29.00"
+              },
+              "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+              "description": "Countersign sandbox cassette",
+              "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+              "items": [
+                {
+                  "category": "DIGITAL_GOODS",
+                  "name": "Brindlewick Cable Organizer",
+                  "quantity": "1",
+                  "sku": "ac-brindlewick-cable-organizer",
+                  "unit_amount": {
+                    "currency_code": "USD",
+                    "value": "11.00"
+                  }
+                },
+                {
+                  "category": "DIGITAL_GOODS",
+                  "name": "Ostrander Trail Earbud Pouch",
+                  "quantity": "2",
+                  "sku": "ac-ostrander-trail-earbud-pouch",
+                  "unit_amount": {
+                    "currency_code": "USD",
+                    "value": "9.00"
+                  }
+                }
+              ],
+              "payee": {
+                "email_address": "SCRUBBED_EMAIL_ADDRESS",
+                "merchant_id": "SCRUBBED_MERCHANT_ID"
+              },
+              "reference_id": "default"
+            }
+          ],
+          "status": "APPROVED"
+        },
+        "headers": {
+          "content-type": "application/json",
+          "paypal-debug-id": "f689178633961"
+        },
+        "status": 200
+      }
+    },
+    {
+      "request": {
+        "body": {},
+        "method": "POST",
+        "path": "/v2/checkout/orders/38099976HV4093935/authorize",
+        "request_id": "cs1.authorize.Wko_0s6ApA87033hf7GNtVr11CKxxiQC6hDWlYDWzdI"
+      },
+      "response": {
+        "body": {
+          "create_time": "2026-10-24T07:23:54Z",
+          "id": "38099976HV4093935",
+          "intent": "AUTHORIZE",
+          "links": [
+            {
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+              "method": "GET",
+              "rel": "self"
+            }
+          ],
+          "payer": {},
+          "payment_source": {},
+          "purchase_units": [
+            {
+              "amount": {
+                "breakdown": {
+                  "handling": {
+                    "currency_code": "USD",
+                    "value": "0.00"
+                  },
+                  "insurance": {
+                    "currency_code": "USD",
+                    "value": "0.00"
+                  },
+                  "item_total": {
+                    "currency_code": "USD",
+                    "value": "29.00"
+                  },
+                  "shipping": {},
+                  "shipping_discount": {
+                    "currency_code": "USD",
+                    "value": "0.00"
+                  }
+                },
+                "currency_code": "USD",
+                "value": "29.00"
+              },
+              "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+              "description": "Countersign sandbox cassette",
+              "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+              "items": [
+                {
+                  "category": "DIGITAL_GOODS",
+                  "name": "Brindlewick Cable Organizer",
+                  "quantity": "1",
+                  "sku": "ac-brindlewick-cable-organizer",
+                  "tax": {
+                    "currency_code": "USD",
+                    "value": "0.00"
+                  },
+                  "unit_amount": {
+                    "currency_code": "USD",
+                    "value": "11.00"
+                  }
+                },
+                {
+                  "category": "DIGITAL_GOODS",
+                  "name": "Ostrander Trail Earbud Pouch",
+                  "quantity": "2",
+                  "sku": "ac-ostrander-trail-earbud-pouch",
+                  "tax": {
+                    "currency_code": "USD",
+                    "value": "0.00"
+                  },
+                  "unit_amount": {
+                    "currency_code": "USD",
+                    "value": "9.00"
+                  }
+                }
+              ],
+              "payee": {
+                "email_address": "SCRUBBED_EMAIL_ADDRESS",
+                "merchant_id": "SCRUBBED_MERCHANT_ID"
+              },
+              "payments": {
+                "authorizations": [
+                  {
+                    "amount": {
+                      "currency_code": "USD",
+                      "value": "29.00"
+                    },
+                    "create_time": "2026-10-24T07:24:18Z",
+                    "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+                    "expiration_time": "2026-11-22T07:24:18Z",
+                    "id": "5RB874223R635620V",
+                    "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+                    "links": [
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V",
+                        "method": "GET",
+                        "rel": "self"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/capture",
+                        "method": "POST",
+                        "rel": "capture"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/void",
+                        "method": "POST",
+                        "rel": "void"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/reauthorize",
+                        "method": "POST",
+                        "rel": "reauthorize"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+                        "method": "GET",
+                        "rel": "up"
+                      }
+                    ],
+                    "seller_protection": {
+                      "dispute_categories": [
+                        "ITEM_NOT_RECEIVED",
+                        "UNAUTHORIZED_TRANSACTION"
+                      ],
+                      "status": "ELIGIBLE"
+                    },
+                    "status": "CREATED",
+                    "update_time": "2026-10-24T07:24:18Z"
+                  }
+                ]
+              },
+              "reference_id": "default"
+            }
+          ],
+          "status": "COMPLETED",
+          "update_time": "2026-10-24T07:24:19Z"
+        },
+        "headers": {
+          "content-type": "application/json",
+          "paypal-debug-id": "f5995671b30ed"
+        },
+        "status": 201
+      }
+    },
+    {
+      "request": {
+        "body": null,
+        "method": "GET",
+        "path": "/v2/checkout/orders/38099976HV4093935",
+        "request_id": null
+      },
+      "response": {
+        "body": {
+          "create_time": "2026-10-24T07:24:18Z",
+          "id": "38099976HV4093935",
+          "intent": "AUTHORIZE",
+          "links": [
+            {
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+              "method": "GET",
+              "rel": "self"
+            }
+          ],
+          "payer": {},
+          "payment_source": {},
+          "purchase_units": [
+            {
+              "amount": {
+                "breakdown": {
+                  "item_total": {
+                    "currency_code": "USD",
+                    "value": "29.00"
+                  }
+                },
+                "currency_code": "USD",
+                "value": "29.00"
+              },
+              "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+              "description": "Countersign sandbox cassette",
+              "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+              "items": [
+                {
+                  "category": "DIGITAL_GOODS",
+                  "name": "Brindlewick Cable Organizer",
+                  "quantity": "1",
+                  "sku": "ac-brindlewick-cable-organizer",
+                  "unit_amount": {
+                    "currency_code": "USD",
+                    "value": "11.00"
+                  }
+                },
+                {
+                  "category": "DIGITAL_GOODS",
+                  "name": "Ostrander Trail Earbud Pouch",
+                  "quantity": "2",
+                  "sku": "ac-ostrander-trail-earbud-pouch",
+                  "unit_amount": {
+                    "currency_code": "USD",
+                    "value": "9.00"
+                  }
+                }
+              ],
+              "payee": {
+                "email_address": "SCRUBBED_EMAIL_ADDRESS",
+                "merchant_id": "SCRUBBED_MERCHANT_ID"
+              },
+              "payments": {
+                "authorizations": [
+                  {
+                    "amount": {
+                      "currency_code": "USD",
+                      "value": "29.00"
+                    },
+                    "create_time": "2026-10-24T07:24:18Z",
+                    "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+                    "expiration_time": "2026-11-22T07:24:18Z",
+                    "id": "5RB874223R635620V",
+                    "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+                    "links": [
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V",
+                        "method": "GET",
+                        "rel": "self"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/capture",
+                        "method": "POST",
+                        "rel": "capture"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/void",
+                        "method": "POST",
+                        "rel": "void"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/reauthorize",
+                        "method": "POST",
+                        "rel": "reauthorize"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+                        "method": "GET",
+                        "rel": "up"
+                      }
+                    ],
+                    "seller_protection": {
+                      "dispute_categories": [
+                        "ITEM_NOT_RECEIVED",
+                        "UNAUTHORIZED_TRANSACTION"
+                      ],
+                      "status": "ELIGIBLE"
+                    },
+                    "status": "CREATED",
+                    "update_time": "2026-10-24T07:24:18Z"
+                  }
+                ]
+              },
+              "reference_id": "default"
+            }
+          ],
+          "status": "COMPLETED",
+          "update_time": "2026-10-24T07:24:18Z"
+        },
+        "headers": {
+          "content-type": "application/json",
+          "paypal-debug-id": "f781523ec07be"
+        },
+        "status": 200
+      }
+    },
+    {
+      "request": {
+        "body": null,
+        "method": "GET",
+        "path": "/v2/payments/authorizations/5RB874223R635620V",
+        "request_id": null
+      },
+      "response": {
+        "body": {
+          "amount": {
+            "currency_code": "USD",
+            "value": "29.00"
+          },
+          "create_time": "2026-10-24T07:24:18Z",
+          "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+          "expiration_time": "2026-11-22T07:24:18Z",
+          "id": "5RB874223R635620V",
+          "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+          "links": [
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V",
+              "method": "GET",
+              "rel": "self"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/capture",
+              "method": "POST",
+              "rel": "capture"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/void",
+              "method": "POST",
+              "rel": "void"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/reauthorize",
+              "method": "POST",
+              "rel": "reauthorize"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+              "method": "GET",
+              "rel": "up"
+            }
+          ],
+          "payee": {
+            "email_address": "SCRUBBED_EMAIL_ADDRESS",
+            "merchant_id": "SCRUBBED_MERCHANT_ID"
+          },
+          "seller_protection": {
+            "dispute_categories": [
+              "ITEM_NOT_RECEIVED",
+              "UNAUTHORIZED_TRANSACTION"
+            ],
+            "status": "ELIGIBLE"
+          },
+          "status": "CREATED",
+          "supplementary_data": {
+            "related_ids": {
+              "order_id": "38099976HV4093935"
+            }
+          },
+          "update_time": "2026-10-24T07:24:18Z"
+        },
+        "headers": {
+          "content-type": "application/json;charset=UTF-8",
+          "paypal-debug-id": "f665437e70c62"
+        },
+        "status": 200
+      }
+    },
+    {
+      "request": {
+        "body": null,
+        "method": "GET",
+        "path": "/v2/payments/authorizations/5RB874223R635620V",
+        "request_id": null
+      },
+      "response": {
+        "body": {
+          "amount": {
+            "currency_code": "USD",
+            "value": "29.00"
+          },
+          "create_time": "2026-10-24T07:24:18Z",
+          "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+          "expiration_time": "2026-11-22T07:24:18Z",
+          "id": "5RB874223R635620V",
+          "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+          "links": [
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V",
+              "method": "GET",
+              "rel": "self"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/capture",
+              "method": "POST",
+              "rel": "capture"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/void",
+              "method": "POST",
+              "rel": "void"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/reauthorize",
+              "method": "POST",
+              "rel": "reauthorize"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+              "method": "GET",
+              "rel": "up"
+            }
+          ],
+          "payee": {
+            "email_address": "SCRUBBED_EMAIL_ADDRESS",
+            "merchant_id": "SCRUBBED_MERCHANT_ID"
+          },
+          "seller_protection": {
+            "dispute_categories": [
+              "ITEM_NOT_RECEIVED",
+              "UNAUTHORIZED_TRANSACTION"
+            ],
+            "status": "ELIGIBLE"
+          },
+          "status": "CREATED",
+          "supplementary_data": {
+            "related_ids": {
+              "order_id": "38099976HV4093935"
+            }
+          },
+          "update_time": "2026-10-24T07:24:18Z"
+        },
+        "headers": {
+          "content-type": "application/json;charset=UTF-8",
+          "paypal-debug-id": "f6152335d05f0"
+        },
+        "status": 200
+      }
+    },
+    {
+      "request": {
+        "body": {
+          "amount": {
+            "currency_code": "USD",
+            "value": "29.00"
+          },
+          "final_capture": true
+        },
+        "method": "POST",
+        "path": "/v2/payments/authorizations/5RB874223R635620V/capture",
+        "request_id": "cs1.capture.3vCNMCZNhjiHfpcZ9Ef-OLCdyhurPr6tMF1cXG2GZbI"
+      },
+      "response": {
+        "body": {
+          "amount": {
+            "currency_code": "USD",
+            "value": "29.00"
+          },
+          "create_time": "2026-10-24T07:24:25Z",
+          "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+          "final_capture": true,
+          "id": "0FJ719957V092431H",
+          "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+          "links": [
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/captures/0FJ719957V092431H",
+              "method": "GET",
+              "rel": "self"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/captures/0FJ719957V092431H/refund",
+              "method": "POST",
+              "rel": "refund"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V",
+              "method": "GET",
+              "rel": "up"
+            }
+          ],
+          "seller_protection": {
+            "dispute_categories": [
+              "ITEM_NOT_RECEIVED",
+              "UNAUTHORIZED_TRANSACTION"
+            ],
+            "status": "ELIGIBLE"
+          },
+          "seller_receivable_breakdown": {
+            "exchange_rate": {},
+            "gross_amount": {
+              "currency_code": "USD",
+              "value": "29.00"
+            },
+            "net_amount": {
+              "currency_code": "USD",
+              "value": "27.50"
+            },
+            "paypal_fee": {
+              "currency_code": "USD",
+              "value": "1.50"
+            }
+          },
+          "status": "COMPLETED",
+          "update_time": "2026-10-24T07:24:25Z"
+        },
+        "headers": {
+          "content-type": "application/json;charset=UTF-8",
+          "paypal-debug-id": "f204775dfe0fa"
+        },
+        "status": 201
+      }
+    },
+    {
+      "request": {
+        "body": null,
+        "method": "GET",
+        "path": "/v2/checkout/orders/38099976HV4093935",
+        "request_id": null
+      },
+      "response": {
+        "body": {
+          "create_time": "2026-10-24T07:24:18Z",
+          "id": "38099976HV4093935",
+          "intent": "AUTHORIZE",
+          "links": [
+            {
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+              "method": "GET",
+              "rel": "self"
+            }
+          ],
+          "payer": {},
+          "payment_source": {},
+          "purchase_units": [
+            {
+              "amount": {
+                "breakdown": {
+                  "item_total": {
+                    "currency_code": "USD",
+                    "value": "29.00"
+                  }
+                },
+                "currency_code": "USD",
+                "value": "29.00"
+              },
+              "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+              "description": "Countersign sandbox cassette",
+              "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+              "items": [
+                {
+                  "category": "DIGITAL_GOODS",
+                  "name": "Brindlewick Cable Organizer",
+                  "quantity": "1",
+                  "sku": "ac-brindlewick-cable-organizer",
+                  "unit_amount": {
+                    "currency_code": "USD",
+                    "value": "11.00"
+                  }
+                },
+                {
+                  "category": "DIGITAL_GOODS",
+                  "name": "Ostrander Trail Earbud Pouch",
+                  "quantity": "2",
+                  "sku": "ac-ostrander-trail-earbud-pouch",
+                  "unit_amount": {
+                    "currency_code": "USD",
+                    "value": "9.00"
+                  }
+                }
+              ],
+              "payee": {
+                "email_address": "SCRUBBED_EMAIL_ADDRESS",
+                "merchant_id": "SCRUBBED_MERCHANT_ID"
+              },
+              "payments": {
+                "authorizations": [
+                  {
+                    "amount": {
+                      "currency_code": "USD",
+                      "value": "29.00"
+                    },
+                    "create_time": "2026-10-24T07:24:18Z",
+                    "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+                    "expiration_time": "2026-11-22T07:24:18Z",
+                    "id": "5RB874223R635620V",
+                    "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+                    "links": [
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V",
+                        "method": "GET",
+                        "rel": "self"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/capture",
+                        "method": "POST",
+                        "rel": "capture"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/void",
+                        "method": "POST",
+                        "rel": "void"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/reauthorize",
+                        "method": "POST",
+                        "rel": "reauthorize"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+                        "method": "GET",
+                        "rel": "up"
+                      }
+                    ],
+                    "seller_protection": {
+                      "dispute_categories": [
+                        "ITEM_NOT_RECEIVED",
+                        "UNAUTHORIZED_TRANSACTION"
+                      ],
+                      "status": "ELIGIBLE"
+                    },
+                    "status": "CAPTURED",
+                    "update_time": "2026-10-24T07:24:25Z"
+                  }
+                ],
+                "captures": [
+                  {
+                    "amount": {
+                      "currency_code": "USD",
+                      "value": "29.00"
+                    },
+                    "create_time": "2026-10-24T07:24:25Z",
+                    "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+                    "disbursement_mode": "INSTANT",
+                    "final_capture": true,
+                    "id": "0FJ719957V092431H",
+                    "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+                    "links": [
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/captures/0FJ719957V092431H",
+                        "method": "GET",
+                        "rel": "self"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/captures/0FJ719957V092431H/refund",
+                        "method": "POST",
+                        "rel": "refund"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V",
+                        "method": "GET",
+                        "rel": "up"
+                      }
+                    ],
+                    "seller_protection": {
+                      "dispute_categories": [
+                        "ITEM_NOT_RECEIVED",
+                        "UNAUTHORIZED_TRANSACTION"
+                      ],
+                      "status": "ELIGIBLE"
+                    },
+                    "seller_receivable_breakdown": {
+                      "gross_amount": {
+                        "currency_code": "USD",
+                        "value": "29.00"
+                      },
+                      "net_amount": {
+                        "currency_code": "USD",
+                        "value": "27.50"
+                      },
+                      "paypal_fee": {
+                        "currency_code": "USD",
+                        "value": "1.50"
+                      }
+                    },
+                    "status": "COMPLETED",
+                    "update_time": "2026-10-24T07:24:25Z"
+                  }
+                ]
+              },
+              "reference_id": "default"
+            }
+          ],
+          "status": "COMPLETED",
+          "update_time": "2026-10-24T07:24:25Z"
+        },
+        "headers": {
+          "content-type": "application/json",
+          "paypal-debug-id": "f4513563b5341"
+        },
+        "status": 200
+      }
+    },
+    {
+      "request": {
+        "body": null,
+        "method": "GET",
+        "path": "/v2/payments/captures/0FJ719957V092431H",
+        "request_id": null
+      },
+      "response": {
+        "body": {
+          "amount": {
+            "currency_code": "USD",
+            "value": "29.00"
+          },
+          "create_time": "2026-10-24T07:24:25Z",
+          "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+          "disbursement_mode": "INSTANT",
+          "final_capture": true,
+          "id": "0FJ719957V092431H",
+          "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+          "links": [
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/captures/0FJ719957V092431H",
+              "method": "GET",
+              "rel": "self"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/captures/0FJ719957V092431H/refund",
+              "method": "POST",
+              "rel": "refund"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V",
+              "method": "GET",
+              "rel": "up"
+            }
+          ],
+          "payee": {
+            "email_address": "SCRUBBED_EMAIL_ADDRESS",
+            "merchant_id": "SCRUBBED_MERCHANT_ID"
+          },
+          "seller_protection": {
+            "dispute_categories": [
+              "ITEM_NOT_RECEIVED",
+              "UNAUTHORIZED_TRANSACTION"
+            ],
+            "status": "ELIGIBLE"
+          },
+          "seller_receivable_breakdown": {
+            "gross_amount": {
+              "currency_code": "USD",
+              "value": "29.00"
+            },
+            "net_amount": {
+              "currency_code": "USD",
+              "value": "27.50"
+            },
+            "paypal_fee": {
+              "currency_code": "USD",
+              "value": "1.50"
+            }
+          },
+          "status": "COMPLETED",
+          "supplementary_data": {
+            "related_ids": {
+              "authorization_id": "5RB874223R635620V",
+              "order_id": "38099976HV4093935"
+            }
+          },
+          "update_time": "2026-10-24T07:24:25Z"
+        },
+        "headers": {
+          "content-type": "application/json;charset=UTF-8",
+          "paypal-debug-id": "f55276059f381"
+        },
+        "status": 200
+      }
+    },
+    {
+      "request": {
+        "body": null,
+        "method": "GET",
+        "path": "/v2/payments/authorizations/5RB874223R635620V",
+        "request_id": null
+      },
+      "response": {
+        "body": {
+          "amount": {
+            "currency_code": "USD",
+            "value": "29.00"
+          },
+          "create_time": "2026-10-24T07:24:18Z",
+          "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+          "expiration_time": "2026-11-22T07:24:18Z",
+          "id": "5RB874223R635620V",
+          "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+          "links": [
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V",
+              "method": "GET",
+              "rel": "self"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/capture",
+              "method": "POST",
+              "rel": "capture"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/void",
+              "method": "POST",
+              "rel": "void"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/reauthorize",
+              "method": "POST",
+              "rel": "reauthorize"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+              "method": "GET",
+              "rel": "up"
+            }
+          ],
+          "payee": {
+            "email_address": "SCRUBBED_EMAIL_ADDRESS",
+            "merchant_id": "SCRUBBED_MERCHANT_ID"
+          },
+          "seller_protection": {
+            "dispute_categories": [
+              "ITEM_NOT_RECEIVED",
+              "UNAUTHORIZED_TRANSACTION"
+            ],
+            "status": "ELIGIBLE"
+          },
+          "status": "CAPTURED",
+          "supplementary_data": {
+            "related_ids": {
+              "order_id": "38099976HV4093935"
+            }
+          },
+          "update_time": "2026-10-24T07:24:25Z"
+        },
+        "headers": {
+          "content-type": "application/json;charset=UTF-8",
+          "paypal-debug-id": "f970510c6b2ce"
+        },
+        "status": 200
+      }
+    }
+  ],
+  "meta": {
+    "checkout_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+    "host": "sandbox",
+    "recorded_at": "2026-10-24T07:23:52Z"
+  },
+  "version": 1
+}
