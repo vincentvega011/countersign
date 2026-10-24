@@ -1174,7 +1174,10 @@ Resolves: how `countersign.paypal` turns the facts in [section 4](#4-confirmed-p
   with GET. A mutation returns only the identifier of the resource it touched (and, for create, the
   `payer-action` or `approve` link); `authorize` does not read its response body at all, because the
   authorization id is in the fetched order. Mutations send `Prefer: return=representation`, the
-  setting the verified sandbox runs used.
+  setting the verified sandbox runs used. **A POST with no payload still sends a JSON body:**
+  `authorize` and a full refund send `{}` with `Content-Type: application/json`, as the accepted runs
+  did; with no body at all PayPal answered 415 `UNSUPPORTED_MEDIA_TYPE` (found when recording the
+  cassette, [ENV.md](ENV.md) 2.5). `void` sends no body, which is what the accepted runs did.
 - **Request ids.** `cs1.<operation>.<digest>`, the digest being the unpadded base64url of
   `SHA-256("cs.paypal.request.v1" || 0x00 || fields)` where each of the checkout id, the operation
   and any extra parts is a 4 byte big-endian length then its UTF-8 bytes. At most 60 characters.
@@ -1313,7 +1316,7 @@ Also observed: a later GET of the first capture (requested with `final_capture` 
 | ------------------------------------------------------ | ------------------------------------------------------------- |
 | Partial refund 10.00 of a 30.00 capture                | accepted; capture status `PARTIALLY_REFUNDED`                 |
 | Refund 25.00 when 20.00 remained                       | HTTP 422 `REFUND_AMOUNT_EXCEEDED`                             |
-| Refund with an empty body after the partial refund     | accepted; capture status `REFUNDED`                           |
+| Refund with `{}` (no amount) after the partial refund  | accepted; capture status `REFUNDED`                           |
 | Refund of a fully refunded capture                     | HTTP 422 `CAPTURE_FULLY_REFUNDED`                             |
 
 The amount refunded by the empty-body call was not printed, so it is not recorded.

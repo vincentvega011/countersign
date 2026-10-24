@@ -896,7 +896,7 @@ def test_authorize_posts_without_reading_the_response(
     assert result == Mutation("ORDER1", 201, None, False)
     (request,) = post_calls(paypal)
     assert request.headers["paypal-request-id"] == derive_request_id(CHECKOUT, Operation.AUTHORIZE)
-    assert request.content == b""
+    assert request.content == b"{}"
 
 
 def test_authorize_replay(paypal: respx.MockRouter, pp: PayPalClient) -> None:
@@ -1068,14 +1068,14 @@ def test_void_with_an_unexpected_success_code(paypal: respx.MockRouter, pp: PayP
 # =============================================================== refund
 
 
-def test_full_refund_sends_an_empty_body(paypal: respx.MockRouter, pp: PayPalClient) -> None:
+def test_full_refund_sends_an_empty_json_object(paypal: respx.MockRouter, pp: PayPalClient) -> None:
     paypal.post(f"{BASE}/v2/payments/captures/CAP1/refund").mock(
         return_value=httpx.Response(201, json={"id": "REF1", "status": "COMPLETED"})
     )
     result = pp.refund_capture(CHECKOUT, "CAP1")
     assert result.resource_id == "REF1" and result.status_code == 201
     (request,) = post_calls(paypal)
-    assert request.content == b""
+    assert request.content == b"{}" and request.headers["content-type"] == "application/json"
     assert request.headers["paypal-request-id"] == derive_request_id(
         CHECKOUT, Operation.REFUND, "CAP1", "full"
     )
@@ -1582,6 +1582,105 @@ def test_a_token_in_an_error_body_is_not_echoed_by_the_client_state(
     client = make_client(clock)
     client.get_order("ORDER1")
     assert TOKEN not in repr(client.__dict__.get("_token")) and TOKEN not in repr(client)
+
+
+# ----------------------------------------------- content type and body on every POST
+
+
+def test_every_post_sends_the_content_type_and_body_paypal_accepted(
+    paypal: respx.MockRouter, pp: PayPalClient
+) -> None:
+    """Pinned to the working smoke and confirmation runs (docs/ENV.md 2.5).
+
+    Authorize with no body and no content type was answered 415 UNSUPPORTED_MEDIA_TYPE, so a POST
+    that carries no payload still sends a JSON object. Void is the exception the accepted runs show:
+    no body and no content type.
+    """
+    capture_routes(paypal)
+    paypal.post(f"{BASE}/v2/checkout/orders").mock(
+        return_value=httpx.Response(201, json={"id": "O1"})
+    )
+    paypal.post(f"{BASE}/v2/checkout/orders/ORDER1/authorize").mock(
+        return_value=httpx.Response(201, json={})
+    )
+    paypal.post(f"{BASE}/v2/payments/authorizations/AUTH2/void").mock(
+        return_value=httpx.Response(204)
+    )
+    paypal.post(f"{BASE}/v2/payments/captures/CAP1/refund").mock(
+        return_value=httpx.Response(201, json={"id": "REF1"})
+    )
+    pp.create_order(CHECKOUT, order_request())
+    pp.authorize_order(CHECKOUT, "ORDER1")
+    pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
+    pp.void_authorization(CHECKOUT, "AUTH2")
+    pp.refund_capture(CHECKOUT, "CAP1")
+    pp.refund_capture(CHECKOUT, "CAP1", amount=Money(USD, 1000))
+
+    sent = {(r.url.path, r.content): r.headers.get("content-type") for r in post_calls(paypal)}
+    by_path = {}
+    for request in post_calls(paypal):
+        by_path.setdefault(request.url.path, []).append(request)
+
+    (authorize,) = by_path["/v2/checkout/orders/ORDER1/authorize"]
+    assert authorize.headers["content-type"] == "application/json"
+    assert authorize.content == b"{}"
+
+    (capture,) = by_path["/v2/payments/authorizations/AUTH1/capture"]
+    assert capture.headers["content-type"] == "application/json"
+    assert json.loads(capture.content) == {"amount": money("74.00"), "final_capture": True}
+
+    (void,) = by_path["/v2/payments/authorizations/AUTH2/void"]
+    assert void.content == b"" and "content-type" not in void.headers
+
+    full, partial = by_path["/v2/payments/captures/CAP1/refund"]
+    assert full.headers["content-type"] == "application/json" and full.content == b"{}"
+    assert partial.headers["content-type"] == "application/json"
+    assert json.loads(partial.content) == {"amount": money("10.00")}
+
+    (create,) = by_path["/v2/checkout/orders"]
+    assert create.headers["content-type"] == "application/json"
+    assert json.loads(create.content) == order_request().to_json()
+    assert all(ct in ("application/json", None) for ct in sent.values())
+
+
+def test_a_server_that_wants_a_json_body_gets_one(
+    paypal: respx.MockRouter, pp: PayPalClient
+) -> None:
+    """The sandbox's behaviour, reproduced: no content type on an authorize is a 415."""
+
+    def reject_unless_json(request: httpx.Request) -> httpx.Response:
+        if request.headers.get("content-type") != "application/json":
+            return httpx.Response(
+                415,
+                json={
+                    "name": "UNSUPPORTED_MEDIA_TYPE",
+                    "message": "The request payload is not supported",
+                },
+            )
+        return httpx.Response(201, json={"id": "X1"})
+
+    paypal.post(f"{BASE}/v2/checkout/orders/ORDER1/authorize").mock(side_effect=reject_unless_json)
+    paypal.post(f"{BASE}/v2/payments/captures/CAP1/refund").mock(side_effect=reject_unless_json)
+    assert pp.authorize_order(CHECKOUT, "ORDER1").status_code == 201
+    assert pp.refund_capture(CHECKOUT, "CAP1").status_code == 201
+
+
+def test_a_415_is_a_request_error_and_is_not_retried(
+    paypal: respx.MockRouter, pp: PayPalClient
+) -> None:
+    route = paypal.post(f"{BASE}/v2/checkout/orders/ORDER1/authorize").mock(
+        return_value=httpx.Response(
+            415,
+            json={
+                "name": "UNSUPPORTED_MEDIA_TYPE",
+                "message": "The request payload is not supported",
+            },
+        )
+    )
+    with pytest.raises(E.PayPalRequestError) as exc:
+        pp.authorize_order(CHECKOUT, "ORDER1")
+    assert exc.value.status == 415 and exc.value.name == "UNSUPPORTED_MEDIA_TYPE"
+    assert route.call_count == 1
 
 
 def test_the_context_manager_closes_the_client(clock: Clock) -> None:

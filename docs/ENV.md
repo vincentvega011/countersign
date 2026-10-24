@@ -134,11 +134,11 @@ The script refuses any other host.
 | Token             | `POST /v1/oauth2/token`                                       | 200                            | HTTP Basic (client id, secret), form body `grant_type=client_credentials`                      |
 | Create order      | `POST /v2/checkout/orders`                                    | 201 (200 on idempotent replay) | `PayPal-Request-Id`, optional `Prefer`                                                         |
 | Get order         | `GET /v2/checkout/orders/{id}`                                | 200                            | Path `id` pattern `^[A-Z0-9]+$`, max 36                                                        |
-| Authorize order   | `POST /v2/checkout/orders/{id}/authorize`                     | 201 (200 idempotent replay)    | Body optional. Also lists 202, 207 and 409 (order or unit state)                               |
+| Authorize order   | `POST /v2/checkout/orders/{id}/authorize`                     | 201 (200 idempotent replay)    | Body optional in the schema, but send `{}`: with no body and no content type PayPal returns 415 (see 2.5). Also lists 202, 207 and 409                               |
 | Get authorization | `GET /v2/payments/authorizations/{authorization_id}`          | 200                            | No idempotency header                                                                          |
 | Capture           | `POST /v2/payments/authorizations/{authorization_id}/capture` | 201 (200 idempotent replay)    | 409 `PREVIOUS_REQUEST_IN_PROGRESS`; 422 `MAX_CAPTURE_AMOUNT_EXCEEDED`, `AUTHORIZATION_EXPIRED` |
 | Get capture       | `GET /v2/payments/captures/{capture_id}`                      | 200                            |                                                                                                |
-| Refund            | `POST /v2/payments/captures/{capture_id}/refund`              | 201 (200 idempotent replay)    | Empty body is a full refund. 422 `REFUND_AMOUNT_EXCEEDED`, `TRANSACTION_DISPUTED`              |
+| Refund            | `POST /v2/payments/captures/{capture_id}/refund`              | 201 (200 idempotent replay)    | Omitting `amount` is a full refund; the runs sent `{}` (2.5). 422 `REFUND_AMOUNT_EXCEEDED`, `TRANSACTION_DISPUTED`              |
 | Void              | `POST /v2/payments/authorizations/{authorization_id}/void`    | 200 (204 also listed)          | Returns the authorization with `status` `VOIDED`. 422 `PREVIOUSLY_CAPTURED`                    |
 
 Headers. `PayPal-Request-Id`: 1 to 108 characters; the server keeps keys for 6 hours (up to 72 hours
@@ -222,6 +222,14 @@ Items marked _single run_ are not yet established as general rules.
 - **Refund.** After a full refund, GET capture shows status `REFUNDED`.
 - **`PayPal-Request-Id`.** The values used were accepted at the lengths used.
 - **`seller_protection.status`** appeared in sandbox output. Countersign makes no claims about it.
+
+- **Payload-less POSTs (found when recording the cassette).** `authorize` sent with no body and no
+  content type returned HTTP 415 `UNSUPPORTED_MEDIA_TYPE` ("The request payload is not supported"),
+  although the schema calls the body optional. The smoke script and the confirmation runs, which
+  PayPal accepted, sent `{}` (a JSON object, `Content-Type: application/json`) for authorize and for
+  the full refund (`F05`, `F07`), and sent no body for void (`V03` and the smoke run, HTTP 200 or
+  204). The client does the same. What was not tested: void with `{}`, and authorize or refund with a
+  genuinely empty body other than the 415 above.
 
 Demo-setup note. The sandbox buyer and merchant accounts must be US-based. A buyer account based in
 Nepal could not approve the order.

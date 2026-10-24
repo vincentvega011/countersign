@@ -9,6 +9,9 @@ Security reasoning.
   the sandbox (docs/ENV.md section 2.5), so a mutation returns only the identifier of the resource it
   touched (`Mutation`) and callers re-fetch with `get_order`, `get_authorization` or `get_capture`.
   `authorize` does not even read its response body.
+- A POST with no payload still sends a JSON body: `authorize` and a full refund send `{}` with
+  `Content-Type: application/json`, as the working smoke and confirmation runs did. With no body PayPal
+  answers HTTP 415. `void` sends no body, which is what those runs did and PayPal accepted.
 - Every state-changing call carries a deterministic `PayPal-Request-Id` (`request_id.py`) and the
   client refuses to send one without it. Retries (5xx, timeouts, connection errors, and a 409 for a
   request still in progress) reuse the same id, so PayPal replays instead of repeating. A call whose
@@ -396,6 +399,9 @@ class PayPalClient:
             f"/v2/checkout/orders/{ident}/authorize",
             op="authorize",
             ok=(200, 201),
+            # An empty JSON object, not no body: with no body and no content type PayPal answers
+            # 415 UNSUPPORTED_MEDIA_TYPE. The smoke and confirmation runs sent `{}` (ENV.md 2.5).
+            body={},
             request_id=derive_request_id(checkout_id, Operation.AUTHORIZE),
         )
         return self._mutation(response, ident, replayable=True)
@@ -448,9 +454,10 @@ class PayPalClient:
     def refund_capture(
         self, checkout_id: str, capture_id: str, *, amount: Money | None = None
     ) -> Mutation:
-        """Refund a capture: in full (an empty body) or for `amount`. Re-fetch with `get_capture`."""
+        """Refund a capture: in full (an empty JSON object) or for `amount`. Re-fetch with `get_capture`."""
         ident = check_path_id(capture_id, "capture id")
-        body: dict[str, Any] | None = None
+        # A full refund sends `{}`, the form the confirmation runs sent (PROTOCOL.md 4.6), not no body.
+        body: dict[str, Any] = {}
         if amount is None:
             part = "full"
         else:
