@@ -390,6 +390,10 @@ closed; a recurrence other than one occurrence fails closed.
 - `PayPal-Request-Id` is deterministic: a hash of the checkout id and the operation name, so a retry
   of the same operation replays instead of repeating. Length and replay behavior are confirmed in
   section 10.
+- Capture has no amount argument: it fetches the authorization, requires `CREATED`, an unexpired
+  `expiration_time` and the expected total, and sends the full amount with `final_capture` true. A
+  state-changing call that ends with an unknown outcome is resolved by re-fetching, never repeated
+  ([PROTOCOL.md](PROTOCOL.md) Decision 19).
 - `invoice_id` equals the checkout id. `custom_id` carries a compact reference derived from the
   evidence reference, for example `cs1.` plus a base64url digest, truncated only if the confirmed
   length limit requires it, with the security level documented. The full evidence lives in our store.

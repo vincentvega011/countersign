@@ -110,3 +110,16 @@ Complete is a stub that always answers `mandate_required`. Every checkout respon
 `ap2.merchant_authorization` whether or not the platform negotiated AP2 ([PROTOCOL.md](PROTOCOL.md)
 Decision 18). Per-checkout line items are limited to 20
 and quantities to 99, which are Countersign choices, not UCP limits.
+
+## PayPal client
+
+### L12. What the client has and has not been shown to do
+
+The client is tested against mocked HTTP and a fake PayPal, not yet against a recording of the real
+sandbox: the cassette needs one live approval and has not been recorded. Until it is, the required
+response fields (an order's `intent`, an authorization's `expiration_time`, a capture's
+`final_capture`) are taken from the schema notes, and the client fails closed if PayPal omits one.
+Where PayPal puts the specific error code (`name` or `details[].issue`) is accepted both ways rather
+than confirmed ([PROTOCOL.md](PROTOCOL.md) Decision 19). Only redirect-style payer approval is built;
+the vaulted flow in [PROTOCOL.md](PROTOCOL.md) 4.7 is not. A capture whose outcome is unknown must be
+resolved by re-fetching, and the client will not repeat it.

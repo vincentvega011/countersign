@@ -1164,6 +1164,62 @@ payload is the checkout without its `ap2` member; coverage is the complete check
   uvicorn, creates, updates, reads, completes and cancels a checkout over HTTP, and verifies each
   response with that script.
 
+### Decision 19: PayPal client
+
+Resolves: how `countersign.paypal` turns the facts in [section 4](#4-confirmed-paypal-facts) and
+[ENV.md](ENV.md) section 2 into rules. Endpoints and fields are only those recorded there.
+
+- **Calls.** OAuth `POST /v1/oauth2/token`; create `POST /v2/checkout/orders` (intent `AUTHORIZE`
+  only); get order; authorize; get authorization; capture; void; refund; get capture. State is read
+  with GET. A mutation returns only the identifier of the resource it touched (and, for create, the
+  `payer-action` or `approve` link); `authorize` does not read its response body at all, because the
+  authorization id is in the fetched order. Mutations send `Prefer: return=representation`, the
+  setting the verified sandbox runs used.
+- **Request ids.** `cs1.<operation>.<digest>`, the digest being the unpadded base64url of
+  `SHA-256("cs.paypal.request.v1" || 0x00 || fields)` where each of the checkout id, the operation
+  and any extra parts is a 4 byte big-endian length then its UTF-8 bytes. At most 60 characters.
+  Refunds add the capture id and the amount (`full` or `<currency>:<value>`), so two different
+  partial refunds of one checkout do not replay each other. The client checks every id against the
+  108 character limit and `[A-Za-z0-9._:-]` before sending and refuses to send a state-changing call
+  without one. A test pins two values and compares the derivation with a `hashlib` reference.
+- **Capture.** There is no amount argument and no partial form. The client fetches the authorization,
+  requires status `CREATED` (the status enum has no `EXPIRED`, so expiry is `expiration_time` against
+  the client's clock, with a zone required), requires the amount to equal the total the caller
+  passes, and sends that amount with `final_capture` true. Anything else raises before a capture
+  request is sent. After an error with `outcome_unknown` the caller re-fetches and does not call
+  capture again: a second call would see the status the first one produced.
+- **Retries.** 5xx, timeouts, connection errors and a 409 `PREVIOUS_REQUEST_IN_PROGRESS` are retried
+  up to three attempts in total with a 0.5 s doubling backoff capped at 8 s, always with the same
+  Request-Id. A 401 refreshes the token once without using an attempt. A 4xx is never retried.
+  A state-changing call that ends in a timeout, a connection error, a 5xx or a 409 in progress raises
+  an error with `outcome_unknown` true. Redirects are not followed.
+- **Token.** Cached in memory, refreshed when less than 60 seconds remain, thread safe, never logged.
+- **Error codes.** Mapped to typed exceptions: `INVALID_STRING_LENGTH`, `ORDER_NOT_APPROVED`,
+  `ORDER_ALREADY_AUTHORIZED`, `ORDER_ALREADY_COMPLETED`, `MAX_CAPTURE_AMOUNT_EXCEEDED`,
+  `AUTHORIZATION_ALREADY_CAPTURED`, `AUTHORIZATION_VOIDED`, `PREVIOUSLY_CAPTURED`,
+  `PREVIOUSLY_VOIDED`, `REFUND_AMOUNT_EXCEEDED`, `CAPTURE_FULLY_REFUNDED` (observed) and
+  `AUTHORIZATION_EXPIRED`, `TRANSACTION_DISPUTED`, `PREVIOUS_REQUEST_IN_PROGRESS` (documentation).
+  **Interpretation:** the notes record these as error names, while PayPal's usual body puts a class
+  name in `name` and the specific code in `details[].issue`. The mapper accepts either: `name` first,
+  then each `issue` in order. Other errors map by status (401, 404, 409, 5xx, other 4xx).
+- **Models.** Responses ignore unknown members and fail on a missing required one: an order needs
+  `id`, `status`, `intent` and at least one purchase unit with an `amount`; an authorization needs
+  `id`, `status`, `amount` and `expiration_time`; a capture needs `id`, `status`, `amount` and
+  `final_capture`. These requirements follow the schema notes and fail closed; the recorded cassette
+  will show whether PayPal always sends them. PayPal nests `breakdown` inside `amount`; the model
+  lifts it. Amounts become `Money` and any non-exact decimal is a parse error.
+- **Limits** enforced client side: `custom_id` 255, `invoice_id` 127, Request-Id 108, item `name` and
+  `sku` 127, no control characters, and that `amount` equals items plus tax.
+- **Hosts.** The sandbox host by default. Another host needs `allow_non_sandbox`; the two live PayPal
+  hosts are refused whatever the setting.
+- **Cassettes.** Recording is off unless `PAYPAL_RECORD_CASSETTES=1`. A recording keeps method, path,
+  Request-Id, request body, status, debug id and response body; it drops the `Authorization` header,
+  replaces the token, application id, nonce, scope, merchant and account ids and e-mail addresses,
+  empties `payer`, `shipping` and `payment_source` in responses, replaces every known secret string,
+  and is refused if an `@`, a bearer token or a known secret remains. Replay is strictly in order.
+- **Not implemented here:** webhooks and signature verification, order PATCH, vaulted merchant-initiated
+  orders ([4.7](#47-vaulting-a-sandbox-wallet)), and a refund read (re-fetch the capture instead).
+
 ---
 
 ## 4. Confirmed PayPal facts
