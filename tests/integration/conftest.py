@@ -127,3 +127,10 @@ def clean_log(admin_engine: Engine) -> None:
     """An empty log for the test (the administrator may truncate; the application role may not)."""
     with admin_engine.begin() as conn:
         conn.execute(text("TRUNCATE decision_log"))
+
+
+@pytest.fixture
+def clean_checkouts(admin_engine: Engine) -> None:
+    """Empty checkout and log tables for the test (the administrator may truncate)."""
+    with admin_engine.begin() as conn:
+        conn.execute(text("TRUNCATE checkout_sessions, decision_log"))
