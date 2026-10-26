@@ -10,7 +10,8 @@ so `expiration_time` is required and callers judge expiry from it.
 
 Requests. `OrderRequest` is the only order Countersign creates: intent `AUTHORIZE`, one purchase unit.
 It checks the limits (`limits.py`) and that the amounts add up the way PayPal requires (items times
-quantity to `item_total`, per-unit tax to `tax_total`, `amount` the sum), so a mismatch is found before
+quantity to `item_total`, per-unit tax to `tax_total`, `amount` item_total plus tax, shipping and
+handling, minus discount), so a mismatch is found before
 anything is sent rather than as a 422.
 """
 
@@ -223,6 +224,9 @@ class OrderRequest:
     experience_context: ExperienceContext
     reference_id: str = "default"
     description: str | None = None
+    shipping: Money | None = None
+    handling: Money | None = None
+    discount: Money | None = None  # a positive amount that is subtracted
 
     def __post_init__(self) -> None:
         check_invoice_id(self.invoice_id)
@@ -240,10 +244,13 @@ class OrderRequest:
             for money in (item.unit_amount, item.tax):
                 if money is not None and money.currency != currency:
                     raise LimitError("every amount must use the order currency")
+        for extra in (self.shipping, self.handling, self.discount):
+            if extra is not None and (extra.currency != currency or extra.minor < 0):
+                raise LimitError("shipping, handling and discount must be non-negative amounts")
         if self.amount.minor <= 0:
             raise LimitError("the order amount must be positive")
-        if self.item_total + self.tax_total != self.amount:
-            raise LimitError("amount is not item_total plus tax_total")
+        if self.expected_amount != self.amount:
+            raise LimitError("amount is not the breakdown total")
 
     @property
     def item_total(self) -> Money:
@@ -255,10 +262,25 @@ class OrderRequest:
             (i.tax * i.quantity for i in self.items if i.tax is not None), self.amount.currency
         )
 
+    @property
+    def expected_amount(self) -> Money:
+        """item_total + tax_total + shipping + handling - discount, the sum PayPal requires."""
+        total = self.item_total + self.tax_total
+        for added in (self.shipping, self.handling):
+            if added is not None:
+                total = total + added
+        if self.discount is not None:
+            total = total - self.discount
+        return total
+
     def to_json(self) -> dict[str, Any]:
         breakdown: dict[str, Any] = {"item_total": amount_json(self.item_total)}
         if any(i.tax is not None for i in self.items):
             breakdown["tax_total"] = amount_json(self.tax_total)
+        for name in ("shipping", "handling", "discount"):
+            value: Money | None = getattr(self, name)
+            if value is not None:
+                breakdown[name] = amount_json(value)
         unit: dict[str, Any] = {
             "reference_id": self.reference_id,
             "invoice_id": self.invoice_id,

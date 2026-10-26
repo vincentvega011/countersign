@@ -307,7 +307,7 @@ def test_item_quantity_must_be_a_small_positive_integer(quantity: Any) -> None:
 
 
 def test_order_totals_must_add_up_and_share_a_currency() -> None:
-    with pytest.raises(LimitError, match="item_total plus tax_total"):
+    with pytest.raises(LimitError, match="breakdown total"):
         order_request(amount=Money(USD, 7401))
     with pytest.raises(LimitError, match="positive"):
         order_request(amount=Money(USD, 0), items=(OrderItem("n", 1, Money(USD, 0)),))

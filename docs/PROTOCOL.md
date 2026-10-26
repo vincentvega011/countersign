@@ -1218,10 +1218,79 @@ Resolves: how `countersign.paypal` turns the facts in [section 4](#4-confirmed-p
 - **Cassettes.** Recording is off unless `PAYPAL_RECORD_CASSETTES=1`. A recording keeps method, path,
   Request-Id, request body, status, debug id and response body; it drops the `Authorization` header,
   replaces the token, application id, nonce, scope, merchant and account ids and e-mail addresses,
-  empties `payer`, `shipping` and `payment_source` in responses, replaces every known secret string,
+  empties `payer`, `shipping` (except the `breakdown.shipping` amount) and `payment_source` in responses, replaces every known secret string,
   and is refused if an `@`, a bearer token or a known secret remains. Replay is strictly in order.
 - **Not implemented here:** webhooks and signature verification, order PATCH, vaulted merchant-initiated
   orders ([4.7](#47-vaulting-a-sandbox-wallet)), and a refund read (re-fetch the capture instead).
+
+### Decision 20: Canonical checkout to PayPal order, and back
+
+Resolves: the field mapping in both directions (`src/countersign/paypal/translate.py`) and what PayPal
+cannot carry. Compared by `OrderTerms.terms_hash()`, domain `cs.paypal.terms.v1`, over the JCS bytes of
+`{checkout: <Decision 14 terms>, payee: {merchant_id}, invoice_id, custom_id}`.
+
+**Forward mapping** (`order_request_from_checkout`):
+
+| Canonical                                  | PayPal                                                           |
+| ------------------------------------------ | ---------------------------------------------------------------- |
+| checkout `id`                              | `invoice_id` (127 characters at most)                            |
+| evidence reference                         | `custom_id` (255 at most), given by the caller                   |
+| line `item.title`, `item.id`               | item `name`, `sku` (127 each)                                    |
+| line `item.price`, `quantity`              | item `unit_amount`, `quantity` (decimal string of a whole number) |
+| line `tax` entry (a total for the line)    | item `tax`, per unit                                             |
+| order `subtotal`                           | `breakdown.item_total`                                           |
+| order `fulfillment`                        | `breakdown.shipping`                                             |
+| order `tax`                                | `breakdown.tax_total`                                            |
+| order `fee`                                | `breakdown.handling`                                             |
+| order `discount` (negative)                | `breakdown.discount` (positive)                                  |
+| order `total`                              | `amount`                                                         |
+
+**Refused, never rounded or truncated.** The forward direction raises `TranslationError` for: a
+total type with no PayPal field (`items_discount`, and any line entry other than `subtotal`, `tax`
+and `total`); a repeated total type; order entries not listed in the order subtotal, fulfillment, tax,
+fee, discount, total (a breakdown has no order, so one order is fixed); a line tax that is not a
+whole number of minor units per unit; an order tax that differs from the sum of the line taxes (or
+is present without any line tax, or absent with one); a HUF or TWD amount that is not a whole unit
+(Decision 13); a zero total; a checkout id or evidence reference over its limit. A title or item id
+over 127 characters cannot be built into a checkout at all (Decision 14).
+
+**Reverse mapping** (`paypal_order_to_canonical_terms`, takes the order from `get_order` and the signed
+line ids). It fails closed, with `TranslationError`, when: the intent is not `AUTHORIZE`; there is not
+exactly one purchase unit; `item_total`, `invoice_id`, `custom_id`, the payee `merchant_id`, an item
+`sku` or an item `name` is missing; an item count differs from the line id count; a quantity is not
+`[1-9][0-9]{0,9}`; any amount is in a different currency from the order amount; `item_total` is not
+the sum of the items, `tax_total` is not the sum of the item taxes or is present without item taxes
+or absent with them; `insurance` or `shipping_discount` is present (this mapping never produces them,
+so they could hide money); a `discount` is zero; the amount is not `item_total` plus tax, shipping and
+handling minus discount. Unknown members of the order are ignored (PayPal adds fields), and the
+members that are read are the only ones that count.
+
+**What PayPal cannot carry, and what covers it.** None of these can be re-derived from a live order.
+They are bound by the evidence reference in `custom_id` (a hash of the evidence record, which holds
+the signed checkout), so a change to one of them changes the signed checkout and the reference, not
+the PayPal order:
+
+| Canonical field                              | Why it is not in the order                                          |
+| -------------------------------------------- | ------------------------------------------------------------------- |
+| Line item `id`                               | PayPal has no per-line id; `sku` holds the item id, and one item may appear on two lines. Applied by position from the signed line ids, relying on PayPal returning items in the order sent |
+| `display_text` of totals, `quantity_unit`    | Presentation, not money; `terms()` already drops them (Decision 14) |
+| Per-line `total` entries                     | Derived: unit amount times quantity plus tax                        |
+| Order of the `totals` array                  | A breakdown is unordered; the fixed order above is required instead |
+| Item `category`, `reference_id`, `description` | Not terms; sent for PayPal, never compared                        |
+| Titles and item ids over 127 characters      | Refused when the checkout is built (Decision 14), not truncated      |
+
+Because line ids are applied by position, a PayPal order whose items were reordered reverses to
+different terms whenever the reordered items differ, and an order with an added or removed item is
+refused.
+
+**Observed** in the recorded authorize and capture cassette (`tests/cassettes/paypal_authorize_capture.json`):
+GET returned the purchase unit as sent, in the same item order, with `breakdown` holding only the
+entries that were sent, `payee.merchant_id` added, and `payee.email_address` (scrubbed in the
+recording). Create answered HTTP 200 in every run, and replay detection does not use the status
+code. **Not yet observed** (the order terms cassette records it): that the sandbox accepts item
+`tax`, `tax_total`, `shipping`, `handling` and `discount` with `NO_SHIPPING` and echoes them
+unchanged. If a field is dropped or altered, the reverse translation refuses the order, which is the
+safe outcome, and this decision is revised with the observation.
 
 ---
 
@@ -1366,5 +1435,4 @@ Added by later work, not yet present in this file:
 
 - Live webhook confirmation (deferred to the Render deploy).
 - Human Present token format and receipt transport (see Decisions 8 and gap 4).
-- Gate step codes, principal lock semantics, the evidence reference encoding and the PayPal field
-  mapping in both directions.
+- Gate step codes, principal lock semantics and the evidence reference encoding.
