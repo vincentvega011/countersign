@@ -800,7 +800,6 @@ def test_create_order_sends_the_exact_request(paypal: respx.MockRouter, pp: PayP
     result = pp.create_order(CHECKOUT, order_request())
     assert isinstance(result, OrderCreated)
     assert (result.resource_id, result.approval_url, result.status_code) == ("ORDER1", approve, 201)
-    assert result.replayed is False
     (request,) = post_calls(paypal)
     assert request.headers["paypal-request-id"] == derive_request_id(
         CHECKOUT, Operation.CREATE_ORDER
@@ -810,7 +809,7 @@ def test_create_order_sends_the_exact_request(paypal: respx.MockRouter, pp: PayP
     assert json.loads(request.content) == order_request().to_json()
 
 
-def test_create_order_replay_is_reported_and_prefers_payer_action(
+def test_create_order_200_is_a_normal_success_and_prefers_payer_action(
     paypal: respx.MockRouter, pp: PayPalClient
 ) -> None:
     paypal.post(f"{BASE}/v2/checkout/orders").mock(
@@ -826,7 +825,10 @@ def test_create_order_replay_is_reported_and_prefers_payer_action(
         )
     )
     result = pp.create_order(CHECKOUT, order_request())
-    assert result.replayed is True and result.approval_url == "https://payer.example/p"
+    # The sandbox answered 200 on every create; the status code says nothing about replays.
+    assert (result.status_code, result.resource_id) == (200, "ORDER1")
+    assert result.approval_url == "https://payer.example/p"
+    assert not hasattr(result, "replayed")
 
 
 @pytest.mark.parametrize(
@@ -893,18 +895,19 @@ def test_authorize_posts_without_reading_the_response(
         return_value=httpx.Response(201, content=b"not even json")
     )
     result = pp.authorize_order(CHECKOUT, "ORDER1")
-    assert result == Mutation("ORDER1", 201, None, False)
+    assert result == Mutation("ORDER1", 201, None)
     (request,) = post_calls(paypal)
     assert request.headers["paypal-request-id"] == derive_request_id(CHECKOUT, Operation.AUTHORIZE)
     assert request.content == b"{}"
 
 
-def test_authorize_replay(paypal: respx.MockRouter, pp: PayPalClient) -> None:
+def test_authorize_200_is_a_normal_success(paypal: respx.MockRouter, pp: PayPalClient) -> None:
     paypal.post(f"{BASE}/v2/checkout/orders/ORDER1/authorize").mock(
         return_value=httpx.Response(200, headers={"paypal-debug-id": "d1"}, json={})
     )
     result = pp.authorize_order(CHECKOUT, "ORDER1")
-    assert result.replayed is True and result.debug_id == "d1"
+    assert result.status_code == 200 and result.debug_id == "d1"
+    assert not hasattr(result, "replayed")
 
 
 # =============================================================== capture
@@ -926,7 +929,7 @@ def test_capture_fetches_first_then_sends_the_full_amount_with_final_capture(
 ) -> None:
     route = capture_routes(paypal)
     result = pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
-    assert result == Mutation("CAP1", 201, None, False)
+    assert result == Mutation("CAP1", 201, None)
     methods = [(c.request.method, c.request.url.path) for c in paypal.calls]
     assert methods == [
         ("POST", "/v1/oauth2/token"),
@@ -1037,7 +1040,7 @@ def test_void(paypal: respx.MockRouter, pp: PayPalClient, status: int) -> None:
         return_value=httpx.Response(status)
     )
     result = pp.void_authorization(CHECKOUT, "AUTH1")
-    assert result == Mutation("AUTH1", status, None, False)
+    assert result == Mutation("AUTH1", status, None)
     (request,) = post_calls(paypal)
     assert request.headers["paypal-request-id"] == derive_request_id(CHECKOUT, Operation.VOID)
     assert request.content == b""

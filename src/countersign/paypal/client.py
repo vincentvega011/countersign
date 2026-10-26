@@ -75,7 +75,6 @@ class Mutation:
     resource_id: str
     status_code: int
     debug_id: str | None
-    replayed: bool  # HTTP 200 where PayPal answers 201 for a new result: an idempotent replay
 
 
 @dataclass(frozen=True)
@@ -338,12 +337,11 @@ class PayPalClient:
         return check_path_id(value, f"{what} id")
 
     @staticmethod
-    def _mutation(response: httpx.Response, resource_id: str, *, replayable: bool) -> Mutation:
+    def _mutation(response: httpx.Response, resource_id: str) -> Mutation:
         return Mutation(
             resource_id=resource_id,
             status_code=response.status_code,
             debug_id=debug_id_of(response, {}),
-            replayed=replayable and response.status_code == 200,
         )
 
     # ------------------------------------------------------------------ reads
@@ -388,7 +386,7 @@ class PayPalClient:
                             break
                 if approval:
                     break
-        base = self._mutation(response, order_id, replayable=True)
+        base = self._mutation(response, order_id)
         return OrderCreated(**base.__dict__, approval_url=approval)
 
     def authorize_order(self, checkout_id: str, order_id: str) -> Mutation:
@@ -404,7 +402,7 @@ class PayPalClient:
             body={},
             request_id=derive_request_id(checkout_id, Operation.AUTHORIZE),
         )
-        return self._mutation(response, ident, replayable=True)
+        return self._mutation(response, ident)
 
     def capture_authorization(
         self, checkout_id: str, authorization_id: str, *, expected_total: Money
@@ -437,7 +435,7 @@ class PayPalClient:
             body={"amount": amount_json(authorization.amount), "final_capture": True},
             request_id=derive_request_id(checkout_id, Operation.CAPTURE),
         )
-        return self._mutation(response, self._resource_id(response, "capture"), replayable=True)
+        return self._mutation(response, self._resource_id(response, "capture"))
 
     def void_authorization(self, checkout_id: str, authorization_id: str) -> Mutation:
         """Void an authorization. Re-fetch with `get_authorization` for the result."""
@@ -449,7 +447,7 @@ class PayPalClient:
             ok=(200, 204),
             request_id=derive_request_id(checkout_id, Operation.VOID),
         )
-        return self._mutation(response, ident, replayable=False)
+        return self._mutation(response, ident)
 
     def refund_capture(
         self, checkout_id: str, capture_id: str, *, amount: Money | None = None
@@ -473,4 +471,4 @@ class PayPalClient:
             body=body,
             request_id=derive_request_id(checkout_id, Operation.REFUND, ident, part),
         )
-        return self._mutation(response, self._resource_id(response, "refund"), replayable=True)
+        return self._mutation(response, self._resource_id(response, "refund"))
