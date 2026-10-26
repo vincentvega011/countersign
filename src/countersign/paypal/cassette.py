@@ -58,19 +58,20 @@ def scrub(value: Any, secrets: Iterable[str], *, structural: bool = True) -> Any
     """
     known = [s for s in secrets if isinstance(s, str) and len(s) >= 4]
 
-    def walk(node: Any) -> Any:
+    def walk(node: Any, parent: str = "") -> Any:
         if isinstance(node, dict):
             out: dict[str, Any] = {}
             for key, item in node.items():
-                if structural and key in _DROP:
+                # `breakdown.shipping` is an amount the order terms depend on, not the payer's address.
+                if structural and key in _DROP and parent != "breakdown":
                     out[key] = {}
                 elif structural and key in _KEYS:
                     out[key] = f"{SCRUBBED}_{key.upper()}"
                 else:
-                    out[key] = walk(item)
+                    out[key] = walk(item, key)
             return out
         if isinstance(node, list):
-            return [walk(x) for x in node]
+            return [walk(x, parent) for x in node]
         if isinstance(node, str):
             for secret in known:
                 node = node.replace(secret, SCRUBBED)

@@ -375,3 +375,48 @@ def test_the_recording_script_refuses_a_live_host_even_when_opted_in(
 
 def test_recorded_at_is_a_timezone_aware_instant() -> None:
     assert fake.RECORDED_AT == datetime(2026, 10, 24, 10, 0, tzinfo=UTC)
+
+
+# ---------------------------------------------------------------- order terms flow
+
+
+def test_terms_flow_records_and_replays_with_equal_terms(tmp_path: Path) -> None:
+    """The flow behind the order terms cassette, against the fake: record, save, replay."""
+    from countersign.paypal.terms_flow import KINDS, run_terms_flow
+
+    ids = {kind: f"chk_{kind}_AAAAAAAAAAAA" for kind in KINDS}
+    upstream = fake.FakePayPal()
+    recorder = RecordingTransport(
+        upstream.transport(), secrets=[CLIENT_ID, SECRET], meta={"checkout_ids": ids}
+    )
+    with client_for(recorder) as client:
+        recorded = [run_terms_flow(client, kind, ids[kind]) for kind in KINDS]
+    path = tmp_path / "terms.json"
+    recorder.save(path)
+
+    transport = CassetteTransport(load_cassette(path))
+    with client_for(transport) as client:
+        replayed = [run_terms_flow(client, kind, ids[kind]) for kind in KINDS]
+    transport.assert_exhausted()
+    for before, after in zip(recorded, replayed, strict=True):
+        assert after.terms.checkout.terms_bytes() == after.checkout.terms_bytes()
+        assert after.terms.checkout.terms_hash() == before.terms.checkout.terms_hash()
+        assert before.terms.payee_merchant_id == fake.MERCHANT
+        assert after.terms.payee_merchant_id == "SCRUBBED_MERCHANT_ID"  # scrubbed, never empty
+
+
+def test_scrub_keeps_the_shipping_amount_in_a_breakdown_but_drops_the_address() -> None:
+    from countersign.paypal.cassette import scrub
+
+    body = {
+        "purchase_units": [
+            {
+                "amount": {"breakdown": {"shipping": {"currency_code": "USD", "value": "4.99"}}},
+                "shipping": {"address": {"address_line_1": "1 Main St"}},
+            }
+        ]
+    }
+    out = scrub(body, [])
+    unit = out["purchase_units"][0]
+    assert unit["amount"]["breakdown"]["shipping"] == {"currency_code": "USD", "value": "4.99"}
+    assert unit["shipping"] == {}
