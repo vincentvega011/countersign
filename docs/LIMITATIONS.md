@@ -123,3 +123,13 @@ Where PayPal puts the specific error code (`name` or `details[].issue`) is accep
 than confirmed ([PROTOCOL.md](PROTOCOL.md) Decision 19). Only redirect-style payer approval is built;
 the vaulted flow in [PROTOCOL.md](PROTOCOL.md) 4.7 is not. A capture whose outcome is unknown must be
 resolved by re-fetching, and the client will not repeat it.
+
+### L13. Line item ids are applied by position
+
+PayPal has no per-line item id, so the reverse translation applies the signed line ids to the
+order's items by position ([PROTOCOL.md](PROTOCOL.md) Decision 20). This relies on PayPal returning
+items in the order they were sent. That held in every recording made so far: three orders, each with
+two items (`tests/cassettes/paypal_authorize_capture.json` and `tests/cassettes/paypal_order_terms.json`).
+Orders with one item, or with more than two, have not been recorded, and PayPal documents no ordering
+guarantee. If PayPal ever reordered items, the terms would differ and the order would be refused,
+which fails safe but would block a legitimate purchase.

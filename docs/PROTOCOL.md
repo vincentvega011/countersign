@@ -1283,14 +1283,14 @@ Because line ids are applied by position, a PayPal order whose items were reorde
 different terms whenever the reordered items differ, and an order with an added or removed item is
 refused.
 
-**Observed** in the recorded authorize and capture cassette (`tests/cassettes/paypal_authorize_capture.json`):
-GET returned the purchase unit as sent, in the same item order, with `breakdown` holding only the
-entries that were sent, `payee.merchant_id` added, and `payee.email_address` (scrubbed in the
-recording). Create answered HTTP 200 in every run, and replay detection does not use the status
-code. **Not yet observed** (the order terms cassette records it): that the sandbox accepts item
-`tax`, `tax_total`, `shipping`, `handling` and `discount` with `NO_SHIPPING` and echoes them
-unchanged. If a field is dropped or altered, the reverse translation refuses the order, which is the
-safe outcome, and this decision is revised with the observation.
+**Observed** in the recorded cassettes (`tests/cassettes/paypal_authorize_capture.json` and
+`tests/cassettes/paypal_order_terms.json`): GET returned the purchase unit as sent, with the items in
+the order sent, `breakdown` holding only the entries that were sent, `payee.merchant_id` added and
+`payee.email_address` (scrubbed in the recording). The second cassette shows the sandbox accepting and
+echoing unchanged item `tax`, `tax_total`, `shipping`, `handling` and `discount` with `NO_SHIPPING`,
+and both of its orders reverse to the checkout that was sent. Create answered HTTP 200 in every run,
+and replay detection does not use the status code. Item order was observed only for orders of two
+items ([LIMITATIONS.md](LIMITATIONS.md) L13).
 
 ---
 
