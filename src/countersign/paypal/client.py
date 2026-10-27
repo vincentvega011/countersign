@@ -304,6 +304,14 @@ class PayPalClient:
             refresh_on_401=self._invalidate_token,
         )
         if response.status_code in ok:
+            if mutating:
+                # The call went through, so a body the strict loader refuses (INV-8) leaves the
+                # outcome unknown, not failed: the caller must re-fetch before it decides anything.
+                try:
+                    error_body(response)
+                except PayPalResponseError as exc:
+                    exc.outcome_unknown = True
+                    raise
             return response
         error = map_error(response, mutating=mutating)
         if isinstance(error, PreviousRequestInProgress):
@@ -341,13 +349,20 @@ class PayPalClient:
 
     @staticmethod
     def _resource_id(response: httpx.Response, what: str) -> str:
-        body = PayPalClient._object(response)
+        try:
+            body = PayPalClient._object(response)
+        except PayPalResponseError as exc:
+            exc.outcome_unknown = True  # a mutation that went through but answered with no object
+            raise
         value = body.get("id")
         if not isinstance(value, str) or not value:
+            # Only mutations read an id from a response, and one that went through but returned
+            # none has an unknown outcome.
             raise PayPalResponseError(
                 f"the {what} response has no id",
                 status=response.status_code,
                 debug_id=debug_id_of(response, body),
+                outcome_unknown=True,
             )
         return check_path_id(value, f"{what} id")
 

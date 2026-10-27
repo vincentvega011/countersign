@@ -27,6 +27,7 @@ from tests.unit.test_paypal_client import (
     CHECKOUT,
     TERMS,
     Clock,
+    approval,
     auth_json,
     make_client,
     order_json,
@@ -195,3 +196,106 @@ def test_recording_refuses_a_response_with_a_duplicate_key() -> None:
     recorder = RecordingTransport(upstream, secrets=[], meta={})
     with httpx.Client(transport=recorder, base_url=BASE) as http, pytest.raises(CassetteError):
         http.get("/v2/checkout/orders/ORDER1")
+
+
+# ---------------------------------------------------------------- outcome of a refused 2xx mutation
+
+CAPTURE_URL = f"{BASE}/v2/payments/authorizations/AUTH1/capture"
+
+
+def _mutations() -> list[Any]:
+    from countersign.canonical.money import Money
+
+    return [
+        pytest.param(
+            lambda c: c.create_order(CHECKOUT, order_request(), terms_hash=TERMS),
+            "POST",
+            f"{BASE}/v2/checkout/orders",
+            201,
+            id="create_order",
+        ),
+        pytest.param(
+            lambda c: c.authorize_order(CHECKOUT, "ORDER1"),
+            "POST",
+            f"{BASE}/v2/checkout/orders/ORDER1/authorize",
+            201,
+            id="authorize",
+        ),
+        pytest.param(
+            lambda c: c.capture_authorization(approval()),
+            "POST",
+            CAPTURE_URL,
+            201,
+            id="capture",
+        ),
+        pytest.param(
+            lambda c: c.void_authorization(CHECKOUT, "AUTH1"),
+            "POST",
+            f"{BASE}/v2/payments/authorizations/AUTH1/void",
+            200,
+            id="void",
+        ),
+        pytest.param(
+            lambda c: c.refund_capture(CHECKOUT, "CAP1", refund_key="k1"),
+            "POST",
+            f"{BASE}/v2/payments/captures/CAP1/refund",
+            201,
+            id="refund",
+        ),
+        pytest.param(
+            lambda c: c.refund_capture(
+                CHECKOUT, "CAP1", refund_key="k2", amount=Money("USD", 1000)
+            ),
+            "POST",
+            f"{BASE}/v2/payments/captures/CAP1/refund",
+            201,
+            id="partial_refund",
+        ),
+    ]
+
+
+@pytest.mark.parametrize("body", REFUSED, ids=IDS)
+@pytest.mark.parametrize(("call", "method", "url", "status"), _mutations())
+def test_a_refused_2xx_body_on_a_mutation_has_an_unknown_outcome(
+    paypal: respx.MockRouter,
+    pp: PayPalClient,
+    call: Any,
+    method: str,
+    url: str,
+    status: int,
+    body: bytes,
+) -> None:
+    paypal.get(f"{BASE}/v2/payments/authorizations/AUTH1").mock(
+        return_value=httpx.Response(200, json=auth_json())
+    )
+    route = paypal.route(method=method, url=url).mock(return_value=raw(status, body))
+    with pytest.raises(E.PayPalResponseError) as caught:
+        call(pp)
+    assert caught.value.outcome_unknown is True
+    assert route.call_count == 1  # never retried
+
+
+@pytest.mark.parametrize(
+    ("call", "method", "url", "status"),
+    [p for p in _mutations() if p.id in {"create_order", "capture", "refund", "partial_refund"}],
+)
+def test_a_2xx_mutation_with_no_object_or_no_id_has_an_unknown_outcome(
+    paypal: respx.MockRouter, pp: PayPalClient, call: Any, method: str, url: str, status: int
+) -> None:
+    paypal.get(f"{BASE}/v2/payments/authorizations/AUTH1").mock(
+        return_value=httpx.Response(200, json=auth_json())
+    )
+    for answer in (httpx.Response(status), httpx.Response(status, json={"status": "COMPLETED"})):
+        paypal.route(method=method, url=url).mock(return_value=answer)
+        with pytest.raises(E.PayPalResponseError) as caught:
+            call(pp)
+        assert caught.value.outcome_unknown is True
+
+
+def test_a_clean_2xx_mutation_is_not_marked_unknown(
+    paypal: respx.MockRouter, pp: PayPalClient
+) -> None:
+    paypal.post(f"{BASE}/v2/checkout/orders").mock(
+        return_value=httpx.Response(201, json={"id": "ORDER1", "status": "CREATED"})
+    )
+    assert pp.create_order(CHECKOUT, order_request(), terms_hash=TERMS).resource_id == "ORDER1"

@@ -27,6 +27,7 @@ OUTSIDE_MINTERS = {
 OUTSIDE_CAPTURERS = {
     "tests/ungated_capture_cycle.py",
     "tests/unit/test_paypal_client.py",
+    "tests/unit/test_paypal_strict_json.py",
 }
 
 
