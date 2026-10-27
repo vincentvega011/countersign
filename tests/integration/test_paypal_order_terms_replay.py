@@ -90,10 +90,6 @@ def test_the_recorded_file_holds_no_credentials_or_account_data(recorded: dict[s
 CYCLE_CASSETTE = Path(__file__).resolve().parents[1] / "cassettes" / "paypal_authorize_capture.json"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="cassette recorded before the create-order Request-Id included the terms hash",
-)
 def test_orders_recorded_in_the_authorize_capture_cassette_reverse_to_the_checkout() -> None:
     """Every GET of the order in that recording, from created to captured, has the same terms."""
     from countersign.paypal.translate import paypal_order_to_canonical_terms

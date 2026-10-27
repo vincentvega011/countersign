@@ -11,14 +11,14 @@
         "body": {
           "access_token": "SCRUBBED_ACCESS_TOKEN",
           "app_id": "SCRUBBED_APP_ID",
-          "expires_in": 32400,
+          "expires_in": 30598,
           "nonce": "SCRUBBED_NONCE",
           "scope": "SCRUBBED_SCOPE",
           "token_type": "Bearer"
         },
         "headers": {
           "content-type": "application/json",
-          "paypal-debug-id": "f1656523c929b"
+          "paypal-debug-id": "f1112029e5d5c"
         },
         "status": 200
       }
@@ -50,9 +50,9 @@
                 "currency_code": "USD",
                 "value": "29.00"
               },
-              "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+              "custom_id": "cs1.2BrnCgu9prR9AbdsEq19Cw-7owpjFMwSI4gXGeiAPI8",
               "description": "Countersign sandbox cassette",
-              "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+              "invoice_id": "chk_AvyGSXHiIP2_0md2-nR30A",
               "items": [
                 {
                   "category": "DIGITAL_GOODS",
@@ -81,20 +81,20 @@
         },
         "method": "POST",
         "path": "/v2/checkout/orders",
-        "request_id": "cs1.create_order.Z8LixtuBGNmCD4izsI06wvzOi1CzV31YCM9NrctrzXc"
+        "request_id": "cs1.create_order.guwvUTByPUFBuuLfbCD4fF1NJtGk2HqVUZdZBoPHVrc"
       },
       "response": {
         "body": {
-          "id": "38099976HV4093935",
+          "id": "2R390539YU7859354",
           "intent": "AUTHORIZE",
           "links": [
             {
-              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/2R390539YU7859354",
               "method": "GET",
               "rel": "self"
             },
             {
-              "href": "https://www.sandbox.paypal.com/checkoutnow?token=38099976HV4093935",
+              "href": "https://www.sandbox.paypal.com/checkoutnow?token=2R390539YU7859354",
               "method": "GET",
               "rel": "payer-action"
             }
@@ -112,9 +112,9 @@
                 "currency_code": "USD",
                 "value": "29.00"
               },
-              "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+              "custom_id": "cs1.2BrnCgu9prR9AbdsEq19Cw-7owpjFMwSI4gXGeiAPI8",
               "description": "Countersign sandbox cassette",
-              "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+              "invoice_id": "chk_AvyGSXHiIP2_0md2-nR30A",
               "items": [
                 {
                   "category": "DIGITAL_GOODS",
@@ -148,7 +148,7 @@
         },
         "headers": {
           "content-type": "application/json",
-          "paypal-debug-id": "f898951a558ec"
+          "paypal-debug-id": "f111202581fe6"
         },
         "status": 200
       }
@@ -157,27 +157,27 @@
       "request": {
         "body": null,
         "method": "GET",
-        "path": "/v2/checkout/orders/38099976HV4093935",
+        "path": "/v2/checkout/orders/2R390539YU7859354",
         "request_id": null
       },
       "response": {
         "body": {
-          "create_time": "2026-10-24T07:23:54Z",
-          "id": "38099976HV4093935",
+          "create_time": "2026-10-27T04:37:34Z",
+          "id": "2R390539YU7859354",
           "intent": "AUTHORIZE",
           "links": [
             {
-              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/2R390539YU7859354",
               "method": "GET",
               "rel": "self"
             },
             {
-              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/2R390539YU7859354",
               "method": "PATCH",
               "rel": "update"
             },
             {
-              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935/authorize",
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/2R390539YU7859354/authorize",
               "method": "POST",
               "rel": "authorize"
             }
@@ -196,9 +196,9 @@
                 "currency_code": "USD",
                 "value": "29.00"
               },
-              "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+              "custom_id": "cs1.2BrnCgu9prR9AbdsEq19Cw-7owpjFMwSI4gXGeiAPI8",
               "description": "Countersign sandbox cassette",
-              "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+              "invoice_id": "chk_AvyGSXHiIP2_0md2-nR30A",
               "items": [
                 {
                   "category": "DIGITAL_GOODS",
@@ -232,7 +232,7 @@
         },
         "headers": {
           "content-type": "application/json",
-          "paypal-debug-id": "f689178633961"
+          "paypal-debug-id": "ca50f02c4cfbd"
         },
         "status": 200
       }
@@ -241,17 +241,17 @@
       "request": {
         "body": {},
         "method": "POST",
-        "path": "/v2/checkout/orders/38099976HV4093935/authorize",
-        "request_id": "cs1.authorize.Wko_0s6ApA87033hf7GNtVr11CKxxiQC6hDWlYDWzdI"
+        "path": "/v2/checkout/orders/2R390539YU7859354/authorize",
+        "request_id": "cs1.authorize.1fTmbte_tAlYFIbuVK-5Wq7TYCx9nP4DOEWAh8rDjlI"
       },
       "response": {
         "body": {
-          "create_time": "2026-10-24T07:23:54Z",
-          "id": "38099976HV4093935",
+          "create_time": "2026-10-27T04:37:34Z",
+          "id": "2R390539YU7859354",
           "intent": "AUTHORIZE",
           "links": [
             {
-              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/2R390539YU7859354",
               "method": "GET",
               "rel": "self"
             }
@@ -274,7 +274,10 @@
                     "currency_code": "USD",
                     "value": "29.00"
                   },
-                  "shipping": {},
+                  "shipping": {
+                    "currency_code": "USD",
+                    "value": "0.00"
+                  },
                   "shipping_discount": {
                     "currency_code": "USD",
                     "value": "0.00"
@@ -283,9 +286,9 @@
                 "currency_code": "USD",
                 "value": "29.00"
               },
-              "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+              "custom_id": "cs1.2BrnCgu9prR9AbdsEq19Cw-7owpjFMwSI4gXGeiAPI8",
               "description": "Countersign sandbox cassette",
-              "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+              "invoice_id": "chk_AvyGSXHiIP2_0md2-nR30A",
               "items": [
                 {
                   "category": "DIGITAL_GOODS",
@@ -327,34 +330,34 @@
                       "currency_code": "USD",
                       "value": "29.00"
                     },
-                    "create_time": "2026-10-24T07:24:18Z",
-                    "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
-                    "expiration_time": "2026-11-22T07:24:18Z",
-                    "id": "5RB874223R635620V",
-                    "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+                    "create_time": "2026-10-27T04:38:24Z",
+                    "custom_id": "cs1.2BrnCgu9prR9AbdsEq19Cw-7owpjFMwSI4gXGeiAPI8",
+                    "expiration_time": "2026-11-25T04:38:24Z",
+                    "id": "48U73464UP186183L",
+                    "invoice_id": "chk_AvyGSXHiIP2_0md2-nR30A",
                     "links": [
                       {
-                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V",
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L",
                         "method": "GET",
                         "rel": "self"
                       },
                       {
-                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/capture",
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L/capture",
                         "method": "POST",
                         "rel": "capture"
                       },
                       {
-                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/void",
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L/void",
                         "method": "POST",
                         "rel": "void"
                       },
                       {
-                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/reauthorize",
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L/reauthorize",
                         "method": "POST",
                         "rel": "reauthorize"
                       },
                       {
-                        "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+                        "href": "https://api.sandbox.paypal.com/v2/checkout/orders/2R390539YU7859354",
                         "method": "GET",
                         "rel": "up"
                       }
@@ -367,7 +370,7 @@
                       "status": "ELIGIBLE"
                     },
                     "status": "CREATED",
-                    "update_time": "2026-10-24T07:24:18Z"
+                    "update_time": "2026-10-27T04:38:24Z"
                   }
                 ]
               },
@@ -375,11 +378,11 @@
             }
           ],
           "status": "COMPLETED",
-          "update_time": "2026-10-24T07:24:19Z"
+          "update_time": "2026-10-27T04:38:24Z"
         },
         "headers": {
           "content-type": "application/json",
-          "paypal-debug-id": "f5995671b30ed"
+          "paypal-debug-id": "ca50f02cc98af"
         },
         "status": 201
       }
@@ -388,17 +391,17 @@
       "request": {
         "body": null,
         "method": "GET",
-        "path": "/v2/checkout/orders/38099976HV4093935",
+        "path": "/v2/checkout/orders/2R390539YU7859354",
         "request_id": null
       },
       "response": {
         "body": {
-          "create_time": "2026-10-24T07:24:18Z",
-          "id": "38099976HV4093935",
+          "create_time": "2026-10-27T04:38:24Z",
+          "id": "2R390539YU7859354",
           "intent": "AUTHORIZE",
           "links": [
             {
-              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/2R390539YU7859354",
               "method": "GET",
               "rel": "self"
             }
@@ -417,9 +420,9 @@
                 "currency_code": "USD",
                 "value": "29.00"
               },
-              "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+              "custom_id": "cs1.2BrnCgu9prR9AbdsEq19Cw-7owpjFMwSI4gXGeiAPI8",
               "description": "Countersign sandbox cassette",
-              "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+              "invoice_id": "chk_AvyGSXHiIP2_0md2-nR30A",
               "items": [
                 {
                   "category": "DIGITAL_GOODS",
@@ -453,34 +456,34 @@
                       "currency_code": "USD",
                       "value": "29.00"
                     },
-                    "create_time": "2026-10-24T07:24:18Z",
-                    "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
-                    "expiration_time": "2026-11-22T07:24:18Z",
-                    "id": "5RB874223R635620V",
-                    "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+                    "create_time": "2026-10-27T04:38:24Z",
+                    "custom_id": "cs1.2BrnCgu9prR9AbdsEq19Cw-7owpjFMwSI4gXGeiAPI8",
+                    "expiration_time": "2026-11-25T04:38:24Z",
+                    "id": "48U73464UP186183L",
+                    "invoice_id": "chk_AvyGSXHiIP2_0md2-nR30A",
                     "links": [
                       {
-                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V",
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L",
                         "method": "GET",
                         "rel": "self"
                       },
                       {
-                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/capture",
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L/capture",
                         "method": "POST",
                         "rel": "capture"
                       },
                       {
-                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/void",
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L/void",
                         "method": "POST",
                         "rel": "void"
                       },
                       {
-                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/reauthorize",
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L/reauthorize",
                         "method": "POST",
                         "rel": "reauthorize"
                       },
                       {
-                        "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+                        "href": "https://api.sandbox.paypal.com/v2/checkout/orders/2R390539YU7859354",
                         "method": "GET",
                         "rel": "up"
                       }
@@ -493,7 +496,7 @@
                       "status": "ELIGIBLE"
                     },
                     "status": "CREATED",
-                    "update_time": "2026-10-24T07:24:18Z"
+                    "update_time": "2026-10-27T04:38:24Z"
                   }
                 ]
               },
@@ -501,11 +504,11 @@
             }
           ],
           "status": "COMPLETED",
-          "update_time": "2026-10-24T07:24:18Z"
+          "update_time": "2026-10-27T04:38:24Z"
         },
         "headers": {
           "content-type": "application/json",
-          "paypal-debug-id": "f781523ec07be"
+          "paypal-debug-id": "ca50f02d96b22"
         },
         "status": 200
       }
@@ -514,7 +517,7 @@
       "request": {
         "body": null,
         "method": "GET",
-        "path": "/v2/payments/authorizations/5RB874223R635620V",
+        "path": "/v2/payments/authorizations/48U73464UP186183L",
         "request_id": null
       },
       "response": {
@@ -523,34 +526,34 @@
             "currency_code": "USD",
             "value": "29.00"
           },
-          "create_time": "2026-10-24T07:24:18Z",
-          "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
-          "expiration_time": "2026-11-22T07:24:18Z",
-          "id": "5RB874223R635620V",
-          "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+          "create_time": "2026-10-27T04:38:24Z",
+          "custom_id": "cs1.2BrnCgu9prR9AbdsEq19Cw-7owpjFMwSI4gXGeiAPI8",
+          "expiration_time": "2026-11-25T04:38:24Z",
+          "id": "48U73464UP186183L",
+          "invoice_id": "chk_AvyGSXHiIP2_0md2-nR30A",
           "links": [
             {
-              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V",
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L",
               "method": "GET",
               "rel": "self"
             },
             {
-              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/capture",
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L/capture",
               "method": "POST",
               "rel": "capture"
             },
             {
-              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/void",
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L/void",
               "method": "POST",
               "rel": "void"
             },
             {
-              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/reauthorize",
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L/reauthorize",
               "method": "POST",
               "rel": "reauthorize"
             },
             {
-              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/2R390539YU7859354",
               "method": "GET",
               "rel": "up"
             }
@@ -569,14 +572,14 @@
           "status": "CREATED",
           "supplementary_data": {
             "related_ids": {
-              "order_id": "38099976HV4093935"
+              "order_id": "2R390539YU7859354"
             }
           },
-          "update_time": "2026-10-24T07:24:18Z"
+          "update_time": "2026-10-27T04:38:24Z"
         },
         "headers": {
           "content-type": "application/json;charset=UTF-8",
-          "paypal-debug-id": "f665437e70c62"
+          "paypal-debug-id": "ca50f02dd6bd0"
         },
         "status": 200
       }
@@ -585,7 +588,7 @@
       "request": {
         "body": null,
         "method": "GET",
-        "path": "/v2/payments/authorizations/5RB874223R635620V",
+        "path": "/v2/payments/authorizations/48U73464UP186183L",
         "request_id": null
       },
       "response": {
@@ -594,34 +597,34 @@
             "currency_code": "USD",
             "value": "29.00"
           },
-          "create_time": "2026-10-24T07:24:18Z",
-          "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
-          "expiration_time": "2026-11-22T07:24:18Z",
-          "id": "5RB874223R635620V",
-          "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+          "create_time": "2026-10-27T04:38:24Z",
+          "custom_id": "cs1.2BrnCgu9prR9AbdsEq19Cw-7owpjFMwSI4gXGeiAPI8",
+          "expiration_time": "2026-11-25T04:38:24Z",
+          "id": "48U73464UP186183L",
+          "invoice_id": "chk_AvyGSXHiIP2_0md2-nR30A",
           "links": [
             {
-              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V",
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L",
               "method": "GET",
               "rel": "self"
             },
             {
-              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/capture",
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L/capture",
               "method": "POST",
               "rel": "capture"
             },
             {
-              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/void",
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L/void",
               "method": "POST",
               "rel": "void"
             },
             {
-              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/reauthorize",
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L/reauthorize",
               "method": "POST",
               "rel": "reauthorize"
             },
             {
-              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/2R390539YU7859354",
               "method": "GET",
               "rel": "up"
             }
@@ -640,14 +643,14 @@
           "status": "CREATED",
           "supplementary_data": {
             "related_ids": {
-              "order_id": "38099976HV4093935"
+              "order_id": "2R390539YU7859354"
             }
           },
-          "update_time": "2026-10-24T07:24:18Z"
+          "update_time": "2026-10-27T04:38:24Z"
         },
         "headers": {
           "content-type": "application/json;charset=UTF-8",
-          "paypal-debug-id": "f6152335d05f0"
+          "paypal-debug-id": "ca50f02e68f5e"
         },
         "status": 200
       }
@@ -662,8 +665,8 @@
           "final_capture": true
         },
         "method": "POST",
-        "path": "/v2/payments/authorizations/5RB874223R635620V/capture",
-        "request_id": "cs1.capture.3vCNMCZNhjiHfpcZ9Ef-OLCdyhurPr6tMF1cXG2GZbI"
+        "path": "/v2/payments/authorizations/48U73464UP186183L/capture",
+        "request_id": "cs1.capture.aVsCR95GZBKQNAsVqJVeEJpJ9l8zCFQv_cAJIneOxRA"
       },
       "response": {
         "body": {
@@ -671,24 +674,24 @@
             "currency_code": "USD",
             "value": "29.00"
           },
-          "create_time": "2026-10-24T07:24:25Z",
-          "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+          "create_time": "2026-10-27T04:38:30Z",
+          "custom_id": "cs1.2BrnCgu9prR9AbdsEq19Cw-7owpjFMwSI4gXGeiAPI8",
           "final_capture": true,
-          "id": "0FJ719957V092431H",
-          "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+          "id": "8WK92204D00870121",
+          "invoice_id": "chk_AvyGSXHiIP2_0md2-nR30A",
           "links": [
             {
-              "href": "https://api.sandbox.paypal.com/v2/payments/captures/0FJ719957V092431H",
+              "href": "https://api.sandbox.paypal.com/v2/payments/captures/8WK92204D00870121",
               "method": "GET",
               "rel": "self"
             },
             {
-              "href": "https://api.sandbox.paypal.com/v2/payments/captures/0FJ719957V092431H/refund",
+              "href": "https://api.sandbox.paypal.com/v2/payments/captures/8WK92204D00870121/refund",
               "method": "POST",
               "rel": "refund"
             },
             {
-              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V",
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L",
               "method": "GET",
               "rel": "up"
             }
@@ -716,11 +719,11 @@
             }
           },
           "status": "COMPLETED",
-          "update_time": "2026-10-24T07:24:25Z"
+          "update_time": "2026-10-27T04:38:30Z"
         },
         "headers": {
           "content-type": "application/json;charset=UTF-8",
-          "paypal-debug-id": "f204775dfe0fa"
+          "paypal-debug-id": "ca50f02e99d28"
         },
         "status": 201
       }
@@ -729,17 +732,17 @@
       "request": {
         "body": null,
         "method": "GET",
-        "path": "/v2/checkout/orders/38099976HV4093935",
+        "path": "/v2/checkout/orders/2R390539YU7859354",
         "request_id": null
       },
       "response": {
         "body": {
-          "create_time": "2026-10-24T07:24:18Z",
-          "id": "38099976HV4093935",
+          "create_time": "2026-10-27T04:38:24Z",
+          "id": "2R390539YU7859354",
           "intent": "AUTHORIZE",
           "links": [
             {
-              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/2R390539YU7859354",
               "method": "GET",
               "rel": "self"
             }
@@ -758,9 +761,9 @@
                 "currency_code": "USD",
                 "value": "29.00"
               },
-              "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+              "custom_id": "cs1.2BrnCgu9prR9AbdsEq19Cw-7owpjFMwSI4gXGeiAPI8",
               "description": "Countersign sandbox cassette",
-              "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+              "invoice_id": "chk_AvyGSXHiIP2_0md2-nR30A",
               "items": [
                 {
                   "category": "DIGITAL_GOODS",
@@ -794,34 +797,34 @@
                       "currency_code": "USD",
                       "value": "29.00"
                     },
-                    "create_time": "2026-10-24T07:24:18Z",
-                    "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
-                    "expiration_time": "2026-11-22T07:24:18Z",
-                    "id": "5RB874223R635620V",
-                    "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+                    "create_time": "2026-10-27T04:38:24Z",
+                    "custom_id": "cs1.2BrnCgu9prR9AbdsEq19Cw-7owpjFMwSI4gXGeiAPI8",
+                    "expiration_time": "2026-11-25T04:38:24Z",
+                    "id": "48U73464UP186183L",
+                    "invoice_id": "chk_AvyGSXHiIP2_0md2-nR30A",
                     "links": [
                       {
-                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V",
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L",
                         "method": "GET",
                         "rel": "self"
                       },
                       {
-                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/capture",
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L/capture",
                         "method": "POST",
                         "rel": "capture"
                       },
                       {
-                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/void",
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L/void",
                         "method": "POST",
                         "rel": "void"
                       },
                       {
-                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/reauthorize",
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L/reauthorize",
                         "method": "POST",
                         "rel": "reauthorize"
                       },
                       {
-                        "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+                        "href": "https://api.sandbox.paypal.com/v2/checkout/orders/2R390539YU7859354",
                         "method": "GET",
                         "rel": "up"
                       }
@@ -834,7 +837,7 @@
                       "status": "ELIGIBLE"
                     },
                     "status": "CAPTURED",
-                    "update_time": "2026-10-24T07:24:25Z"
+                    "update_time": "2026-10-27T04:38:30Z"
                   }
                 ],
                 "captures": [
@@ -843,25 +846,25 @@
                       "currency_code": "USD",
                       "value": "29.00"
                     },
-                    "create_time": "2026-10-24T07:24:25Z",
-                    "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+                    "create_time": "2026-10-27T04:38:30Z",
+                    "custom_id": "cs1.2BrnCgu9prR9AbdsEq19Cw-7owpjFMwSI4gXGeiAPI8",
                     "disbursement_mode": "INSTANT",
                     "final_capture": true,
-                    "id": "0FJ719957V092431H",
-                    "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+                    "id": "8WK92204D00870121",
+                    "invoice_id": "chk_AvyGSXHiIP2_0md2-nR30A",
                     "links": [
                       {
-                        "href": "https://api.sandbox.paypal.com/v2/payments/captures/0FJ719957V092431H",
+                        "href": "https://api.sandbox.paypal.com/v2/payments/captures/8WK92204D00870121",
                         "method": "GET",
                         "rel": "self"
                       },
                       {
-                        "href": "https://api.sandbox.paypal.com/v2/payments/captures/0FJ719957V092431H/refund",
+                        "href": "https://api.sandbox.paypal.com/v2/payments/captures/8WK92204D00870121/refund",
                         "method": "POST",
                         "rel": "refund"
                       },
                       {
-                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V",
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L",
                         "method": "GET",
                         "rel": "up"
                       }
@@ -888,7 +891,7 @@
                       }
                     },
                     "status": "COMPLETED",
-                    "update_time": "2026-10-24T07:24:25Z"
+                    "update_time": "2026-10-27T04:38:30Z"
                   }
                 ]
               },
@@ -896,11 +899,11 @@
             }
           ],
           "status": "COMPLETED",
-          "update_time": "2026-10-24T07:24:25Z"
+          "update_time": "2026-10-27T04:38:30Z"
         },
         "headers": {
           "content-type": "application/json",
-          "paypal-debug-id": "f4513563b5341"
+          "paypal-debug-id": "ca50f02fa4800"
         },
         "status": 200
       }
@@ -909,7 +912,7 @@
       "request": {
         "body": null,
         "method": "GET",
-        "path": "/v2/payments/captures/0FJ719957V092431H",
+        "path": "/v2/payments/captures/8WK92204D00870121",
         "request_id": null
       },
       "response": {
@@ -918,25 +921,25 @@
             "currency_code": "USD",
             "value": "29.00"
           },
-          "create_time": "2026-10-24T07:24:25Z",
-          "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
+          "create_time": "2026-10-27T04:38:30Z",
+          "custom_id": "cs1.2BrnCgu9prR9AbdsEq19Cw-7owpjFMwSI4gXGeiAPI8",
           "disbursement_mode": "INSTANT",
           "final_capture": true,
-          "id": "0FJ719957V092431H",
-          "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+          "id": "8WK92204D00870121",
+          "invoice_id": "chk_AvyGSXHiIP2_0md2-nR30A",
           "links": [
             {
-              "href": "https://api.sandbox.paypal.com/v2/payments/captures/0FJ719957V092431H",
+              "href": "https://api.sandbox.paypal.com/v2/payments/captures/8WK92204D00870121",
               "method": "GET",
               "rel": "self"
             },
             {
-              "href": "https://api.sandbox.paypal.com/v2/payments/captures/0FJ719957V092431H/refund",
+              "href": "https://api.sandbox.paypal.com/v2/payments/captures/8WK92204D00870121/refund",
               "method": "POST",
               "rel": "refund"
             },
             {
-              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V",
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L",
               "method": "GET",
               "rel": "up"
             }
@@ -969,15 +972,15 @@
           "status": "COMPLETED",
           "supplementary_data": {
             "related_ids": {
-              "authorization_id": "5RB874223R635620V",
-              "order_id": "38099976HV4093935"
+              "authorization_id": "48U73464UP186183L",
+              "order_id": "2R390539YU7859354"
             }
           },
-          "update_time": "2026-10-24T07:24:25Z"
+          "update_time": "2026-10-27T04:38:30Z"
         },
         "headers": {
           "content-type": "application/json;charset=UTF-8",
-          "paypal-debug-id": "f55276059f381"
+          "paypal-debug-id": "ca50f02fdefb4"
         },
         "status": 200
       }
@@ -986,7 +989,7 @@
       "request": {
         "body": null,
         "method": "GET",
-        "path": "/v2/payments/authorizations/5RB874223R635620V",
+        "path": "/v2/payments/authorizations/48U73464UP186183L",
         "request_id": null
       },
       "response": {
@@ -995,34 +998,34 @@
             "currency_code": "USD",
             "value": "29.00"
           },
-          "create_time": "2026-10-24T07:24:18Z",
-          "custom_id": "cs1.5X7-qgEwFEnChNqobNYCNvl408EGg9YaH9M_-Ky6D80",
-          "expiration_time": "2026-11-22T07:24:18Z",
-          "id": "5RB874223R635620V",
-          "invoice_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+          "create_time": "2026-10-27T04:38:24Z",
+          "custom_id": "cs1.2BrnCgu9prR9AbdsEq19Cw-7owpjFMwSI4gXGeiAPI8",
+          "expiration_time": "2026-11-25T04:38:24Z",
+          "id": "48U73464UP186183L",
+          "invoice_id": "chk_AvyGSXHiIP2_0md2-nR30A",
           "links": [
             {
-              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V",
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L",
               "method": "GET",
               "rel": "self"
             },
             {
-              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/capture",
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L/capture",
               "method": "POST",
               "rel": "capture"
             },
             {
-              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/void",
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L/void",
               "method": "POST",
               "rel": "void"
             },
             {
-              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/5RB874223R635620V/reauthorize",
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/48U73464UP186183L/reauthorize",
               "method": "POST",
               "rel": "reauthorize"
             },
             {
-              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/38099976HV4093935",
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/2R390539YU7859354",
               "method": "GET",
               "rel": "up"
             }
@@ -1041,23 +1044,23 @@
           "status": "CAPTURED",
           "supplementary_data": {
             "related_ids": {
-              "order_id": "38099976HV4093935"
+              "order_id": "2R390539YU7859354"
             }
           },
-          "update_time": "2026-10-24T07:24:25Z"
+          "update_time": "2026-10-27T04:38:30Z"
         },
         "headers": {
           "content-type": "application/json;charset=UTF-8",
-          "paypal-debug-id": "f970510c6b2ce"
+          "paypal-debug-id": "ca50f0300cdab"
         },
         "status": 200
       }
     }
   ],
   "meta": {
-    "checkout_id": "chk_nYolDeii-I4gupU4XyW8hQ",
+    "checkout_id": "chk_AvyGSXHiIP2_0md2-nR30A",
     "host": "sandbox",
-    "recorded_at": "2026-10-24T07:23:52Z"
+    "recorded_at": "2026-10-27T04:37:32Z"
   },
   "version": 1
 }
