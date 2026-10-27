@@ -73,21 +73,44 @@ is fixed and the review is repeated.
   (`paypal/errors.py`, `paypal/client.py`, `paypal/cassette.py`), not the strict loader, so duplicate
   keys, NaN and Infinity are not rejected. Fix: parse with `loads_strict` and fail closed.
 
-Notes to resolve before or during P2:
+Fixed after the review (2026-10-27):
 
-- The package contains an ungated capture path (`paypal/cycle.py` and the public
-  `capture_authorization`). Move the cycle helper out of the package and require a gate-issued value
-  to capture.
-- Pre-capture checks do not compare the authorization's `invoice_id` and `custom_id` to the checkout.
-- The create-order `PayPal-Request-Id` ignores the checkout terms, and the refund one collides for
-  equal partial refunds.
-- `checkout_hash` is not unique per checkout because every signature differs; single use must be
-  enforced on the checkout id with a database constraint. PROTOCOL.md wording needs correcting.
-- The app connects as the table owner; it must run as the INSERT and SELECT role, and the PayPal
-  client needs ledger appends around each call.
-- Import-guard tests are missing (verification modules must not import the LLM package; lock and
-  policy must not import protocol adapters).
-- Document the clock skew used for the authorization expiry check.
+- INV-8: every PayPal body (success, error, token and cassette files and bodies) goes through the
+  strict loader and fails closed with a typed error.
+- Pre-capture checks compare the authorization's id, `invoice_id` and `custom_id` with the approved
+  values, and capture needs a sealed approval that only the gate can mint. The ungated recording
+  cycle moved out of the package into `tests/ungated_capture_cycle.py`.
+- The create-order `PayPal-Request-Id` includes the canonical terms hash.
+- The refund `PayPal-Request-Id` includes a required, caller-supplied refund key.
+- An authorization within 60 seconds of `expiration_time` counts as expired
+  ([PROTOCOL.md](PROTOCOL.md) 4.4).
+
+Outstanding before the gate closes:
+
+- The authorize-and-capture cassette must be re-recorded with a payer approval, because the
+  create-order Request-Id changed (`PAYPAL_RECORD_CASSETTES=1 uv run python
+  scripts/record_paypal_cassette.py`). Until then two replay tests are strict xfail
+  (`STALE_RECORDING` in `tests/integration/test_paypal_cassette_replay.py` and the marker in
+  `test_paypal_order_terms_replay.py`); remove both markers after recording.
+
+## P2 carry-over tasks
+
+Findings from the P1 review that belong to P2 and are not optional there:
+
+- **P2.4, single use on the checkout id.** A unique constraint on the checkout id in the
+  authorization table. `checkout_hash` is not unique per checkout (signature malleability and
+  re-signing), so it cannot carry single use alone ([PROTOCOL.md](PROTOCOL.md) Decision 1 and 18).
+- **P2.4, restricted runtime database role.** The application connects as an INSERT and SELECT role
+  and migrations as the owner; the default `DATABASE_URL` and `.env.example` change accordingly.
+  [LIMITATIONS.md](LIMITATIONS.md) L9 is updated in the same change.
+- **P2.4 and P2.5, ledger writes by the callers.** The PayPal client writes only to the process log.
+  The CP role (P2.4) and the gate (P2.5) append a ledger entry before and after every PayPal call
+  and before responding (INV-12); a failed append fails the operation.
+- **P2.5 and P2.6, import-guard tests.** At P2.5: verification and gate modules never import the LLM
+  package (INV-1). At P2.6: `lock/` and policy code never import `protocols/` (INV-5). Both are
+  AST-based, like `tests/unit/test_capture_surface.py`.
+- **P2.5, gate mints the approval.** The gate is the only library code that calls
+  `mint_capture_approval`; the surface test already enforces that.
 
 ## Open risks
 

@@ -90,6 +90,12 @@ the restricted role. Whether the hosted Postgres allows a second, restricted log
 checked ([ENV.md](ENV.md) section 4 does not say). Check at the Render deploy that the service uses
 the restricted role; if it cannot, record the fallback here and rely on the anchors in L8.
 
+Locally the default `DATABASE_URL` and `.env.example` still connect as the table owner, which can
+update or delete log rows and disable the trigger. Until P2.4 the application is not run under the
+restricted role anywhere, so no tamper-resistance is claimed for the log: P2.4 switches the runtime
+to the INSERT and SELECT role (migrations keep running as the owner) and this entry is rewritten with
+what the hosted database allows.
+
 ### L10. Throughput and clocks
 
 All appends take one advisory lock, so the log is a single-writer bottleneck by design; at demo scale

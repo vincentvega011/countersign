@@ -1152,7 +1152,10 @@ payload is the checkout without its `ap2` member; coverage is the complete check
 - **Signature malleability.** ECDSA accepts both `(r, s)` and `(r, n - s)`. A copy with the other
   `s` verifies and has a different `checkout_hash`, because the hash is over the whole JWT string.
   This does not let anyone change terms, and a mandate binds the hash of the string its signer
-  verified; it matters only if something expects one signature per checkout, which nothing does.
+  verified. It does matter for single use: every re-signed response, and every `s` flip, has a new
+  `checkout_hash`, so single use cannot rest on the hash alone. [Decision 1](#decision-1-single-use-keys)
+  rule 1 also makes the checkout id unique to one authorization, and the database must enforce that
+  with a unique constraint on the checkout id (task P2.4 in [PROGRESS.md](PROGRESS.md)).
 - **Scope.** Every response that carries a checkout is signed, whether or not AP2 was negotiated,
   because capability negotiation is not implemented yet ([Decision 17](#decision-17-ucp-checkout-rest-binding)).
   A response with no checkout (an error response) carries no `ap2`. A request that carries an `ap2`
