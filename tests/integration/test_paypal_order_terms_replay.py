@@ -96,8 +96,8 @@ CYCLE_CASSETTE = Path(__file__).resolve().parents[1] / "cassettes" / "paypal_aut
 )
 def test_orders_recorded_in_the_authorize_capture_cassette_reverse_to_the_checkout() -> None:
     """Every GET of the order in that recording, from created to captured, has the same terms."""
-    from countersign.paypal.cycle import run_cycle
     from countersign.paypal.translate import paypal_order_to_canonical_terms
+    from tests.ungated_capture_cycle import run_cycle
 
     document = load_cassette(CYCLE_CASSETTE)
     recorded_at = datetime.fromisoformat(document["meta"]["recorded_at"])

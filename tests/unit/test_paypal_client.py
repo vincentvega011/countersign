@@ -16,6 +16,7 @@ import structlog
 
 from countersign.canonical.money import Money
 from countersign.paypal import errors as E
+from countersign.paypal.approval import CaptureApproval, mint_capture_approval
 from countersign.paypal.client import Mutation, OrderCreated, PayPalClient
 from countersign.paypal.config import PayPalConfig
 from countersign.paypal.limits import (
@@ -39,6 +40,7 @@ USD = "USD"
 NOW = datetime(2026, 10, 24, 12, 0, tzinfo=UTC)
 CHECKOUT = "chk_abcdefghijklmnopqrstuv"
 RK = "refund-1"
+CUSTOM = "cs1.x"  # the custom_id auth_json carries
 TERMS = bytes(range(32))  # stands in for Checkout.terms_hash()
 
 
@@ -153,6 +155,19 @@ def order_request(**overrides: Any) -> OrderRequest:
     }
     fields.update(overrides)
     return OrderRequest(**fields)
+
+
+def approval(minor: int = 7400, **overrides: Any) -> CaptureApproval:
+    """A capture approval as the gate would mint it (the tests stand in for the gate)."""
+    fields: dict[str, Any] = {
+        "checkout_id": CHECKOUT,
+        "authorization_id": "AUTH1",
+        "expected_total": Money(USD, minor),
+        "invoice_id": CHECKOUT,
+        "custom_id": CUSTOM,
+    }
+    fields.update(overrides)
+    return mint_capture_approval(**fields)
 
 
 def post_calls(router: respx.MockRouter) -> list[httpx.Request]:
@@ -969,7 +984,7 @@ def test_capture_fetches_first_then_sends_the_full_amount_with_final_capture(
     paypal: respx.MockRouter, pp: PayPalClient
 ) -> None:
     route = capture_routes(paypal)
-    result = pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
+    result = pp.capture_authorization(approval(7400))
     assert result == Mutation("CAP1", 201, None)
     methods = [(c.request.method, c.request.url.path) for c in paypal.calls]
     assert methods == [
@@ -984,7 +999,7 @@ def test_capture_fetches_first_then_sends_the_full_amount_with_final_capture(
 
 def test_capture_has_no_way_to_choose_an_amount_or_partial() -> None:
     parameters = inspect.signature(PayPalClient.capture_authorization).parameters
-    assert set(parameters) == {"self", "checkout_id", "authorization_id", "expected_total"}
+    assert set(parameters) == {"self", "approval"}
     for name in ("amount", "final_capture", "partial"):
         assert name not in parameters
     public = {n for n in dir(PayPalClient) if not n.startswith("_")}
@@ -995,8 +1010,55 @@ def test_capture_sends_the_fetched_amount_not_a_caller_amount(
     paypal: respx.MockRouter, pp: PayPalClient
 ) -> None:
     route = capture_routes(paypal, authorization=auth_json(amount="19.99"))
-    pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 1999))
+    pp.capture_authorization(approval(1999))
     assert json.loads(route.calls[0].request.content)["amount"] == money("19.99")
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"invoice_id": "chk_ZZZZZZZZZZZZZZZZZZZZZZ"},  # another checkout's authorization
+        {"invoice_id": None},
+        {"invoice_id": ""},
+        {"custom_id": "cs1.other"},
+        {"custom_id": None},
+        {"custom_id": ""},
+        {"id": "AUTH2"},
+    ],
+)
+def test_capture_refuses_an_authorization_that_is_not_the_approved_one(
+    paypal: respx.MockRouter, pp: PayPalClient, override: dict[str, Any]
+) -> None:
+    body = auth_json()
+    body.update(override)
+    if body.get("invoice_id", "x") is None:
+        del body["invoice_id"]
+    if body.get("custom_id", "x") is None:
+        del body["custom_id"]
+    route = capture_routes(paypal, authorization=body)
+    with pytest.raises(E.AuthorizationMismatch):
+        pp.capture_authorization(approval(7400))
+    assert route.call_count == 0
+
+
+def test_capture_is_for_the_approved_checkout_whatever_the_amount_matches(
+    paypal: respx.MockRouter, pp: PayPalClient
+) -> None:
+    """Checkout B's authorization for the same total must not be captured as checkout A."""
+    route = capture_routes(paypal, authorization=auth_json(invoice_id="chk_B_bbbbbbbbbbbbbbbbbbbb"))
+    with pytest.raises(E.AuthorizationMismatch, match="invoice_id"):
+        pp.capture_authorization(approval(7400, checkout_id=CHECKOUT))
+    assert route.call_count == 0
+
+
+@pytest.mark.parametrize("bad", [None, "AUTH1", {"checkout_id": CHECKOUT}, (CHECKOUT, "AUTH1")])
+def test_capture_takes_only_a_capture_approval(
+    paypal: respx.MockRouter, pp: PayPalClient, bad: Any
+) -> None:
+    route = capture_routes(paypal)
+    with pytest.raises(TypeError):
+        pp.capture_authorization(bad)
+    assert paypal.calls.call_count == 0 and route.call_count == 0
 
 
 @pytest.mark.parametrize(
@@ -1008,7 +1070,7 @@ def test_capture_refuses_any_status_but_created_without_sending(
 ) -> None:
     route = capture_routes(paypal, authorization=auth_json(status=status))
     with pytest.raises(E.AuthorizationNotCapturable, match="status"):
-        pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
+        pp.capture_authorization(approval(7400))
     assert route.call_count == 0
 
 
@@ -1018,7 +1080,7 @@ def test_capture_refuses_an_amount_that_is_not_the_expected_total(
 ) -> None:
     route = capture_routes(paypal, authorization=auth_json(amount=amount))
     with pytest.raises(E.AmountMismatch):
-        pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
+        pp.capture_authorization(approval(7400))
     assert route.call_count == 0
 
 
@@ -1027,7 +1089,7 @@ def test_capture_refuses_a_different_currency(paypal: respx.MockRouter, pp: PayP
     body["amount"] = money("74.00", "EUR")
     route = capture_routes(paypal, authorization=body)
     with pytest.raises(E.AmountMismatch):
-        pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
+        pp.capture_authorization(approval(7400))
     assert route.call_count == 0
 
 
@@ -1037,10 +1099,10 @@ def test_capture_refuses_an_expired_authorization_by_expiration_time(
     for exp in ("2026-10-24T12:00:00Z", "2026-10-24T11:59:59Z", "2020-01-01T00:00:00Z"):
         route = capture_routes(paypal, authorization=auth_json(expiration_time=exp))
         with pytest.raises(E.AuthorizationNotCapturable, match="expired"):
-            pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
+            pp.capture_authorization(approval(7400))
         assert route.call_count == 0
     route = capture_routes(paypal, authorization=auth_json(expiration_time="2026-10-24T12:01:01Z"))
-    pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
+    pp.capture_authorization(approval(7400))
     assert route.call_count == 1
 
 
@@ -1058,11 +1120,11 @@ def test_capture_treats_an_authorization_within_the_clock_skew_as_expired(
 ) -> None:
     route = capture_routes(paypal, authorization=auth_json(expiration_time=expiration))
     if capturable:
-        pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
+        pp.capture_authorization(approval(7400))
         assert route.call_count == 1
     else:
         with pytest.raises(E.AuthorizationNotCapturable, match="clock skew"):
-            pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
+            pp.capture_authorization(approval(7400))
         assert route.call_count == 0
 
 
@@ -1071,7 +1133,7 @@ def test_the_expiry_skew_is_configurable_and_never_negative(
 ) -> None:
     route = capture_routes(paypal, authorization=auth_json(expiration_time="2026-10-24T12:00:30Z"))
     pp = make_client(clock, authorization_expiry_skew_s=0.0)
-    pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
+    pp.capture_authorization(approval(7400))
     assert route.call_count == 1
     with pytest.raises(E.PayPalConfigError):
         PayPalConfig(client_id=CLIENT_ID, client_secret=SECRET, authorization_expiry_skew_s=-1)
@@ -1082,7 +1144,7 @@ def test_capture_refuses_an_expiration_time_without_a_zone(
 ) -> None:
     route = capture_routes(paypal, authorization=auth_json(expiration_time="2030-01-01T00:00:00"))
     with pytest.raises(E.PayPalResponseError, match="time zone"):
-        pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
+        pp.capture_authorization(approval(7400))
     assert route.call_count == 0
 
 
@@ -1101,7 +1163,7 @@ def test_capture_errors_are_mapped(
     route = capture_routes(paypal)
     route.mock(return_value=httpx.Response(422, json={"name": issue, "message": "no"}))
     with pytest.raises(exc):
-        pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
+        pp.capture_authorization(approval(7400))
     assert route.call_count == 1  # a 422 is not retried
 
 
@@ -1427,7 +1489,7 @@ def test_capture_retry_reuses_the_request_id_and_does_not_refetch(
 ) -> None:
     route = capture_routes(paypal)
     route.side_effect = [httpx.Response(500), httpx.Response(201, json=capture_json())]
-    pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
+    pp.capture_authorization(approval(7400))
     assert len(route.calls) == 2
     assert len({c.request.headers["paypal-request-id"] for c in route.calls}) == 1
     gets = [c for c in paypal.calls if c.request.method == "GET"]
@@ -1508,12 +1570,12 @@ def test_409_in_progress_is_retried_then_outcome_unknown(
     body = {"name": "PREVIOUS_REQUEST_IN_PROGRESS", "message": "busy"}
     route = capture_routes(paypal)
     route.side_effect = [httpx.Response(409, json=body), httpx.Response(201, json=capture_json())]
-    pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
+    pp.capture_authorization(approval(7400))
     assert route.call_count == 2
     route.side_effect = None
     route.mock(return_value=httpx.Response(409, json=body))
     with pytest.raises(E.PreviousRequestInProgress) as exc:
-        pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
+        pp.capture_authorization(approval(7400))
     assert exc.value.outcome_unknown is True
 
 
@@ -1730,7 +1792,7 @@ def test_every_post_sends_the_content_type_and_body_paypal_accepted(
     )
     pp.create_order(CHECKOUT, order_request(), terms_hash=TERMS)
     pp.authorize_order(CHECKOUT, "ORDER1")
-    pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
+    pp.capture_authorization(approval(7400))
     pp.void_authorization(CHECKOUT, "AUTH2")
     pp.refund_capture(CHECKOUT, "CAP1", refund_key=RK)
     pp.refund_capture(CHECKOUT, "CAP1", refund_key=RK, amount=Money(USD, 1000))

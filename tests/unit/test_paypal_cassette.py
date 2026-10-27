@@ -23,8 +23,8 @@ from countersign.paypal.cassette import (
 )
 from countersign.paypal.client import PayPalClient
 from countersign.paypal.config import PayPalConfig
-from countersign.paypal.cycle import CycleResult, cycle_checkout, run_cycle
 from tests import paypal_fake as fake
+from tests.ungated_capture_cycle import CycleResult, cycle_checkout, run_cycle
 
 CLIENT_ID = "client-id-ABCDEF"
 SECRET = "client-secret-ZYXWVU"

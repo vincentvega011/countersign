@@ -158,6 +158,10 @@ class AmountMismatch(PayPalError):
     """The fetched authorization amount is not the amount the caller expects. Nothing was sent."""
 
 
+class AuthorizationMismatch(PayPalError):
+    """The fetched authorization is not the one the approval was issued for. Nothing was sent."""
+
+
 # PayPal code -> exception. Names and issues are looked up in the same table.
 ERROR_CODES: dict[str, type[PayPalRequestError]] = {
     "INVALID_STRING_LENGTH": InvalidStringLength,

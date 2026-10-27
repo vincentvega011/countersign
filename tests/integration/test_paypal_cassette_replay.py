@@ -19,8 +19,8 @@ from countersign.catalog.catalog import load_catalog
 from countersign.paypal.cassette import CassetteTransport, load_cassette
 from countersign.paypal.client import PayPalClient
 from countersign.paypal.config import PayPalConfig
-from countersign.paypal.cycle import cycle_checkout, run_cycle
 from countersign.paypal.request_id import Operation, create_order_request_id, derive_request_id
+from tests.ungated_capture_cycle import cycle_checkout, run_cycle
 
 CASSETTE = Path(__file__).resolve().parents[1] / "cassettes" / "paypal_authorize_capture.json"
 

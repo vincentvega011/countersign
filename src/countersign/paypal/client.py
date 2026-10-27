@@ -43,9 +43,11 @@ import structlog
 from pydantic import BaseModel, ValidationError
 
 from countersign.canonical.money import Money
+from countersign.paypal.approval import CaptureApproval
 from countersign.paypal.config import PayPalConfig
 from countersign.paypal.errors import (
     AmountMismatch,
+    AuthorizationMismatch,
     AuthorizationNotCapturable,
     PayPalAuthError,
     PayPalResponseError,
@@ -424,18 +426,23 @@ class PayPalClient:
         )
         return self._mutation(response, ident)
 
-    def capture_authorization(
-        self, checkout_id: str, authorization_id: str, *, expected_total: Money
-    ) -> Mutation:
+    def capture_authorization(self, approval: CaptureApproval) -> Mutation:
         """Capture the whole authorization, once, with `final_capture` true.
 
-        There is no amount to choose: the amount sent is the one in the authorization fetched a moment
-        ago, and only if that is `expected_total`. Raises `AuthorizationNotCapturable` or
-        `AmountMismatch` without sending a capture otherwise. After an error with `outcome_unknown`,
-        re-fetch; do not call this again for the same checkout.
+        Needs a `CaptureApproval`, which only the capture gate can issue. There is no amount to
+        choose: the amount sent is the one in the authorization fetched a moment ago, and only if
+        that is the approved total and the authorization carries the approved `invoice_id` and
+        `custom_id`. Raises `AuthorizationNotCapturable`, `AuthorizationMismatch` or `AmountMismatch`
+        without sending a capture otherwise. After an error with `outcome_unknown`, re-fetch; do not
+        call this again for the same checkout.
         """
-        ident = check_path_id(authorization_id, "authorization id")
+        if type(approval) is not CaptureApproval:
+            raise TypeError("capture needs a CaptureApproval from the capture gate")
+        checkout_id = approval.checkout_id
+        ident = approval.authorization_id
         authorization = self.get_authorization(ident)
+        if authorization.id != ident:
+            raise AuthorizationMismatch("the fetched authorization is not the approved one")
         if authorization.status != "CREATED":
             raise AuthorizationNotCapturable(
                 f"the authorization status is {authorization.status}, not CREATED"
@@ -450,7 +457,11 @@ class PayPalClient:
             raise AuthorizationNotCapturable(
                 "the authorization has expired or expires within the clock skew"
             )
-        if authorization.amount != expected_total:
+        if authorization.invoice_id != approval.invoice_id:
+            raise AuthorizationMismatch("the authorization invoice_id is not the approved one")
+        if authorization.custom_id != approval.custom_id:
+            raise AuthorizationMismatch("the authorization custom_id is not the approved one")
+        if authorization.amount != approval.expected_total:
             raise AmountMismatch("the authorization amount is not the expected total")
         response = self._call(
             "POST",

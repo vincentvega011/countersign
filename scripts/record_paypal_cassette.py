@@ -26,10 +26,12 @@ import httpx
 from countersign.paypal.cassette import RecordingTransport, recording_enabled
 from countersign.paypal.client import PayPalClient
 from countersign.paypal.config import PayPalConfig
-from countersign.paypal.cycle import run_cycle
 from countersign.paypal.errors import PayPalError
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))  # the recording cycle lives in tests/, never in the package
+from tests.ungated_capture_cycle import run_cycle
+
 OUTPUT = ROOT / "tests" / "cassettes" / "paypal_authorize_capture.json"
 
 

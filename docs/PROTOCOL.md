@@ -1192,13 +1192,22 @@ Resolves: how `countersign.paypal` turns the facts in [section 4](#4-confirmed-p
   the first. A retry of one refund passes the same key, a new refund a new key. The client checks every id against the
   108 character limit and `[A-Za-z0-9._:-]` before sending and refuses to send a state-changing call
   without one. A test pins two values and compares the derivation with a `hashlib` reference.
-- **Capture.** There is no amount argument and no partial form. The client fetches the authorization,
-  requires status `CREATED` (the status enum has no `EXPIRED`, so expiry is `expiration_time` against
-  the client's clock, with a zone required, and the rule in [4.4](#44-authorization-lifetime)),
-  requires the amount to equal the total the caller
-  passes, and sends that amount with `final_capture` true. Anything else raises before a capture
-  request is sent. After an error with `outcome_unknown` the caller re-fetches and does not call
-  capture again: a second call would see the status the first one produced.
+- **Capture.** `capture_authorization` takes one argument, a `CaptureApproval`, a sealed value that
+  states the checkout id, authorization id, total, `invoice_id` and `custom_id` the capture gate
+  approved. Only `countersign.gate` is allowed to build one (`mint_capture_approval` in
+  `paypal/approval.py`); a structural test fails if other library code imports the mint or calls the
+  capture, and it lists the recording and test helpers outside the package that do. Python cannot
+  stop a caller that reaches into private names, so the guard is the sealed constructor, that test
+  and review. There is no amount argument and no partial form. The client fetches the authorization
+  and requires: the same id, status `CREATED` (the status enum has no `EXPIRED`, so expiry is
+  `expiration_time` against the client's clock with the rule in [4.4](#44-authorization-lifetime),
+  and a zone required), `invoice_id` and `custom_id` equal to the approved values (so another
+  checkout's authorization of the same total is not captured), and an amount equal to the approved
+  total. It then sends that amount with `final_capture` true. Anything else raises before a capture
+  request is sent (`AuthorizationNotCapturable`, `AuthorizationMismatch`, `AmountMismatch`). After
+  an error with `outcome_unknown` the caller re-fetches and does not call capture again: a second
+  call would see the status the first one produced. The sandbox recording cycle that captures
+  without a gate lives in `tests/ungated_capture_cycle.py`, not in the package.
 - **Retries.** 5xx, timeouts, connection errors and a 409 `PREVIOUS_REQUEST_IN_PROGRESS` are retried
   up to three attempts in total with a 0.5 s doubling backoff capped at 8 s, always with the same
   Request-Id. A 401 refreshes the token once without using an attempt. A 4xx is never retried.

@@ -1,6 +1,6 @@
 """A small stateful stand-in for the PayPal sandbox, for testing the cassette machinery.
 
-It answers the calls in `countersign.paypal.cycle` and deliberately puts the things a recording must
+It answers the calls in `tests.ungated_capture_cycle` and deliberately puts the things a recording must
 scrub into its responses: an access token, an application id, a merchant account id, and payer
 personal data. Nothing here is a real credential.
 """

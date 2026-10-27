@@ -1,4 +1,11 @@
-"""The authorize-and-capture cycle that the cassette is recorded from and replayed against.
+"""SANDBOX RECORDING AND TEST ONLY: an authorize-and-capture cycle with no capture gate.
+
+This runs create, authorize and capture with no mandate and no gate, and mints its own capture
+approval. It exists so the sandbox cassette can be recorded and replayed. It is deliberately not part
+of the `countersign` package: nothing in `src/` may import it (tests/unit/test_capture_surface.py
+enforces that), and the product captures only through the capture gate.
+
+The authorize-and-capture cycle that the cassette is recorded from and replayed against.
 
 `scripts/record_paypal_cassette.py` runs it live (a person approves the order on the sandbox) and the
 replay test runs the same code against the recording, so both make exactly the same calls in the same
@@ -14,6 +21,7 @@ from countersign.canonical.hashing import b64url, domain_hash
 from countersign.canonical.models import Checkout
 from countersign.canonical.money import Money
 from countersign.catalog.catalog import Catalog, load_catalog
+from countersign.paypal.approval import mint_capture_approval
 from countersign.paypal.client import PayPalClient
 from countersign.paypal.models import (
     Authorization,
@@ -94,7 +102,14 @@ def run_cycle(
     (authorization_ref,) = authorized.authorizations
     authorization = client.get_authorization(authorization_ref.id)
 
-    client.capture_authorization(checkout_id, authorization.id, expected_total=total)
+    approval = mint_capture_approval(  # recording and tests only: there is no gate here
+        checkout_id=checkout_id,
+        authorization_id=authorization.id,
+        expected_total=total,
+        invoice_id=checkout_id,
+        custom_id=custom_id,
+    )
+    client.capture_authorization(approval)
     final_order = client.get_order(created.resource_id)
     (capture_ref,) = final_order.captures
     capture = client.get_capture(capture_ref.id)
