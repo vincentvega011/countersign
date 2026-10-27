@@ -15,9 +15,12 @@ inside PayPal's 108; the client checks every Request-Id against the limit again 
 from __future__ import annotations
 
 import struct
+from collections.abc import Mapping
 from enum import StrEnum
+from typing import Any
 
 from countersign.canonical.hashing import b64url, domain_hash
+from countersign.canonical.jcs import canonicalize
 
 DOMAIN = "cs.paypal.request.v1"
 PREFIX = "cs1"
@@ -45,14 +48,21 @@ def derive_request_id(checkout_id: str, operation: Operation, *parts: str) -> st
     return f"{PREFIX}.{operation.value}.{digest}"
 
 
-def create_order_request_id(checkout_id: str, terms_hash: bytes) -> str:
-    """The Request-Id for creating the order of `checkout_id` with the terms hashed as `terms_hash`.
+ORDER_REQUEST_DOMAIN = "cs.paypal.order_request.v1"
+
+
+def order_request_hash(body: Mapping[str, Any]) -> bytes:
+    """Domain separated SHA-256 over the JCS bytes of the create-order body that is sent."""
+    return domain_hash(ORDER_REQUEST_DOMAIN, canonicalize(body))
+
+
+def create_order_request_id(checkout_id: str, body: Mapping[str, Any]) -> str:
+    """The Request-Id for creating an order of `checkout_id` with exactly this request `body`.
 
     PayPal replays the first response for a repeated Request-Id even when the body differs
     (docs/PROTOCOL.md section 4.2), so an id from the checkout id alone would hand back a stale order
-    after the checkout is re-priced. Including the canonical terms hash makes a changed checkout a
-    different request, and an unchanged one the same request.
+    after the checkout is re-priced. The id covers the hash of the body that is actually sent, so a
+    changed request is a different request and an identical one is the same request. The caller
+    cannot supply the hash: it is derived here, from the bytes that go out.
     """
-    if not isinstance(terms_hash, bytes) or len(terms_hash) != 32:
-        raise ValueError("the terms hash must be 32 bytes")
-    return derive_request_id(checkout_id, Operation.CREATE_ORDER, b64url(terms_hash))
+    return derive_request_id(checkout_id, Operation.CREATE_ORDER, b64url(order_request_hash(body)))

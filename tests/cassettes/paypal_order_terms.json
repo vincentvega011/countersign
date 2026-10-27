@@ -11,14 +11,14 @@
         "body": {
           "access_token": "SCRUBBED_ACCESS_TOKEN",
           "app_id": "SCRUBBED_APP_ID",
-          "expires_in": 31230,
+          "expires_in": 30159,
           "nonce": "SCRUBBED_NONCE",
           "scope": "SCRUBBED_SCOPE",
           "token_type": "Bearer"
         },
         "headers": {
           "content-type": "application/json",
-          "paypal-debug-id": "f781771f08ff9"
+          "paypal-debug-id": "f3501130c7116"
         },
         "status": 200
       }
@@ -50,9 +50,9 @@
                 "currency_code": "USD",
                 "value": "29.00"
               },
-              "custom_id": "cs1.myjSbL-7hTliXf7NXo9yHIUtKpTtC7ZqehHR1cvbDP8",
+              "custom_id": "cs1.czHqhkSmtTDEV3clgnBLmvZNcHHPWFuQl-cvtZrhOwM",
               "description": "Countersign order terms cassette",
-              "invoice_id": "chk_plain_XadKnki9d_fxI3v7",
+              "invoice_id": "chk_plain_HBbej6lbqQ8LvwiG",
               "items": [
                 {
                   "category": "DIGITAL_GOODS",
@@ -81,20 +81,20 @@
         },
         "method": "POST",
         "path": "/v2/checkout/orders",
-        "request_id": "cs1.create_order.JDKn3ZYWRriulFmr049VaXSjG_hLibpHKhunLpnamAk"
+        "request_id": "cs1.create_order.vDRUtSMSg-dIryvookLhdFxo0gCKcEW2TXDb2N0Pl1E"
       },
       "response": {
         "body": {
-          "id": "9PU45624WF817642X",
+          "id": "3WK90650K6475042G",
           "intent": "AUTHORIZE",
           "links": [
             {
-              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/9PU45624WF817642X",
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/3WK90650K6475042G",
               "method": "GET",
               "rel": "self"
             },
             {
-              "href": "https://www.sandbox.paypal.com/checkoutnow?token=9PU45624WF817642X",
+              "href": "https://www.sandbox.paypal.com/checkoutnow?token=3WK90650K6475042G",
               "method": "GET",
               "rel": "payer-action"
             }
@@ -112,9 +112,9 @@
                 "currency_code": "USD",
                 "value": "29.00"
               },
-              "custom_id": "cs1.myjSbL-7hTliXf7NXo9yHIUtKpTtC7ZqehHR1cvbDP8",
+              "custom_id": "cs1.czHqhkSmtTDEV3clgnBLmvZNcHHPWFuQl-cvtZrhOwM",
               "description": "Countersign order terms cassette",
-              "invoice_id": "chk_plain_XadKnki9d_fxI3v7",
+              "invoice_id": "chk_plain_HBbej6lbqQ8LvwiG",
               "items": [
                 {
                   "category": "DIGITAL_GOODS",
@@ -148,7 +148,7 @@
         },
         "headers": {
           "content-type": "application/json",
-          "paypal-debug-id": "f795931146428"
+          "paypal-debug-id": "f4521498368f7"
         },
         "status": 200
       }
@@ -157,22 +157,22 @@
       "request": {
         "body": null,
         "method": "GET",
-        "path": "/v2/checkout/orders/9PU45624WF817642X",
+        "path": "/v2/checkout/orders/3WK90650K6475042G",
         "request_id": null
       },
       "response": {
         "body": {
-          "create_time": "2026-10-27T04:27:02Z",
-          "id": "9PU45624WF817642X",
+          "create_time": "2026-10-27T04:44:52Z",
+          "id": "3WK90650K6475042G",
           "intent": "AUTHORIZE",
           "links": [
             {
-              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/9PU45624WF817642X",
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/3WK90650K6475042G",
               "method": "GET",
               "rel": "self"
             },
             {
-              "href": "https://www.sandbox.paypal.com/checkoutnow?token=9PU45624WF817642X",
+              "href": "https://www.sandbox.paypal.com/checkoutnow?token=3WK90650K6475042G",
               "method": "GET",
               "rel": "payer-action"
             }
@@ -190,9 +190,9 @@
                 "currency_code": "USD",
                 "value": "29.00"
               },
-              "custom_id": "cs1.myjSbL-7hTliXf7NXo9yHIUtKpTtC7ZqehHR1cvbDP8",
+              "custom_id": "cs1.czHqhkSmtTDEV3clgnBLmvZNcHHPWFuQl-cvtZrhOwM",
               "description": "Countersign order terms cassette",
-              "invoice_id": "chk_plain_XadKnki9d_fxI3v7",
+              "invoice_id": "chk_plain_HBbej6lbqQ8LvwiG",
               "items": [
                 {
                   "category": "DIGITAL_GOODS",
@@ -226,7 +226,7 @@
         },
         "headers": {
           "content-type": "application/json",
-          "paypal-debug-id": "f13649249fcc5"
+          "paypal-debug-id": "f424236d9447a"
         },
         "status": 200
       }
@@ -274,9 +274,9 @@
                 "currency_code": "USD",
                 "value": "36.49"
               },
-              "custom_id": "cs1.qr7zTtDqRIY4NPy-jx6kLdFDzYnOTlmxZ3OU9zPKiUU",
+              "custom_id": "cs1.FGqdv_jGcDOdGIxpQPD7_Ir3FkzuqoQOa83qpMHLq-c",
               "description": "Countersign order terms cassette",
-              "invoice_id": "chk_rich_GHfO-mMfXfmLrfQZ",
+              "invoice_id": "chk_rich_k5PmisAClcV539lC",
               "items": [
                 {
                   "category": "DIGITAL_GOODS",
@@ -313,20 +313,20 @@
         },
         "method": "POST",
         "path": "/v2/checkout/orders",
-        "request_id": "cs1.create_order.DgwpQPGifBMiBdNRSj8dfnW6OjLwk82GcGKydw_06xA"
+        "request_id": "cs1.create_order.5eChkbg8dzOqhBYerDSbq-OGFjmmodb6dOJQrZpAQvc"
       },
       "response": {
         "body": {
-          "id": "8S812326H3454560G",
+          "id": "0TH81454XU2124514",
           "intent": "AUTHORIZE",
           "links": [
             {
-              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/8S812326H3454560G",
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/0TH81454XU2124514",
               "method": "GET",
               "rel": "self"
             },
             {
-              "href": "https://www.sandbox.paypal.com/checkoutnow?token=8S812326H3454560G",
+              "href": "https://www.sandbox.paypal.com/checkoutnow?token=0TH81454XU2124514",
               "method": "GET",
               "rel": "payer-action"
             }
@@ -360,9 +360,9 @@
                 "currency_code": "USD",
                 "value": "36.49"
               },
-              "custom_id": "cs1.qr7zTtDqRIY4NPy-jx6kLdFDzYnOTlmxZ3OU9zPKiUU",
+              "custom_id": "cs1.FGqdv_jGcDOdGIxpQPD7_Ir3FkzuqoQOa83qpMHLq-c",
               "description": "Countersign order terms cassette",
-              "invoice_id": "chk_rich_GHfO-mMfXfmLrfQZ",
+              "invoice_id": "chk_rich_k5PmisAClcV539lC",
               "items": [
                 {
                   "category": "DIGITAL_GOODS",
@@ -404,7 +404,7 @@
         },
         "headers": {
           "content-type": "application/json",
-          "paypal-debug-id": "f371179f3b73d"
+          "paypal-debug-id": "f78504148e5bc"
         },
         "status": 200
       }
@@ -413,22 +413,22 @@
       "request": {
         "body": null,
         "method": "GET",
-        "path": "/v2/checkout/orders/8S812326H3454560G",
+        "path": "/v2/checkout/orders/0TH81454XU2124514",
         "request_id": null
       },
       "response": {
         "body": {
-          "create_time": "2026-10-27T04:27:04Z",
-          "id": "8S812326H3454560G",
+          "create_time": "2026-10-27T04:44:55Z",
+          "id": "0TH81454XU2124514",
           "intent": "AUTHORIZE",
           "links": [
             {
-              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/8S812326H3454560G",
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/0TH81454XU2124514",
               "method": "GET",
               "rel": "self"
             },
             {
-              "href": "https://www.sandbox.paypal.com/checkoutnow?token=8S812326H3454560G",
+              "href": "https://www.sandbox.paypal.com/checkoutnow?token=0TH81454XU2124514",
               "method": "GET",
               "rel": "payer-action"
             }
@@ -462,9 +462,9 @@
                 "currency_code": "USD",
                 "value": "36.49"
               },
-              "custom_id": "cs1.qr7zTtDqRIY4NPy-jx6kLdFDzYnOTlmxZ3OU9zPKiUU",
+              "custom_id": "cs1.FGqdv_jGcDOdGIxpQPD7_Ir3FkzuqoQOa83qpMHLq-c",
               "description": "Countersign order terms cassette",
-              "invoice_id": "chk_rich_GHfO-mMfXfmLrfQZ",
+              "invoice_id": "chk_rich_k5PmisAClcV539lC",
               "items": [
                 {
                   "category": "DIGITAL_GOODS",
@@ -506,7 +506,7 @@
         },
         "headers": {
           "content-type": "application/json",
-          "paypal-debug-id": "f1437292d20f5"
+          "paypal-debug-id": "f766791900732"
         },
         "status": 200
       }
@@ -514,11 +514,11 @@
   ],
   "meta": {
     "checkout_ids": {
-      "plain": "chk_plain_XadKnki9d_fxI3v7",
-      "rich": "chk_rich_GHfO-mMfXfmLrfQZ"
+      "plain": "chk_plain_HBbej6lbqQ8LvwiG",
+      "rich": "chk_rich_k5PmisAClcV539lC"
     },
     "host": "sandbox",
-    "recorded_at": "2026-10-27T04:26:59Z"
+    "recorded_at": "2026-10-27T04:44:50Z"
   },
   "version": 1
 }

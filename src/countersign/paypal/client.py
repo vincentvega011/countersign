@@ -393,22 +393,20 @@ class PayPalClient:
 
     # ------------------------------------------------------------------ state-changing calls
 
-    def create_order(
-        self, checkout_id: str, order: OrderRequest, *, terms_hash: bytes
-    ) -> OrderCreated:
+    def create_order(self, checkout_id: str, order: OrderRequest) -> OrderCreated:
         """Create an AUTHORIZE order. Re-fetch with `get_order` for its state.
 
-        `terms_hash` is the canonical terms hash (`Checkout.terms_hash()`) of the checkout the order
-        was built from. It is part of the Request-Id, so re-pricing a checkout never replays the
-        earlier order.
+        The Request-Id covers the hash of the request body, computed here, so a re-priced checkout
+        never replays the earlier order and a caller cannot say otherwise.
         """
+        body = order.to_json()
         response = self._call(
             "POST",
             "/v2/checkout/orders",
             op="create_order",
             ok=(200, 201),
-            body=order.to_json(),
-            request_id=create_order_request_id(checkout_id, terms_hash),
+            body=body,
+            request_id=create_order_request_id(checkout_id, body),
         )
         order_id = self._resource_id(response, "order")
         links = self._object(response).get("links")

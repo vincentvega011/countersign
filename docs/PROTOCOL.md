@@ -1184,11 +1184,13 @@ Resolves: how `countersign.paypal` turns the facts in [section 4](#4-confirmed-p
 - **Request ids.** `cs1.<operation>.<digest>`, the digest being the unpadded base64url of
   `SHA-256("cs.paypal.request.v1" || 0x00 || fields)` where each of the checkout id, the operation
   and any extra parts is a 4 byte big-endian length then its UTF-8 bytes. At most 60 characters.
-  Create order adds the base64url of the 32 byte canonical terms hash (`Checkout.terms_hash()`),
-  because PayPal replays the first order for a repeated id even when the body differs (4.2): a
-  re-priced checkout must be a different request. The pinned value in the unit tests covers this
-  form; the generic derivation and its two golden values did not change. The recorded create-order
-  ids in the cassettes use this form (the authorize and capture cassette is pending a re-recording).
+  Create order adds the base64url of a domain separated SHA-256 (`cs.paypal.order_request.v1`) over
+  the JCS bytes of the create-order body that is sent. The client computes it from that body and the
+  caller cannot supply it, so the id always matches what goes out. PayPal replays the first order
+  for a repeated id even when the body differs (4.2): a re-priced checkout, or any other change to
+  the request, must be a different request. A test compares the derivation with a `hashlib` and
+  `rfc8785` reference and pins one value. The generic derivation and its two golden values did not
+  change. Recorded create-order ids in the cassettes use this form.
   Refunds add the capture id, the amount (`full` or `<currency>:<value>`) and a required
   caller-supplied refund key (1 to 64 characters of letters, digits, `_` and `-`). The amount alone
   is not enough: two separate refunds of the same amount would send one id and PayPal would replay

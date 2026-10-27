@@ -289,11 +289,9 @@ def test_replay_detects_a_request_the_cassette_does_not_have(tmp_path: Path) -> 
 def test_replay_detects_recorded_exchanges_that_were_never_requested(tmp_path: Path) -> None:
     path, _, _ = record(tmp_path)
     transport = CassetteTransport(load_cassette(path))
-    checkout, request, _ = cycle_checkout(CHECKOUT, load_catalog())
+    _, request, _ = cycle_checkout(CHECKOUT, load_catalog())
     with client_for(transport) as client:
-        client.create_order(
-            CHECKOUT, request, terms_hash=checkout.terms_hash()
-        )  # only the token and create exchanges are used
+        client.create_order(CHECKOUT, request)  # only the token and create exchanges are used
     assert transport.remaining == 9
     with pytest.raises(CassetteError, match="never requested"):
         transport.assert_exhausted()

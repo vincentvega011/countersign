@@ -25,7 +25,6 @@ from countersign.paypal.client import PayPalClient
 from tests.unit.test_paypal_client import (
     BASE,
     CHECKOUT,
-    TERMS,
     Clock,
     approval,
     auth_json,
@@ -91,7 +90,7 @@ def test_a_refused_create_order_body_is_not_read(
 ) -> None:
     paypal.post(f"{BASE}/v2/checkout/orders").mock(return_value=raw(201, body))
     with pytest.raises(E.PayPalResponseError, match="strict JSON loader"):
-        pp.create_order(CHECKOUT, order_request(), terms_hash=TERMS)
+        pp.create_order(CHECKOUT, order_request())
 
 
 @pytest.mark.parametrize("body", REFUSED, ids=IDS)
@@ -208,7 +207,7 @@ def _mutations() -> list[Any]:
 
     return [
         pytest.param(
-            lambda c: c.create_order(CHECKOUT, order_request(), terms_hash=TERMS),
+            lambda c: c.create_order(CHECKOUT, order_request()),
             "POST",
             f"{BASE}/v2/checkout/orders",
             201,
@@ -298,4 +297,4 @@ def test_a_clean_2xx_mutation_is_not_marked_unknown(
     paypal.post(f"{BASE}/v2/checkout/orders").mock(
         return_value=httpx.Response(201, json={"id": "ORDER1", "status": "CREATED"})
     )
-    assert pp.create_order(CHECKOUT, order_request(), terms_hash=TERMS).resource_id == "ORDER1"
+    assert pp.create_order(CHECKOUT, order_request()).resource_id == "ORDER1"
