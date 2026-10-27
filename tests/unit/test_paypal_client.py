@@ -998,9 +998,42 @@ def test_capture_refuses_an_expired_authorization_by_expiration_time(
         with pytest.raises(E.AuthorizationNotCapturable, match="expired"):
             pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
         assert route.call_count == 0
-    route = capture_routes(paypal, authorization=auth_json(expiration_time="2026-10-24T12:00:01Z"))
+    route = capture_routes(paypal, authorization=auth_json(expiration_time="2026-10-24T12:01:01Z"))
     pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
     assert route.call_count == 1
+
+
+@pytest.mark.parametrize(
+    ("expiration", "capturable"),
+    [
+        ("2026-10-24T12:01:01Z", True),  # one second beyond the 60 second skew
+        ("2026-10-24T12:01:00Z", False),  # exactly the skew away: counts as expired
+        ("2026-10-24T12:00:59Z", False),  # inside the skew, though not yet expired
+        ("2026-10-24T12:00:01Z", False),
+    ],
+)
+def test_capture_treats_an_authorization_within_the_clock_skew_as_expired(
+    paypal: respx.MockRouter, pp: PayPalClient, expiration: str, capturable: bool
+) -> None:
+    route = capture_routes(paypal, authorization=auth_json(expiration_time=expiration))
+    if capturable:
+        pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
+        assert route.call_count == 1
+    else:
+        with pytest.raises(E.AuthorizationNotCapturable, match="clock skew"):
+            pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
+        assert route.call_count == 0
+
+
+def test_the_expiry_skew_is_configurable_and_never_negative(
+    paypal: respx.MockRouter, clock: Clock
+) -> None:
+    route = capture_routes(paypal, authorization=auth_json(expiration_time="2026-10-24T12:00:30Z"))
+    pp = make_client(clock, authorization_expiry_skew_s=0.0)
+    pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
+    assert route.call_count == 1
+    with pytest.raises(E.PayPalConfigError):
+        PayPalConfig(client_id=CLIENT_ID, client_secret=SECRET, authorization_expiry_skew_s=-1)
 
 
 def test_capture_refuses_an_expiration_time_without_a_zone(

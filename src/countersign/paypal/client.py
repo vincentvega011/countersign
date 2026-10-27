@@ -35,7 +35,7 @@ import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, Self, TypeVar
 
 import httpx
@@ -427,8 +427,13 @@ class PayPalClient:
         expires = authorization.expiration_time
         if expires.tzinfo is None:
             raise PayPalResponseError("the authorization expiration_time has no time zone")
-        if expires <= self._now():
-            raise AuthorizationNotCapturable("the authorization has expired")
+        # Fail closed (INV-10): within the skew of expiration_time the authorization counts as expired,
+        # because our clock may be behind PayPal's and a capture at the edge may be refused or racing.
+        skew = timedelta(seconds=self._config.authorization_expiry_skew_s)
+        if expires <= self._now() + skew:
+            raise AuthorizationNotCapturable(
+                "the authorization has expired or expires within the clock skew"
+            )
         if authorization.amount != expected_total:
             raise AmountMismatch("the authorization amount is not the expected total")
         response = self._call(

@@ -1187,7 +1187,8 @@ Resolves: how `countersign.paypal` turns the facts in [section 4](#4-confirmed-p
   without one. A test pins two values and compares the derivation with a `hashlib` reference.
 - **Capture.** There is no amount argument and no partial form. The client fetches the authorization,
   requires status `CREATED` (the status enum has no `EXPIRED`, so expiry is `expiration_time` against
-  the client's clock, with a zone required), requires the amount to equal the total the caller
+  the client's clock, with a zone required, and the rule in [4.4](#44-authorization-lifetime)),
+  requires the amount to equal the total the caller
   passes, and sends that amount with `final_capture` true. Anything else raises before a capture
   request is sent. After an error with `outcome_unknown` the caller re-fetches and does not call
   capture again: a second call would see the status the first one produced.
@@ -1362,6 +1363,14 @@ Authorizing an order that was already authorized, with a new Request-Id: HTTP 42
 `expiration_time` was 29 days after the authorization was created, in this run and in the earlier
 smoke run. The event documentation (4.8) describes a 30 day validity period. Both are noted; the
 gate reads `expiration_time` from the fetched authorization and does not assume a period.
+
+**Expiry rule (Countersign decision).** An authorization counts as expired when
+`expiration_time <= now + skew`, with `now` the local clock and a skew of 60 seconds (the same value
+as the mandate `exp` skew in Decision 10, held in `PayPalConfig.authorization_expiry_skew_s`). The
+direction is fail closed (INV-10): the local clock may run behind PayPal's, and a capture attempted in
+the last minute could be refused or race the expiry. The cost is that an authorization is not
+captured in the final minute of its life; with a lifetime of about 29 days that is negligible. A
+missing time zone on `expiration_time` is refused. Nothing is sent to PayPal in either case.
 
 ### 4.5 Capture and void
 

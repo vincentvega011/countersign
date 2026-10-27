@@ -40,12 +40,15 @@ class PayPalConfig:
     max_attempts: int = 3
     backoff_s: float = 0.5
     token_skew_s: float = 60.0
+    authorization_expiry_skew_s: float = 60.0
 
     def __post_init__(self) -> None:
         _clean(self.client_id, "PAYPAL_CLIENT_ID")
         _clean(self.client_secret, "PAYPAL_CLIENT_SECRET")
         if not 1 <= self.max_attempts <= 5:
             raise PayPalConfigError("max_attempts must be from 1 to 5")
+        if self.authorization_expiry_skew_s < 0:
+            raise PayPalConfigError("authorization_expiry_skew_s must not be negative")
         if min(self.connect_timeout_s, self.read_timeout_s) <= 0 or self.backoff_s < 0:
             raise PayPalConfigError("timeouts must be positive and the backoff not negative")
         parts = urlsplit(self.base_url)
