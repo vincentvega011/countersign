@@ -7,7 +7,7 @@ A phase starts only when the previous gate has passed.
 | Phase | Scope                                                                                                                                  | Gate                                                                                                                                               | Status      |
 | ----- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
 | P0    | Foundations: repository, CI, vendored specs, spec notes, library selection, PayPal sandbox confirmations                               | `make sandbox-smoke` passes and every Day 0 confirmation in [architecture.md](architecture.md) has an answer or a written fallback                 | Passed      |
-| P1    | Canonical core, UCP checkout and profile, `merchant_authorization`, PayPal client, decision log                                        | A UCP checkout is signed and verified by the independent Node verifier, and canonical terms round-trip through a real sandbox order                | In progress, P1.1 to P1.8 done; P1.9 done |
+| P1    | Canonical core, UCP checkout and profile, `merchant_authorization`, PayPal client, decision log                                        | A UCP checkout is signed and verified by the independent Node verifier, and canonical terms round-trip through a real sandbox order                | In progress, P1.1 to P1.9 done; gate checks pass, security review blocked on one finding |
 | P2    | Mandates, Merchant and Credential Provider roles, constraints, capture gate, principal lock, ACP adapter, baseline mode, first attacks | Downgrade, order-changed-after-approval (nothing is authorized in full; authorized, then voided by the gate with `ABL_NO_PREAUTH_CHECK`) and replay attacks succeed in baseline and fail in full with nothing captured; concurrency tests pass | Not started |
 | P3    | Trusted Surface with device keys and consent, shopping agent, evidence bundles and verifiers                                           | An autonomous purchase runs from phone approval to a captured sandbox order to a verified evidence bundle, with no server-held customer key        | Not started |
 | P4    | Dashboard, assistant, hostile agent, full evaluation                                                                                   | The whole demo runs from the dashboard locally and the evaluation numbers are frozen                                                               | Not started |
@@ -53,6 +53,41 @@ the model provider fallback (section 6).
 Manual checks still owed by the maintainer, none blocking: an AG Grid hackathon or evaluation
 licence, the row pinning and integrated charts questions ([ENV.md](ENV.md) section 3.5), and the
 live Devpost form fields ([submission/checklist.md](submission/checklist.md)).
+
+## P1 gate (run 2026-10-27): not yet closed
+
+Gate checks, all passing:
+
+- `make test`: 1455 passed, 4 expected failures (the strict UCP mandate pattern conformance tests).
+- `make interop`: the independent Node verifier accepted `merchant_authorization` on all five UCP
+  responses (create, update, get, complete, cancel).
+- Live sandbox round-trip: two orders (items only, and items with tax, shipping, handling and a
+  discount) were created and read back, and the reverse-translated terms hash equals the original
+  canonical terms hash in both. Not recorded to a cassette; the existing cassette replay test covers CI.
+- `make lint`: clean.
+
+Security review of the P1 modules: verdict **BLOCK**, for one finding. The gate stays open until it
+is fixed and the review is repeated.
+
+- **INV-8 (blocking):** PayPal response bodies are parsed with the standard JSON parser
+  (`paypal/errors.py`, `paypal/client.py`, `paypal/cassette.py`), not the strict loader, so duplicate
+  keys, NaN and Infinity are not rejected. Fix: parse with `loads_strict` and fail closed.
+
+Notes to resolve before or during P2:
+
+- The package contains an ungated capture path (`paypal/cycle.py` and the public
+  `capture_authorization`). Move the cycle helper out of the package and require a gate-issued value
+  to capture.
+- Pre-capture checks do not compare the authorization's `invoice_id` and `custom_id` to the checkout.
+- The create-order `PayPal-Request-Id` ignores the checkout terms, and the refund one collides for
+  equal partial refunds.
+- `checkout_hash` is not unique per checkout because every signature differs; single use must be
+  enforced on the checkout id with a database constraint. PROTOCOL.md wording needs correcting.
+- The app connects as the table owner; it must run as the INSERT and SELECT role, and the PayPal
+  client needs ledger appends around each call.
+- Import-guard tests are missing (verification modules must not import the LLM package; lock and
+  policy must not import protocol adapters).
+- Document the clock skew used for the authorization expiry check.
 
 ## Open risks
 
