@@ -1186,8 +1186,10 @@ Resolves: how `countersign.paypal` turns the facts in [section 4](#4-confirmed-p
   re-priced checkout must be a different request. The pinned value in the unit tests covers this
   form; the generic derivation and its two golden values did not change. The recorded create-order
   ids in the cassettes use this form (the authorize and capture cassette is pending a re-recording).
-  Refunds add the capture id and the amount (`full` or `<currency>:<value>`), so two different
-  partial refunds of one checkout do not replay each other. The client checks every id against the
+  Refunds add the capture id, the amount (`full` or `<currency>:<value>`) and a required
+  caller-supplied refund key (1 to 64 characters of letters, digits, `_` and `-`). The amount alone
+  is not enough: two separate refunds of the same amount would send one id and PayPal would replay
+  the first. A retry of one refund passes the same key, a new refund a new key. The client checks every id against the
   108 character limit and `[A-Za-z0-9._:-]` before sending and refuses to send a state-changing call
   without one. A test pins two values and compares the derivation with a `hashlib` reference.
 - **Capture.** There is no amount argument and no partial form. The client fetches the authorization,

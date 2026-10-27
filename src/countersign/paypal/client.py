@@ -57,7 +57,12 @@ from countersign.paypal.errors import (
     issues_of,
     map_error,
 )
-from countersign.paypal.limits import LimitError, check_path_id, check_request_id
+from countersign.paypal.limits import (
+    LimitError,
+    check_path_id,
+    check_refund_key,
+    check_request_id,
+)
 from countersign.paypal.models import Authorization, Capture, Order, OrderRequest, amount_json
 from countersign.paypal.request_id import (
     Operation,
@@ -470,9 +475,20 @@ class PayPalClient:
         return self._mutation(response, ident)
 
     def refund_capture(
-        self, checkout_id: str, capture_id: str, *, amount: Money | None = None
+        self,
+        checkout_id: str,
+        capture_id: str,
+        *,
+        refund_key: str,
+        amount: Money | None = None,
     ) -> Mutation:
-        """Refund a capture: in full (an empty JSON object) or for `amount`. Re-fetch with `get_capture`."""
+        """Refund a capture: in full (an empty JSON object) or for `amount`. Re-fetch with `get_capture`.
+
+        `refund_key` identifies this one refund and is part of the Request-Id: retrying the same
+        refund must pass the same key (PayPal then replays the first result), and a second, separate
+        refund of the same amount must pass a new key (otherwise PayPal would replay the first).
+        """
+        key = check_refund_key(refund_key)
         ident = check_path_id(capture_id, "capture id")
         # A full refund sends `{}`, the form the confirmation runs sent (PROTOCOL.md 4.6), not no body.
         body: dict[str, Any] = {}
@@ -489,6 +505,6 @@ class PayPalClient:
             op="refund",
             ok=(200, 201),
             body=body,
-            request_id=derive_request_id(checkout_id, Operation.REFUND, ident, part),
+            request_id=derive_request_id(checkout_id, Operation.REFUND, ident, part, key),
         )
         return self._mutation(response, self._resource_id(response, "refund"))

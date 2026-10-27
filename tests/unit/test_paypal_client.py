@@ -38,6 +38,7 @@ TOKEN = "access-token-QWERTY-0001"
 USD = "USD"
 NOW = datetime(2026, 10, 24, 12, 0, tzinfo=UTC)
 CHECKOUT = "chk_abcdefghijklmnopqrstuv"
+RK = "refund-1"
 TERMS = bytes(range(32))  # stands in for Checkout.terms_hash()
 
 
@@ -817,7 +818,7 @@ def test_ids_that_would_change_the_path_are_refused_before_sending(
     with pytest.raises(LimitError):
         pp.void_authorization(CHECKOUT, ident)
     with pytest.raises(LimitError):
-        pp.refund_capture(CHECKOUT, ident)
+        pp.refund_capture(CHECKOUT, ident, refund_key=RK)
     assert paypal.calls.call_count == 0
 
 
@@ -1148,12 +1149,12 @@ def test_full_refund_sends_an_empty_json_object(paypal: respx.MockRouter, pp: Pa
     paypal.post(f"{BASE}/v2/payments/captures/CAP1/refund").mock(
         return_value=httpx.Response(201, json={"id": "REF1", "status": "COMPLETED"})
     )
-    result = pp.refund_capture(CHECKOUT, "CAP1")
+    result = pp.refund_capture(CHECKOUT, "CAP1", refund_key=RK)
     assert result.resource_id == "REF1" and result.status_code == 201
     (request,) = post_calls(paypal)
     assert request.content == b"{}" and request.headers["content-type"] == "application/json"
     assert request.headers["paypal-request-id"] == derive_request_id(
-        CHECKOUT, Operation.REFUND, "CAP1", "full"
+        CHECKOUT, Operation.REFUND, "CAP1", "full", RK
     )
 
 
@@ -1163,14 +1164,56 @@ def test_partial_refund_sends_the_amount_and_a_distinct_request_id(
     paypal.post(f"{BASE}/v2/payments/captures/CAP1/refund").mock(
         return_value=httpx.Response(201, json={"id": "REF1"})
     )
-    pp.refund_capture(CHECKOUT, "CAP1", amount=Money(USD, 1000))
-    pp.refund_capture(CHECKOUT, "CAP1", amount=Money(USD, 1000))
-    pp.refund_capture(CHECKOUT, "CAP1", amount=Money(USD, 2000))
+    pp.refund_capture(CHECKOUT, "CAP1", refund_key=RK, amount=Money(USD, 1000))
+    pp.refund_capture(CHECKOUT, "CAP1", refund_key=RK, amount=Money(USD, 1000))
+    pp.refund_capture(CHECKOUT, "CAP1", refund_key=RK, amount=Money(USD, 2000))
     first, same, other = post_calls(paypal)
     assert json.loads(first.content) == {"amount": money("10.00")}
     ids = [r.headers["paypal-request-id"] for r in (first, same, other)]
     assert ids[0] == ids[1] != ids[2]
-    assert ids[0] == derive_request_id(CHECKOUT, Operation.REFUND, "CAP1", "USD:10.00")
+    assert ids[0] == derive_request_id(CHECKOUT, Operation.REFUND, "CAP1", "USD:10.00", RK)
+
+
+def test_two_equal_partial_refunds_with_different_keys_do_not_collide(
+    paypal: respx.MockRouter, pp: PayPalClient
+) -> None:
+    paypal.post(f"{BASE}/v2/payments/captures/CAP1/refund").mock(
+        return_value=httpx.Response(201, json={"id": "REF1"})
+    )
+    pp.refund_capture(CHECKOUT, "CAP1", refund_key="first", amount=Money(USD, 1000))
+    pp.refund_capture(CHECKOUT, "CAP1", refund_key="second", amount=Money(USD, 1000))
+    pp.refund_capture(CHECKOUT, "CAP1", refund_key="first", amount=Money(USD, 1000))  # a retry
+    one, two, retry = (r.headers["paypal-request-id"] for r in post_calls(paypal))
+    assert one != two
+    assert one == retry
+    assert one == derive_request_id(CHECKOUT, Operation.REFUND, "CAP1", "USD:10.00", "first")
+
+
+def test_a_full_refund_key_also_distinguishes_requests(
+    paypal: respx.MockRouter, pp: PayPalClient
+) -> None:
+    paypal.post(f"{BASE}/v2/payments/captures/CAP1/refund").mock(
+        return_value=httpx.Response(201, json={"id": "REF1"})
+    )
+    pp.refund_capture(CHECKOUT, "CAP1", refund_key="a")
+    pp.refund_capture(CHECKOUT, "CAP1", refund_key="b")
+    a, b = (r.headers["paypal-request-id"] for r in post_calls(paypal))
+    assert a != b
+
+
+@pytest.mark.parametrize("bad", ["", "x" * 65, "a b", "a/b", "a.b", "k\n", None, 5, b"k"])
+def test_a_refund_key_must_be_a_short_plain_token(
+    paypal: respx.MockRouter, pp: PayPalClient, bad: Any
+) -> None:
+    with pytest.raises(LimitError):
+        pp.refund_capture(CHECKOUT, "CAP1", refund_key=bad)
+    assert paypal.calls.call_count == 0
+
+
+def test_a_refund_needs_a_key() -> None:
+    assert inspect.signature(PayPalClient.refund_capture).parameters["refund_key"].default is (
+        inspect.Parameter.empty
+    )
 
 
 @pytest.mark.parametrize("minor", [0, -100])
@@ -1178,7 +1221,7 @@ def test_refund_amount_must_be_positive(
     paypal: respx.MockRouter, pp: PayPalClient, minor: int
 ) -> None:
     with pytest.raises(LimitError):
-        pp.refund_capture(CHECKOUT, "CAP1", amount=Money(USD, minor))
+        pp.refund_capture(CHECKOUT, "CAP1", refund_key=RK, amount=Money(USD, minor))
     assert paypal.calls.call_count == 0
 
 
@@ -1195,7 +1238,7 @@ def test_refund_errors(paypal: respx.MockRouter, pp: PayPalClient, issue: str, e
         return_value=httpx.Response(422, json={"name": issue, "message": "no"})
     )
     with pytest.raises(exc):
-        pp.refund_capture(CHECKOUT, "CAP1")
+        pp.refund_capture(CHECKOUT, "CAP1", refund_key=RK)
 
 
 def test_refund_without_an_id_in_the_response(paypal: respx.MockRouter, pp: PayPalClient) -> None:
@@ -1203,7 +1246,7 @@ def test_refund_without_an_id_in_the_response(paypal: respx.MockRouter, pp: PayP
         return_value=httpx.Response(201, json={"status": "x"})
     )
     with pytest.raises(E.PayPalResponseError):
-        pp.refund_capture(CHECKOUT, "CAP1")
+        pp.refund_capture(CHECKOUT, "CAP1", refund_key=RK)
 
 
 # =============================================================== error mapping
@@ -1362,7 +1405,7 @@ def test_5xx_on_a_create_is_retried_with_the_same_request_id(
         (lambda pp: pp.create_order(CHECKOUT, order_request(), terms_hash=TERMS), 201),
         (lambda pp: pp.authorize_order(CHECKOUT, "ORDER1"), 201),
         (lambda pp: pp.void_authorization(CHECKOUT, "AUTH1"), 200),
-        (lambda pp: pp.refund_capture(CHECKOUT, "CAP1"), 201),
+        (lambda pp: pp.refund_capture(CHECKOUT, "CAP1", refund_key=RK), 201),
     ],
 )
 def test_every_state_changing_retry_reuses_one_request_id(
@@ -1689,8 +1732,8 @@ def test_every_post_sends_the_content_type_and_body_paypal_accepted(
     pp.authorize_order(CHECKOUT, "ORDER1")
     pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
     pp.void_authorization(CHECKOUT, "AUTH2")
-    pp.refund_capture(CHECKOUT, "CAP1")
-    pp.refund_capture(CHECKOUT, "CAP1", amount=Money(USD, 1000))
+    pp.refund_capture(CHECKOUT, "CAP1", refund_key=RK)
+    pp.refund_capture(CHECKOUT, "CAP1", refund_key=RK, amount=Money(USD, 1000))
 
     sent = {(r.url.path, r.content): r.headers.get("content-type") for r in post_calls(paypal)}
     by_path = {}
@@ -1738,7 +1781,7 @@ def test_a_server_that_wants_a_json_body_gets_one(
     paypal.post(f"{BASE}/v2/checkout/orders/ORDER1/authorize").mock(side_effect=reject_unless_json)
     paypal.post(f"{BASE}/v2/payments/captures/CAP1/refund").mock(side_effect=reject_unless_json)
     assert pp.authorize_order(CHECKOUT, "ORDER1").status_code == 201
-    assert pp.refund_capture(CHECKOUT, "CAP1").status_code == 201
+    assert pp.refund_capture(CHECKOUT, "CAP1", refund_key=RK).status_code == 201
 
 
 def test_a_415_is_a_request_error_and_is_not_retried(

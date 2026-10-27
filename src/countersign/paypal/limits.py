@@ -20,6 +20,7 @@ MAX_INVOICE_ID = 127
 MAX_ITEM_TEXT = 127
 
 _REQUEST_ID = re.compile(r"[A-Za-z0-9._:-]+")
+_REFUND_KEY = re.compile(r"[A-Za-z0-9_-]{1,64}")
 _PATH_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
 
 
@@ -62,4 +63,11 @@ def check_path_id(value: object, name: str) -> str:
     """An identifier that becomes a URL path segment: no slash, dot, query or other surprise."""
     if type(value) is not str or not _PATH_ID.fullmatch(value):
         raise LimitError(f"{name} is not a valid PayPal identifier")
+    return value
+
+
+def check_refund_key(value: object) -> str:
+    """The caller's unique key for one refund: 1 to 64 letters, digits, `_` or `-`."""
+    if type(value) is not str or not _REFUND_KEY.fullmatch(value):
+        raise LimitError("a refund key must be 1 to 64 characters from letters, digits, _ and -")
     return value
