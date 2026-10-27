@@ -50,17 +50,6 @@ def replay_client(document: dict, transport: httpx.BaseTransport) -> PayPalClien
     )
 
 
-# The request ids derived by the client changed (create order now hashes the request body, and
-# authorize, capture and void follow), so this cassette, recorded earlier, no longer replays. It needs
-# a live re-recording with a payer approval:
-# `PAYPAL_RECORD_CASSETTES=1 uv run python scripts/record_paypal_cassette.py`. Strict, so the marker
-# must be removed once the new recording is in place.
-STALE_RECORDING = pytest.mark.xfail(
-    strict=True, reason="cassette recorded before the request ids changed (see the comment above)"
-)
-
-
-@STALE_RECORDING
 def test_the_recorded_cycle_replays_exactly(recorded: dict) -> None:  # type: ignore[type-arg]
     checkout_id = recorded["meta"]["checkout_id"]
     transport = CassetteTransport(recorded)
@@ -81,7 +70,6 @@ def test_the_recorded_cycle_replays_exactly(recorded: dict) -> None:  # type: ig
     assert [c.id for c in result.final_order.captures] == [result.capture.id]
 
 
-@STALE_RECORDING
 def test_the_recorded_request_ids_are_the_derived_ones(recorded: dict) -> None:  # type: ignore[type-arg]
     checkout_id = recorded["meta"]["checkout_id"]
     posts = [
