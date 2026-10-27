@@ -68,8 +68,11 @@ from countersign.paypal.limits import (
 from countersign.paypal.models import Authorization, Capture, Order, OrderRequest, amount_json
 from countersign.paypal.request_id import (
     Operation,
+    authorize_request_id,
+    capture_request_id,
     create_order_request_id,
     derive_request_id,
+    void_request_id,
 )
 
 log = structlog.get_logger("countersign.paypal")
@@ -435,7 +438,7 @@ class PayPalClient:
             # An empty JSON object, not no body: with no body and no content type PayPal answers
             # 415 UNSUPPORTED_MEDIA_TYPE. The smoke and confirmation runs sent `{}` (ENV.md 2.5).
             body={},
-            request_id=derive_request_id(checkout_id, Operation.AUTHORIZE),
+            request_id=authorize_request_id(checkout_id, ident),
         )
         return self._mutation(response, ident)
 
@@ -482,7 +485,13 @@ class PayPalClient:
             op="capture",
             ok=(200, 201),
             body={"amount": amount_json(authorization.amount), "final_capture": True},
-            request_id=derive_request_id(checkout_id, Operation.CAPTURE),
+            request_id=capture_request_id(
+                checkout_id,
+                ident,
+                approval.expected_total,
+                approval.invoice_id,
+                approval.custom_id,
+            ),
         )
         return self._mutation(response, self._resource_id(response, "capture"))
 
@@ -494,7 +503,7 @@ class PayPalClient:
             f"/v2/payments/authorizations/{ident}/void",
             op="void",
             ok=(200, 204),
-            request_id=derive_request_id(checkout_id, Operation.VOID),
+            request_id=void_request_id(checkout_id, ident),
         )
         return self._mutation(response, ident)
 

@@ -21,6 +21,7 @@ from typing import Any
 
 from countersign.canonical.hashing import b64url, domain_hash
 from countersign.canonical.jcs import canonicalize
+from countersign.canonical.money import Money
 
 DOMAIN = "cs.paypal.request.v1"
 PREFIX = "cs1"
@@ -66,3 +67,40 @@ def create_order_request_id(checkout_id: str, body: Mapping[str, Any]) -> str:
     cannot supply the hash: it is derived here, from the bytes that go out.
     """
     return derive_request_id(checkout_id, Operation.CREATE_ORDER, b64url(order_request_hash(body)))
+
+
+def authorize_request_id(checkout_id: str, order_id: str) -> str:
+    """The Request-Id for authorizing `order_id` of `checkout_id`.
+
+    A checkout can have more than one order over its life (a re-priced checkout creates a new one), and
+    PayPal replays the first result for a repeated id, so the id names the order it applies to. The
+    order id fixes the terms: the order was created from a request whose hash is in its own id.
+    """
+    return derive_request_id(checkout_id, Operation.AUTHORIZE, order_id)
+
+
+def capture_request_id(
+    checkout_id: str, authorization_id: str, total: Money, invoice_id: str, custom_id: str
+) -> str:
+    """The Request-Id for capturing `authorization_id` for exactly these approved terms.
+
+    It names the authorization and the approved total, `invoice_id` and `custom_id`, so a capture of
+    another authorization, or for other terms, never replays this one.
+    """
+    return derive_request_id(
+        checkout_id,
+        Operation.CAPTURE,
+        authorization_id,
+        f"{total.currency}:{total.to_paypal()}",
+        invoice_id,
+        custom_id,
+    )
+
+
+def void_request_id(checkout_id: str, authorization_id: str) -> str:
+    """The Request-Id for voiding `authorization_id` of `checkout_id`.
+
+    A void has no body and no terms, so the authorization id is all there is to name. A second
+    authorization of the same checkout, after the first was voided, gets its own id.
+    """
+    return derive_request_id(checkout_id, Operation.VOID, authorization_id)

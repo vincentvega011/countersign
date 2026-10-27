@@ -19,7 +19,11 @@ from countersign.catalog.catalog import load_catalog
 from countersign.paypal.cassette import CassetteTransport, load_cassette
 from countersign.paypal.client import PayPalClient
 from countersign.paypal.config import PayPalConfig
-from countersign.paypal.request_id import Operation, create_order_request_id, derive_request_id
+from countersign.paypal.request_id import (
+    authorize_request_id,
+    capture_request_id,
+    create_order_request_id,
+)
 from tests.ungated_capture_cycle import cycle_checkout, run_cycle
 
 CASSETTE = Path(__file__).resolve().parents[1] / "cassettes" / "paypal_authorize_capture.json"
@@ -80,17 +84,18 @@ def test_the_recorded_cycle_replays_exactly(recorded: dict) -> None:  # type: ig
 @STALE_RECORDING
 def test_the_recorded_request_ids_are_the_derived_ones(recorded: dict) -> None:  # type: ignore[type-arg]
     checkout_id = recorded["meta"]["checkout_id"]
-    ids = [
-        i["request"]["request_id"]
+    posts = [
+        i["request"]
         for i in recorded["interactions"]
         if i["request"]["method"] == "POST" and i["request"]["request_id"]
     ]
-    assert ids == [
-        create_order_request_id(
-            checkout_id, cycle_checkout(checkout_id, load_catalog())[1].to_json()
-        ),
-        derive_request_id(checkout_id, Operation.AUTHORIZE),
-        derive_request_id(checkout_id, Operation.CAPTURE),
+    _, request, custom_id = cycle_checkout(checkout_id, load_catalog())
+    order_id = posts[1]["path"].split("/")[-2]  # /v2/checkout/orders/<id>/authorize
+    authorization_id = posts[2]["path"].split("/")[-2]  # /v2/payments/authorizations/<id>/capture
+    assert [p["request_id"] for p in posts] == [
+        create_order_request_id(checkout_id, request.to_json()),
+        authorize_request_id(checkout_id, order_id),
+        capture_request_id(checkout_id, authorization_id, request.amount, checkout_id, custom_id),
     ]
 
 

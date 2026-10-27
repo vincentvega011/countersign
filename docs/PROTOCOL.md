@@ -1191,6 +1191,14 @@ Resolves: how `countersign.paypal` turns the facts in [section 4](#4-confirmed-p
   the request, must be a different request. A test compares the derivation with a `hashlib` and
   `rfc8785` reference and pins one value. The generic derivation and its two golden values did not
   change. Recorded create-order ids in the cassettes use this form.
+  Authorize adds the order id, void adds the authorization id, and capture adds the authorization
+  id and the approved total (`<currency>:<value>`), `invoice_id` and `custom_id`. A checkout can now
+  have several orders and authorizations over its life (a re-priced checkout creates a new order), and
+  PayPal replays the first result for a repeated id, so an id from checkout and operation alone
+  could replay the void or capture of an earlier authorization. Whether PayPal replays one id across
+  different paths was not tested; the ids avoid depending on it. The authorize id carries no terms
+  of its own: the order id fixes them, because the order was created from a request whose hash is in
+  its own id. Pinned values and a `hashlib` reference cover all three.
   Refunds add the capture id, the amount (`full` or `<currency>:<value>`) and a required
   caller-supplied refund key (1 to 64 characters of letters, digits, `_` and `-`). The amount alone
   is not enough: two separate refunds of the same amount would send one id and PayPal would replay

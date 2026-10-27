@@ -28,8 +28,11 @@ from countersign.paypal.limits import (
 from countersign.paypal.models import ExperienceContext, OrderItem, OrderRequest
 from countersign.paypal.request_id import (
     Operation,
+    authorize_request_id,
+    capture_request_id,
     create_order_request_id,
     derive_request_id,
+    void_request_id,
 )
 
 BASE = "https://api-m.sandbox.paypal.com"
@@ -462,6 +465,86 @@ def test_create_order_request_id_covers_the_request_body() -> None:
     # Pinned. The generic derivation did not change, so its golden values above still hold; this value
     # pins the create-order form: checkout id, operation and the hash of the body that is sent.
     assert a == "cs1.create_order.6Khit-OAGH4yArD4z0bHNMlCxFUhnVTGshLuHMk1rFw"
+
+
+def test_authorize_capture_and_void_request_ids_name_what_they_act_on() -> None:
+    money = Money(USD, 7400)
+    a1 = authorize_request_id(CHECKOUT, "ORDER1")
+    assert a1 == authorize_request_id(CHECKOUT, "ORDER1")
+    assert a1 != authorize_request_id(CHECKOUT, "ORDER2")  # a re-priced checkout's second order
+    assert a1 != authorize_request_id("chk_other", "ORDER1")
+
+    v1 = void_request_id(CHECKOUT, "AUTH1")
+    assert v1 == void_request_id(CHECKOUT, "AUTH1")
+    assert v1 != void_request_id(
+        CHECKOUT, "AUTH2"
+    )  # the second authorization is not voided by replay
+
+    c1 = capture_request_id(CHECKOUT, "AUTH1", money, CHECKOUT, CUSTOM)
+    assert c1 == capture_request_id(CHECKOUT, "AUTH1", money, CHECKOUT, CUSTOM)
+    assert c1 != capture_request_id(CHECKOUT, "AUTH2", money, CHECKOUT, CUSTOM)
+    assert c1 != capture_request_id(CHECKOUT, "AUTH1", Money(USD, 7401), CHECKOUT, CUSTOM)
+    assert c1 != capture_request_id(CHECKOUT, "AUTH1", Money("EUR", 7400), CHECKOUT, CUSTOM)
+    assert c1 != capture_request_id(CHECKOUT, "AUTH1", money, "chk_other", CUSTOM)
+    assert c1 != capture_request_id(CHECKOUT, "AUTH1", money, CHECKOUT, "cs1.other")
+    # none of them is the first derivation, from the checkout id and operation alone
+    assert {a1, v1, c1}.isdisjoint(derive_request_id(CHECKOUT, op) for op in Operation)
+    assert all(len(x) <= MAX_REQUEST_ID for x in (a1, v1, c1))
+
+
+def test_authorize_capture_and_void_request_ids_match_an_independent_reference() -> None:
+    assert authorize_request_id(CHECKOUT, "ORDER1") == _reference_request_id(
+        CHECKOUT, "authorize", "ORDER1"
+    )
+    assert void_request_id(CHECKOUT, "AUTH1") == _reference_request_id(CHECKOUT, "void", "AUTH1")
+    assert capture_request_id(
+        CHECKOUT, "AUTH1", Money(USD, 7400), CHECKOUT, CUSTOM
+    ) == _reference_request_id(CHECKOUT, "capture", "AUTH1", "USD:74.00", CHECKOUT, CUSTOM)
+    # Pinned: these values change every replay key, so a change must be deliberate.
+    assert (
+        authorize_request_id(CHECKOUT, "ORDER1")
+        == "cs1.authorize.li2HNEL7Qv_NFW8x_BFGcOOFZcnA4HqQZLXhIuwbXNo"
+    )
+    assert (
+        void_request_id(CHECKOUT, "AUTH1") == "cs1.void.CuWjXe4NcQJjMi9AnQX6LJUsdW_zDp7W9HswiiaMTls"
+    )
+    assert (
+        capture_request_id(CHECKOUT, "AUTH1", Money(USD, 7400), CHECKOUT, CUSTOM)
+        == "cs1.capture.jQoqx108h_K6xhVm_YoEJ20y-eDrTtpTIbtxCWhdR-8"
+    )
+
+
+def test_a_second_authorization_of_the_same_checkout_is_voided_with_its_own_id(
+    paypal: respx.MockRouter, pp: PayPalClient
+) -> None:
+    paypal.post(url__regex=rf"{BASE}/v2/payments/authorizations/AUTH\d/void").mock(
+        return_value=httpx.Response(204)
+    )
+    pp.void_authorization(CHECKOUT, "AUTH1")
+    pp.void_authorization(CHECKOUT, "AUTH2")
+    first, second = (r.headers["paypal-request-id"] for r in post_calls(paypal))
+    assert first != second
+
+
+def test_authorizing_two_orders_of_one_checkout_uses_two_ids(
+    paypal: respx.MockRouter, pp: PayPalClient
+) -> None:
+    paypal.post(url__regex=rf"{BASE}/v2/checkout/orders/ORDER\d/authorize").mock(
+        return_value=httpx.Response(201, json={})
+    )
+    pp.authorize_order(CHECKOUT, "ORDER1")
+    pp.authorize_order(CHECKOUT, "ORDER2")
+    first, second = (r.headers["paypal-request-id"] for r in post_calls(paypal))
+    assert first != second
+
+
+def test_capture_sends_the_id_for_the_approved_terms(
+    paypal: respx.MockRouter, pp: PayPalClient
+) -> None:
+    route = capture_routes(paypal)
+    pp.capture_authorization(approval(7400))
+    sent = route.calls[0].request.headers["paypal-request-id"]
+    assert sent == capture_request_id(CHECKOUT, "AUTH1", Money(USD, 7400), CHECKOUT, CUSTOM)
 
 
 def test_the_caller_cannot_supply_the_create_order_hash() -> None:
@@ -969,7 +1052,7 @@ def test_authorize_posts_without_reading_the_response(
     result = pp.authorize_order(CHECKOUT, "ORDER1")
     assert result == Mutation("ORDER1", 201, None)
     (request,) = post_calls(paypal)
-    assert request.headers["paypal-request-id"] == derive_request_id(CHECKOUT, Operation.AUTHORIZE)
+    assert request.headers["paypal-request-id"] == authorize_request_id(CHECKOUT, "ORDER1")
     assert request.content == b"{}"
 
 
@@ -1010,7 +1093,9 @@ def test_capture_fetches_first_then_sends_the_full_amount_with_final_capture(
     ]
     request = route.calls[0].request
     assert json.loads(request.content) == {"amount": money("74.00"), "final_capture": True}
-    assert request.headers["paypal-request-id"] == derive_request_id(CHECKOUT, Operation.CAPTURE)
+    assert request.headers["paypal-request-id"] == capture_request_id(
+        CHECKOUT, "AUTH1", Money(USD, 7400), CHECKOUT, CUSTOM
+    )
 
 
 def test_capture_has_no_way_to_choose_an_amount_or_partial() -> None:
@@ -1194,7 +1279,7 @@ def test_void(paypal: respx.MockRouter, pp: PayPalClient, status: int) -> None:
     result = pp.void_authorization(CHECKOUT, "AUTH1")
     assert result == Mutation("AUTH1", status, None)
     (request,) = post_calls(paypal)
-    assert request.headers["paypal-request-id"] == derive_request_id(CHECKOUT, Operation.VOID)
+    assert request.headers["paypal-request-id"] == void_request_id(CHECKOUT, "AUTH1")
     assert request.content == b""
 
 
@@ -1689,7 +1774,9 @@ def test_the_derived_request_id_is_checked_at_send_time(
     paypal.post(f"{BASE}/v2/checkout/orders/ORDER1/authorize").mock(
         return_value=httpx.Response(201, json={})
     )
-    monkeypatch.setattr("countersign.paypal.client.derive_request_id", lambda *a, **k: "x" * 109)
+    monkeypatch.setattr(
+        "countersign.paypal.request_id.derive_request_id", lambda *a, **k: "x" * 109
+    )
     with pytest.raises(LimitError):
         pp.authorize_order(CHECKOUT, "ORDER1")
     assert paypal.calls.call_count == 0
