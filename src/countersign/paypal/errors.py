@@ -18,6 +18,8 @@ from typing import Any
 
 import httpx
 
+from countersign.canonical.jsonstrict import JsonSyntaxError, StrictJsonError, loads_strict
+
 
 class PayPalError(Exception):
     """Base class for everything the client raises about a PayPal exchange."""
@@ -176,11 +178,24 @@ ERROR_CODES: dict[str, type[PayPalRequestError]] = {
 
 
 def error_body(response: httpx.Response) -> dict[str, Any]:
-    """The JSON error body, or an empty dict if there is none."""
+    """The JSON object in the response body, or an empty dict if there is no JSON object.
+
+    Every PayPal body goes through the strict loader (INV-8): a duplicate key, NaN, Infinity, an
+    integer or number the loader refuses, invalid UTF-8 or a byte order mark raises
+    `PayPalResponseError` instead of being read one way or another. Only a body that is not JSON at
+    all (empty, or an HTML error page) is treated as having no object, because a 502 page is not an
+    attack. A body that is JSON but not an object is also no object; callers that need one refuse it.
+    """
     try:
-        data = response.json()
-    except (ValueError, UnicodeDecodeError):
+        data = loads_strict(response.content)
+    except JsonSyntaxError:
         return {}
+    except StrictJsonError as exc:
+        raise PayPalResponseError(
+            f"the response body was refused by the strict JSON loader: {type(exc).__name__}",
+            status=response.status_code,
+            debug_id=_str(response.headers.get("paypal-debug-id")),
+        ) from None
     return data if isinstance(data, dict) else {}
 
 

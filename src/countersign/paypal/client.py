@@ -221,7 +221,11 @@ class PayPalClient:
                     ) from None
                 self._backoff(attempt)
                 continue
-            body = error_body(response) if response.status_code >= 400 else {}
+            try:
+                body = error_body(response) if response.status_code >= 400 else {}
+            except PayPalResponseError as exc:
+                exc.outcome_unknown = mutating  # a garbled answer to a mutation settles nothing
+                raise
             log.info(
                 "paypal_call",
                 op=op,

@@ -24,6 +24,8 @@ from typing import Any
 
 import httpx
 
+from countersign.canonical.jsonstrict import JsonSyntaxError, StrictJsonError, loads_strict
+
 VERSION = 1
 SCRUBBED = "SCRUBBED"
 _KEYS = frozenset(
@@ -94,9 +96,13 @@ def _json_or_none(content: bytes, content_type: str) -> Any:
     if "json" not in content_type or not content:
         return None
     try:
-        return json.loads(content)
-    except ValueError:
+        return loads_strict(content)
+    except JsonSyntaxError:
         return None
+    except StrictJsonError as exc:
+        raise CassetteError(
+            f"a JSON body was refused by the strict JSON loader: {type(exc).__name__}"
+        ) from None
 
 
 class RecordingTransport(httpx.BaseTransport):
@@ -164,10 +170,19 @@ class RecordingTransport(httpx.BaseTransport):
 
 
 def load_cassette(path: Path) -> dict[str, Any]:
-    data = json.loads(path.read_text(encoding="utf-8"))
-    if data.get("version") != VERSION or not isinstance(data.get("interactions"), list):
+    try:
+        data = loads_strict(path.read_bytes(), max_bytes=None)
+    except StrictJsonError as exc:
+        raise CassetteError(
+            f"the cassette file was refused by the strict JSON loader: {type(exc).__name__}"
+        ) from None
+    if (
+        not isinstance(data, dict)
+        or data.get("version") != VERSION
+        or not isinstance(data.get("interactions"), list)
+    ):
         raise CassetteError("unsupported cassette file")
-    return data  # type: ignore[no-any-return]
+    return data
 
 
 class CassetteTransport(httpx.BaseTransport):
