@@ -7,7 +7,7 @@ A phase starts only when the previous gate has passed.
 | Phase | Scope                                                                                                                                  | Gate                                                                                                                                               | Status      |
 | ----- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
 | P0    | Foundations: repository, CI, vendored specs, spec notes, library selection, PayPal sandbox confirmations                               | `make sandbox-smoke` passes and every Day 0 confirmation in [architecture.md](architecture.md) has an answer or a written fallback                 | Passed      |
-| P1    | Canonical core, UCP checkout and profile, `merchant_authorization`, PayPal client, decision log                                        | A UCP checkout is signed and verified by the independent Node verifier, and canonical terms round-trip through a real sandbox order                | In progress, P1.1 to P1.9 done; gate checks pass, security review blocked on one finding |
+| P1    | Canonical core, UCP checkout and profile, `merchant_authorization`, PayPal client, decision log                                        | A UCP checkout is signed and verified by the independent Node verifier, and canonical terms round-trip through a real sandbox order                | Passed |
 | P2    | Mandates, Merchant and Credential Provider roles, constraints, capture gate, principal lock, ACP adapter, baseline mode, first attacks | Downgrade, order-changed-after-approval (nothing is authorized in full; authorized, then voided by the gate with `ABL_NO_PREAUTH_CHECK`) and replay attacks succeed in baseline and fail in full with nothing captured; concurrency tests pass | Not started |
 | P3    | Trusted Surface with device keys and consent, shopping agent, evidence bundles and verifiers                                           | An autonomous purchase runs from phone approval to a captured sandbox order to a verified evidence bundle, with no server-held customer key        | Not started |
 | P4    | Dashboard, assistant, hostile agent, full evaluation                                                                                   | The whole demo runs from the dashboard locally and the evaluation numbers are frozen                                                               | Not started |
@@ -54,7 +54,7 @@ Manual checks still owed by the maintainer, none blocking: an AG Grid hackathon 
 licence, the row pinning and integrated charts questions ([ENV.md](ENV.md) section 3.5), and the
 live Devpost form fields ([submission/checklist.md](submission/checklist.md)).
 
-## P1 gate (run 2026-10-27): not yet closed
+## P1 gate (run 2026-10-27): passed
 
 Gate checks, all passing:
 
@@ -66,8 +66,9 @@ Gate checks, all passing:
   canonical terms hash in both. Not recorded to a cassette; the existing cassette replay test covers CI.
 - `make lint`: clean.
 
-Security review of the P1 modules: verdict **BLOCK**, for one finding. The gate stays open until it
-is fixed and the review is repeated.
+Security review of the P1 modules: the first review returned **BLOCK** for one finding (below). After
+the fixes, a second review of the changes returned **PASS WITH NOTES** with no BLOCK, so the gate
+passed. Its new notes are P2 tasks, listed after the carry-over tasks below.
 
 - **INV-8 (blocking):** PayPal response bodies are parsed with the standard JSON parser
   (`paypal/errors.py`, `paypal/client.py`, `paypal/cassette.py`), not the strict loader, so duplicate
@@ -85,7 +86,8 @@ Fixed after the review (2026-10-27):
 - An authorization within 60 seconds of `expiration_time` counts as expired
   ([PROTOCOL.md](PROTOCOL.md) 4.4).
 
-Outstanding before the gate closes:
+Tracked, not blocking the gate (the order terms cassette was re-recorded live and the round-trip
+ran against the live sandbox on 2026-10-27):
 
 - The authorize-and-capture cassette must be re-recorded with a payer approval, because the
   create-order Request-Id changed (`PAYPAL_RECORD_CASSETTES=1 uv run python
@@ -109,6 +111,20 @@ Findings from the P1 review that belong to P2 and are not optional there:
 - **P2.5 and P2.6, import-guard tests.** At P2.5: verification and gate modules never import the LLM
   package (INV-1). At P2.6: `lock/` and policy code never import `protocols/` (INV-5). Both are
   AST-based, like `tests/unit/test_capture_surface.py`.
+- **P2.4, unknown outcome on a refused 2xx body.** A 2xx answer to a mutation whose body the strict
+  loader refuses raises with `outcome_unknown` false, but the mutation may have happened. Set it true
+  for every mutating call, with tests for capture and create order, before any code trusts the flag
+  to release a budget reservation.
+- **P2.4 and P2.5, authorize, capture and void Request-Ids.** They derive from checkout id and
+  operation only, but a re-priced checkout can now create a second order and authorization. Add the
+  order id to the authorize id and the authorization id to the capture and void ids, or rely on
+  the one-authorization-per-checkout constraint and test that it is in place first. Whether PayPal
+  replays an id across different paths is untested.
+- **P2.5, surface test hardening.** `tests/unit/test_capture_surface.py` flags calls only. Make it flag
+  any reference to `capture_authorization` outside the allowed folders (an alias passes today), and
+  any use of `_SEAL` or `CaptureApproval(` outside `paypal/approval.py`.
+- **P2.4, terms hash from the request.** `create_order` takes the terms hash from the caller. Derive
+  it from the request body or check it against the terms re-derived from that body.
 - **P2.5, gate mints the approval.** The gate is the only library code that calls
   `mint_capture_approval`; the surface test already enforces that.
 
