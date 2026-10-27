@@ -7,7 +7,7 @@ A phase starts only when the previous gate has passed.
 | Phase | Scope                                                                                                                                  | Gate                                                                                                                                               | Status      |
 | ----- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
 | P0    | Foundations: repository, CI, vendored specs, spec notes, library selection, PayPal sandbox confirmations                               | `make sandbox-smoke` passes and every Day 0 confirmation in [architecture.md](architecture.md) has an answer or a written fallback                 | Passed      |
-| P1    | Canonical core, UCP checkout and profile, `merchant_authorization`, PayPal client, decision log                                        | A UCP checkout is signed and verified by the independent Node verifier, and canonical terms round-trip through a real sandbox order                | Passed |
+| P1    | Canonical core, UCP checkout and profile, `merchant_authorization`, PayPal client, decision log                                        | A UCP checkout is signed and verified by the independent Node verifier, and canonical terms round-trip through a real sandbox order                | Passed, then reopened 2026-10-27: pending one re-recording (see the P1 gate section) |
 | P2    | Mandates, Merchant and Credential Provider roles, constraints, capture gate, principal lock, ACP adapter, baseline mode, first attacks | Downgrade, order-changed-after-approval (nothing is authorized in full; authorized, then voided by the gate with `ABL_NO_PREAUTH_CHECK`) and replay attacks succeed in baseline and fail in full with nothing captured; concurrency tests pass | Not started |
 | P3    | Trusted Surface with device keys and consent, shopping agent, evidence bundles and verifiers                                           | An autonomous purchase runs from phone approval to a captured sandbox order to a verified evidence bundle, with no server-held customer key        | Not started |
 | P4    | Dashboard, assistant, hostile agent, full evaluation                                                                                   | The whole demo runs from the dashboard locally and the evaluation numbers are frozen                                                               | Not started |
@@ -54,7 +54,7 @@ Manual checks still owed by the maintainer, none blocking: an AG Grid hackathon 
 licence, the row pinning and integrated charts questions ([ENV.md](ENV.md) section 3.5), and the
 live Devpost form fields ([submission/checklist.md](submission/checklist.md)).
 
-## P1 gate (run 2026-10-27): passed
+## P1 gate (run 2026-10-27): reopened, pending one re-recording
 
 Gate checks, all passing:
 
@@ -86,14 +86,20 @@ Fixed after the review (2026-10-27):
 - An authorization within 60 seconds of `expiration_time` counts as expired
   ([PROTOCOL.md](PROTOCOL.md) 4.4).
 
-Tracked, not blocking the gate (the order terms cassette was re-recorded live and the round-trip
-ran against the live sandbox on 2026-10-27):
+Second round (2026-10-27): the authorize and capture cassette was re-recorded after the create-order
+id change and its replay tests passed (commit `c44eb72`). The review notes were then fixed: a refused
+2xx mutation body is an unknown outcome, authorize, capture and void ids name the order or
+authorization (and, for capture, the approved terms), the surface test catches aliases and
+re-exports, and `create_order` derives its id hash from the request body. The last two changed the
+recorded request ids again, so:
 
-- The authorize-and-capture cassette must be re-recorded with a payer approval, because the
-  create-order Request-Id changed (`PAYPAL_RECORD_CASSETTES=1 uv run python
-  scripts/record_paypal_cassette.py`). Until then two replay tests are strict xfail
-  (`STALE_RECORDING` in `tests/integration/test_paypal_cassette_replay.py` and the marker in
-  `test_paypal_order_terms_replay.py`); remove both markers after recording.
+- **Open: the authorize-and-capture cassette must be re-recorded once more** with a payer approval
+  (`PAYPAL_RECORD_CASSETTES=1 uv run python scripts/record_paypal_cassette.py`). Until then three
+  replay tests are strict xfail (`STALE_RECORDING` in
+  `tests/integration/test_paypal_cassette_replay.py`, and one marker in
+  `tests/integration/test_paypal_order_terms_replay.py`). The gate stays passed only while no
+  xfail replay test remains, so it is open until this is done and the markers are removed. Nothing
+  else is outstanding. The order terms cassette was re-recorded live and matches.
 
 ## P2 carry-over tasks
 
@@ -111,20 +117,6 @@ Findings from the P1 review that belong to P2 and are not optional there:
 - **P2.5 and P2.6, import-guard tests.** At P2.5: verification and gate modules never import the LLM
   package (INV-1). At P2.6: `lock/` and policy code never import `protocols/` (INV-5). Both are
   AST-based, like `tests/unit/test_capture_surface.py`.
-- **P2.4, unknown outcome on a refused 2xx body.** A 2xx answer to a mutation whose body the strict
-  loader refuses raises with `outcome_unknown` false, but the mutation may have happened. Set it true
-  for every mutating call, with tests for capture and create order, before any code trusts the flag
-  to release a budget reservation.
-- **P2.4 and P2.5, authorize, capture and void Request-Ids.** They derive from checkout id and
-  operation only, but a re-priced checkout can now create a second order and authorization. Add the
-  order id to the authorize id and the authorization id to the capture and void ids, or rely on
-  the one-authorization-per-checkout constraint and test that it is in place first. Whether PayPal
-  replays an id across different paths is untested.
-- **P2.5, surface test hardening.** `tests/unit/test_capture_surface.py` flags calls only. Make it flag
-  any reference to `capture_authorization` outside the allowed folders (an alias passes today), and
-  any use of `_SEAL` or `CaptureApproval(` outside `paypal/approval.py`.
-- **P2.4, terms hash from the request.** `create_order` takes the terms hash from the caller. Derive
-  it from the request body or check it against the terms re-derived from that body.
 - **P2.5, gate mints the approval.** The gate is the only library code that calls
   `mint_capture_approval`; the surface test already enforces that.
 
