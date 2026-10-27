@@ -7,7 +7,7 @@ A phase starts only when the previous gate has passed.
 | Phase | Scope                                                                                                                                  | Gate                                                                                                                                               | Status      |
 | ----- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
 | P0    | Foundations: repository, CI, vendored specs, spec notes, library selection, PayPal sandbox confirmations                               | `make sandbox-smoke` passes and every Day 0 confirmation in [architecture.md](architecture.md) has an answer or a written fallback                 | Passed      |
-| P1    | Canonical core, UCP checkout and profile, `merchant_authorization`, PayPal client, decision log                                        | A UCP checkout is signed and verified by the independent Node verifier, and canonical terms round-trip through a real sandbox order                | Passed, then reopened 2026-10-27: pending one re-recording (see the P1 gate section) |
+| P1    | Canonical core, UCP checkout and profile, `merchant_authorization`, PayPal client, decision log                                        | A UCP checkout is signed and verified by the independent Node verifier, and canonical terms round-trip through a real sandbox order                | Passed |
 | P2    | Mandates, Merchant and Credential Provider roles, constraints, capture gate, principal lock, ACP adapter, baseline mode, first attacks | Downgrade, order-changed-after-approval (nothing is authorized in full; authorized, then voided by the gate with `ABL_NO_PREAUTH_CHECK`) and replay attacks succeed in baseline and fail in full with nothing captured; concurrency tests pass | Not started |
 | P3    | Trusted Surface with device keys and consent, shopping agent, evidence bundles and verifiers                                           | An autonomous purchase runs from phone approval to a captured sandbox order to a verified evidence bundle, with no server-held customer key        | Not started |
 | P4    | Dashboard, assistant, hostile agent, full evaluation                                                                                   | The whole demo runs from the dashboard locally and the evaluation numbers are frozen                                                               | Not started |
@@ -54,7 +54,7 @@ Manual checks still owed by the maintainer, none blocking: an AG Grid hackathon 
 licence, the row pinning and integrated charts questions ([ENV.md](ENV.md) section 3.5), and the
 live Devpost form fields ([submission/checklist.md](submission/checklist.md)).
 
-## P1 gate (run 2026-10-27): reopened, pending one re-recording
+## P1 gate (run 2026-10-27): passed
 
 Gate checks, all passing:
 
@@ -93,13 +93,11 @@ authorization (and, for capture, the approved terms), the surface test catches a
 re-exports, and `create_order` derives its id hash from the request body. The last two changed the
 recorded request ids again, so:
 
-- **Open: the authorize-and-capture cassette must be re-recorded once more** with a payer approval
-  (`PAYPAL_RECORD_CASSETTES=1 uv run python scripts/record_paypal_cassette.py`). Until then three
-  replay tests are strict xfail (`STALE_RECORDING` in
-  `tests/integration/test_paypal_cassette_replay.py`, and one marker in
-  `tests/integration/test_paypal_order_terms_replay.py`). The gate stays passed only while no
-  xfail replay test remains, so it is open until this is done and the markers are removed. Nothing
-  else is outstanding. The order terms cassette was re-recorded live and matches.
+- **Closed:** the authorize and capture cassette was re-recorded for the final request ids and the
+  replay tests pass with no xfail marker. The only expected failures left in the suite are the four
+  strict mandate pattern conformance tests ([PROTOCOL.md](PROTOCOL.md) Decision 9). `make lint`,
+  `make test` and `make interop` pass, and the second security review had no blocking finding, so
+  the gate has passed.
 
 ## P2 carry-over tasks
 
