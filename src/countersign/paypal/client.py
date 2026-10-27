@@ -59,7 +59,11 @@ from countersign.paypal.errors import (
 )
 from countersign.paypal.limits import LimitError, check_path_id, check_request_id
 from countersign.paypal.models import Authorization, Capture, Order, OrderRequest, amount_json
-from countersign.paypal.request_id import Operation, derive_request_id
+from countersign.paypal.request_id import (
+    Operation,
+    create_order_request_id,
+    derive_request_id,
+)
 
 log = structlog.get_logger("countersign.paypal")
 _M = TypeVar("_M", bound=BaseModel)
@@ -367,15 +371,22 @@ class PayPalClient:
 
     # ------------------------------------------------------------------ state-changing calls
 
-    def create_order(self, checkout_id: str, order: OrderRequest) -> OrderCreated:
-        """Create an AUTHORIZE order. Re-fetch with `get_order` for its state."""
+    def create_order(
+        self, checkout_id: str, order: OrderRequest, *, terms_hash: bytes
+    ) -> OrderCreated:
+        """Create an AUTHORIZE order. Re-fetch with `get_order` for its state.
+
+        `terms_hash` is the canonical terms hash (`Checkout.terms_hash()`) of the checkout the order
+        was built from. It is part of the Request-Id, so re-pricing a checkout never replays the
+        earlier order.
+        """
         response = self._call(
             "POST",
             "/v2/checkout/orders",
             op="create_order",
             ok=(200, 201),
             body=order.to_json(),
-            request_id=derive_request_id(checkout_id, Operation.CREATE_ORDER),
+            request_id=create_order_request_id(checkout_id, terms_hash),
         )
         order_id = self._resource_id(response, "order")
         links = self._object(response).get("links")

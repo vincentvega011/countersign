@@ -25,7 +25,11 @@ from countersign.paypal.limits import (
     LimitError,
 )
 from countersign.paypal.models import ExperienceContext, OrderItem, OrderRequest
-from countersign.paypal.request_id import Operation, derive_request_id
+from countersign.paypal.request_id import (
+    Operation,
+    create_order_request_id,
+    derive_request_id,
+)
 
 BASE = "https://api-m.sandbox.paypal.com"
 CLIENT_ID = "client-id-ABCDEF"
@@ -34,6 +38,7 @@ TOKEN = "access-token-QWERTY-0001"
 USD = "USD"
 NOW = datetime(2026, 10, 24, 12, 0, tzinfo=UTC)
 CHECKOUT = "chk_abcdefghijklmnopqrstuv"
+TERMS = bytes(range(32))  # stands in for Checkout.terms_hash()
 
 
 class Clock:
@@ -420,6 +425,43 @@ def test_request_id_golden_values_and_independent_reference() -> None:
         )
 
 
+def test_create_order_request_id_covers_the_terms_hash() -> None:
+    other = bytes(reversed(TERMS))
+    a = create_order_request_id(CHECKOUT, TERMS)
+    assert a == create_order_request_id(CHECKOUT, TERMS)
+    assert a != create_order_request_id(CHECKOUT, other)  # a re-priced checkout is a new request
+    assert a != create_order_request_id("chk_other", TERMS)
+    assert a != derive_request_id(CHECKOUT, Operation.CREATE_ORDER)  # the old derivation
+    assert len(a) <= MAX_REQUEST_ID
+    # Pinned. The generic derivation did not change, so its golden values above still hold; this value
+    # pins the new create-order form (checkout id, operation, base64url of the 32 byte terms hash).
+    assert a == "cs1.create_order.-VELnLbIpt-9IxObC6W8Dyx9E38tY9K9LMMitsy1NAQ"
+    import base64
+
+    part = base64.urlsafe_b64encode(TERMS).rstrip(b"=").decode()
+    assert a == _reference_request_id(CHECKOUT, "create_order", part)
+
+
+@pytest.mark.parametrize("bad", [b"", b"x" * 31, b"x" * 33, "x" * 32, None, bytearray(32)])
+def test_create_order_request_id_needs_a_32_byte_hash(bad: Any) -> None:
+    with pytest.raises(ValueError):
+        create_order_request_id(CHECKOUT, bad)
+
+
+def test_a_repriced_checkout_sends_a_different_create_request_id(
+    paypal: respx.MockRouter, pp: PayPalClient
+) -> None:
+    paypal.post(f"{BASE}/v2/checkout/orders").mock(
+        return_value=httpx.Response(201, json={"id": "ORDER1", "status": "CREATED"})
+    )
+    pp.create_order(CHECKOUT, order_request(), terms_hash=TERMS)
+    pp.create_order(CHECKOUT, order_request(), terms_hash=TERMS)
+    pp.create_order(CHECKOUT, order_request(), terms_hash=bytes(reversed(TERMS)))
+    first, again, repriced = (r.headers["paypal-request-id"] for r in post_calls(paypal))
+    assert first == again
+    assert repriced != first
+
+
 def test_request_id_parts_must_be_strings() -> None:
     for part in (5, None, b"x", ("a",)):
         with pytest.raises(ValueError):
@@ -797,13 +839,11 @@ def test_create_order_sends_the_exact_request(paypal: respx.MockRouter, pp: PayP
             },
         )
     )
-    result = pp.create_order(CHECKOUT, order_request())
+    result = pp.create_order(CHECKOUT, order_request(), terms_hash=TERMS)
     assert isinstance(result, OrderCreated)
     assert (result.resource_id, result.approval_url, result.status_code) == ("ORDER1", approve, 201)
     (request,) = post_calls(paypal)
-    assert request.headers["paypal-request-id"] == derive_request_id(
-        CHECKOUT, Operation.CREATE_ORDER
-    )
+    assert request.headers["paypal-request-id"] == create_order_request_id(CHECKOUT, TERMS)
     assert request.headers["authorization"] == f"Bearer {TOKEN}"
     assert request.headers["prefer"] == "return=representation"
     assert json.loads(request.content) == order_request().to_json()
@@ -824,7 +864,7 @@ def test_create_order_200_is_a_normal_success_and_prefers_payer_action(
             },
         )
     )
-    result = pp.create_order(CHECKOUT, order_request())
+    result = pp.create_order(CHECKOUT, order_request(), terms_hash=TERMS)
     # The sandbox answered 200 on every create; the status code says nothing about replays.
     assert (result.status_code, result.resource_id) == (200, "ORDER1")
     assert result.approval_url == "https://payer.example/p"
@@ -849,14 +889,14 @@ def test_create_order_without_a_usable_approval_link(
     if links is not None:
         body["links"] = links
     paypal.post(f"{BASE}/v2/checkout/orders").mock(return_value=httpx.Response(201, json=body))
-    assert pp.create_order(CHECKOUT, order_request()).approval_url is None
+    assert pp.create_order(CHECKOUT, order_request(), terms_hash=TERMS).approval_url is None
 
 
 @pytest.mark.parametrize("body", [{}, {"id": ""}, {"id": 5}, {"id": "a/b"}, []])
 def test_create_order_requires_an_id(paypal: respx.MockRouter, pp: PayPalClient, body: Any) -> None:
     paypal.post(f"{BASE}/v2/checkout/orders").mock(return_value=httpx.Response(201, json=body))
     with pytest.raises((E.PayPalResponseError, LimitError)):
-        pp.create_order(CHECKOUT, order_request())
+        pp.create_order(CHECKOUT, order_request(), terms_hash=TERMS)
 
 
 def test_create_order_rejects_other_success_codes(
@@ -866,7 +906,7 @@ def test_create_order_rejects_other_success_codes(
         return_value=httpx.Response(202, json={"id": "ORDER1"})
     )
     with pytest.raises(E.PayPalRequestError):
-        pp.create_order(CHECKOUT, order_request())
+        pp.create_order(CHECKOUT, order_request(), terms_hash=TERMS)
 
 
 def test_create_order_invalid_string_length(paypal: respx.MockRouter, pp: PayPalClient) -> None:
@@ -881,7 +921,7 @@ def test_create_order_invalid_string_length(paypal: respx.MockRouter, pp: PayPal
         )
     )
     with pytest.raises(E.InvalidStringLength) as exc:
-        pp.create_order(CHECKOUT, order_request())
+        pp.create_order(CHECKOUT, order_request(), terms_hash=TERMS)
     assert exc.value.status == 400 and exc.value.debug_id == "dbg1"
 
 
@@ -1310,16 +1350,16 @@ def test_5xx_on_a_create_is_retried_with_the_same_request_id(
         httpx.Response(503),
         httpx.Response(201, json={"id": "ORDER1"}),
     ]
-    assert pp.create_order(CHECKOUT, order_request()).resource_id == "ORDER1"
+    assert pp.create_order(CHECKOUT, order_request(), terms_hash=TERMS).resource_id == "ORDER1"
     ids = {c.request.headers["paypal-request-id"] for c in route.calls}
-    assert len(route.calls) == 3 and ids == {derive_request_id(CHECKOUT, Operation.CREATE_ORDER)}
+    assert len(route.calls) == 3 and ids == {create_order_request_id(CHECKOUT, TERMS)}
     assert clock.sleeps == [0.5, 1.0]
 
 
 @pytest.mark.parametrize(
     ("call", "success"),
     [
-        (lambda pp: pp.create_order(CHECKOUT, order_request()), 201),
+        (lambda pp: pp.create_order(CHECKOUT, order_request(), terms_hash=TERMS), 201),
         (lambda pp: pp.authorize_order(CHECKOUT, "ORDER1"), 201),
         (lambda pp: pp.void_authorization(CHECKOUT, "AUTH1"), 200),
         (lambda pp: pp.refund_capture(CHECKOUT, "CAP1"), 201),
@@ -1364,7 +1404,7 @@ def test_exhausted_5xx_on_a_state_change_is_outcome_unknown(
         return_value=httpx.Response(500, json={"name": "INTERNAL_SERVICE_ERROR"})
     )
     with pytest.raises(E.PayPalServerError) as exc:
-        pp.create_order(CHECKOUT, order_request())
+        pp.create_order(CHECKOUT, order_request(), terms_hash=TERMS)
     assert route.call_count == 3 and exc.value.outcome_unknown is True
 
 
@@ -1453,7 +1493,7 @@ def test_client_errors_are_not_retried(
         return_value=httpx.Response(status, json={"name": "X"})
     )
     with pytest.raises(E.PayPalRequestError):
-        pp.create_order(CHECKOUT, order_request())
+        pp.create_order(CHECKOUT, order_request(), terms_hash=TERMS)
     assert route.call_count == 1
 
 
@@ -1571,7 +1611,7 @@ def test_secrets_never_appear_in_logs_errors_or_reprs(
     outputs: list[str] = [repr(client), str(client), repr(client._config), str(client._config)]
     with structlog.testing.capture_logs() as logs:
         client.get_order("ORDER1")
-        client.create_order(CHECKOUT, order_request())
+        client.create_order(CHECKOUT, order_request(), terms_hash=TERMS)
         for call in (
             lambda: client.get_order("BAD"),
             lambda: client.authorize_order(CHECKOUT, "T"),
@@ -1645,7 +1685,7 @@ def test_every_post_sends_the_content_type_and_body_paypal_accepted(
     paypal.post(f"{BASE}/v2/payments/captures/CAP1/refund").mock(
         return_value=httpx.Response(201, json={"id": "REF1"})
     )
-    pp.create_order(CHECKOUT, order_request())
+    pp.create_order(CHECKOUT, order_request(), terms_hash=TERMS)
     pp.authorize_order(CHECKOUT, "ORDER1")
     pp.capture_authorization(CHECKOUT, "AUTH1", expected_total=Money(USD, 7400))
     pp.void_authorization(CHECKOUT, "AUTH2")

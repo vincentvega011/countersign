@@ -83,7 +83,7 @@ def run_cycle(
     checkout, request, custom_id = cycle_checkout(checkout_id, catalog or load_catalog())
     total = request.amount
 
-    created = client.create_order(checkout_id, request)
+    created = client.create_order(checkout_id, request, terms_hash=checkout.terms_hash())
     if created.approval_url is None:
         raise RuntimeError("PayPal returned no approval link")
     approve(created.approval_url)

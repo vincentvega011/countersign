@@ -43,3 +43,16 @@ def derive_request_id(checkout_id: str, operation: Operation, *parts: str) -> st
     data = b"".join(struct.pack(">I", len(b)) + b for b in (f.encode("utf-8") for f in fields))
     digest = b64url(domain_hash(DOMAIN, data))
     return f"{PREFIX}.{operation.value}.{digest}"
+
+
+def create_order_request_id(checkout_id: str, terms_hash: bytes) -> str:
+    """The Request-Id for creating the order of `checkout_id` with the terms hashed as `terms_hash`.
+
+    PayPal replays the first response for a repeated Request-Id even when the body differs
+    (docs/PROTOCOL.md section 4.2), so an id from the checkout id alone would hand back a stale order
+    after the checkout is re-priced. Including the canonical terms hash makes a changed checkout a
+    different request, and an unchanged one the same request.
+    """
+    if not isinstance(terms_hash, bytes) or len(terms_hash) != 32:
+        raise ValueError("the terms hash must be 32 bytes")
+    return derive_request_id(checkout_id, Operation.CREATE_ORDER, b64url(terms_hash))

@@ -90,7 +90,7 @@ def run_terms_flow(
         experience_context=ExperienceContext(RETURN_URL, CANCEL_URL),
         description="Countersign order terms cassette",
     )
-    created = client.create_order(checkout_id, request)
+    created = client.create_order(checkout_id, request, terms_hash=checkout.terms_hash())
     order = client.get_order(created.resource_id)
     terms = paypal_order_to_canonical_terms(
         order, line_ids=[line.id for line in checkout.line_items]

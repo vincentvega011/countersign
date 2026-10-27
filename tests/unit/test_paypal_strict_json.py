@@ -25,6 +25,7 @@ from countersign.paypal.client import PayPalClient
 from tests.unit.test_paypal_client import (
     BASE,
     CHECKOUT,
+    TERMS,
     Clock,
     auth_json,
     make_client,
@@ -89,7 +90,7 @@ def test_a_refused_create_order_body_is_not_read(
 ) -> None:
     paypal.post(f"{BASE}/v2/checkout/orders").mock(return_value=raw(201, body))
     with pytest.raises(E.PayPalResponseError, match="strict JSON loader"):
-        pp.create_order(CHECKOUT, order_request())
+        pp.create_order(CHECKOUT, order_request(), terms_hash=TERMS)
 
 
 @pytest.mark.parametrize("body", REFUSED, ids=IDS)
