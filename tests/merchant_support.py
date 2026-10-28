@@ -114,10 +114,11 @@ def make_setup(
     platform_trusted: bool = True,
     published_key: MerchantKey | None = None,
     session_key: MerchantKey | None = None,
+    checkout: Checkout | None = None,
 ) -> Setup:
     merchant_key = validate_jwk(generate_jwk())
     keys = Keys()
-    checkout = make_checkout()
+    checkout = checkout or make_checkout()
     issued = signed_response(checkout, session_key or merchant_key)
     store = InMemoryReservationStore()
     log = ListLog()

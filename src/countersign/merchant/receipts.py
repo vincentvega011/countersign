@@ -31,6 +31,8 @@ from countersign.mandates.errors import MandateError
 from countersign.merchant.keys import ALG, MerchantKey
 
 RECEIPT_TYP = "checkout-receipt+jwt"
+PAYMENT_RECEIPT_TYP = "payment-receipt+jwt"
+_KNOWN_TYP = (RECEIPT_TYP, PAYMENT_RECEIPT_TYP)
 SUCCESS = "Success"
 ERROR = "Error"
 
@@ -49,9 +51,11 @@ def reference_for(presented: object) -> str:
     return b64url(hashlib.sha256(b"").digest())
 
 
-def sign_receipt(claims: Mapping[str, Any], key: MerchantKey) -> str:
+def sign_receipt(claims: Mapping[str, Any], key: MerchantKey, typ: str = RECEIPT_TYP) -> str:
+    if typ not in _KNOWN_TYP:
+        raise ValueError("unknown receipt typ")
     return jws.serialize_compact(
-        {"alg": ALG, "kid": key.kid, "typ": RECEIPT_TYP},
+        {"alg": ALG, "kid": key.kid, "typ": typ},
         canonicalize(dict(claims)),
         key.private_key,
         algorithms=[ALG],
@@ -81,14 +85,16 @@ def error_claims(
     }
 
 
-def verify_receipt(receipt: str, published_keys: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+def verify_receipt(
+    receipt: str, published_keys: Sequence[Mapping[str, Any]], typ: str = RECEIPT_TYP
+) -> dict[str, Any]:
     """Verify a receipt against published merchant keys and return its claims."""
     try:
         header_segment = receipt.split(".")[0]
         header = loads_strict(_unb64(header_segment))
         if not isinstance(header, dict) or set(header) != {"alg", "kid", "typ"}:
             raise ReceiptError("the header must be exactly alg, kid and typ")
-        if header["alg"] != ALG or header["typ"] != RECEIPT_TYP:
+        if header["alg"] != ALG or header["typ"] != typ:
             raise ReceiptError("the header is not a checkout receipt header")
         matches = [k for k in published_keys if k.get("kid") == header["kid"]]
         if len(matches) != 1:

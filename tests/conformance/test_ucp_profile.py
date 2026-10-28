@@ -220,3 +220,22 @@ def test_app_refuses_to_start_with_wrong_curve(
     monkeypatch.setenv("MERCHANT_KEY_PATH", str(path))
     with pytest.raises(MerchantKeyError):
         create_app(public_base_url=BASE)
+
+
+def test_the_payment_handler_that_carries_the_mandate_token(key: MerchantKey) -> None:
+    """Requirement of docs/PROTOCOL.md Decision 39: a handler whose `id` is the `handler_id` of the
+    instrument that holds the Payment Mandate token, validated by the vendored profile schema."""
+    from countersign.protocols.ucp.profile import (
+        PAYMENT_CREDENTIAL_TYPE,
+        PAYMENT_HANDLER_ID,
+        PAYMENT_HANDLER_NAME,
+    )
+
+    profile = build_profile(public_base_url=BASE, key=key)
+    ((name, (handler,)),) = profile["ucp"]["payment_handlers"].items()
+    assert name == PAYMENT_HANDLER_NAME and handler["id"] == PAYMENT_HANDLER_ID
+    assert handler["config"]["credential_type"] == PAYMENT_CREDENTIAL_TYPE
+    assert list(_validator().iter_errors(profile)) == []
+    broken = json.loads(json.dumps(profile))
+    del broken["ucp"]["payment_handlers"][PAYMENT_HANDLER_NAME][0]["id"]
+    assert list(_validator().iter_errors(broken))  # the schema requires the handler id

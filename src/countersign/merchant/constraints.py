@@ -14,7 +14,7 @@ test-only evaluator from tests/.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from countersign.canonical.models import Checkout
 from countersign.mandates import VerifiedChain
@@ -27,10 +27,25 @@ class ConstraintResult:
     unresolved: bool = False  # True for a constraint type that is not understood
 
 
+@runtime_checkable
+class ConstraintOutcome(Protocol):
+    """What the Merchant role needs from an evaluation result (structural, so `constraints/`
+    returns its own result type without importing this package)."""
+
+    @property
+    def satisfied(self) -> bool: ...
+
+    @property
+    def reason(self) -> str: ...
+
+    @property
+    def unresolved(self) -> bool: ...
+
+
 class ConstraintEvaluator(Protocol):
     def evaluate(
         self, *, chain: VerifiedChain, checkout: Checkout, now: float
-    ) -> ConstraintResult: ...
+    ) -> ConstraintOutcome: ...
 
 
 class DenyAllConstraints:

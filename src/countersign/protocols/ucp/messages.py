@@ -31,6 +31,9 @@ QUANTITY_UNIT_MISMATCH = "quantity_unit_mismatch"
 FIELD_IGNORED = "field_ignored"
 INVALID_REQUEST = "invalid_request"
 INTERNAL_ERROR = "internal_error"
+PAYER_APPROVAL_REQUIRED = "payer_approval_required"
+PAYMENT_AUTHORIZED = "payment_authorized"
+CHECKOUT_CANCELED_AFTER_REJECTION = "checkout_canceled_after_rejection"
 
 
 class ProtocolError(Exception):
@@ -57,6 +60,13 @@ def error_message(
 
 def warning_message(code: str, content: str, path: str | None = None) -> dict[str, Any]:
     out: dict[str, Any] = {"type": "warning", "code": code, "content": content}
+    if path is not None:
+        out["path"] = path
+    return out
+
+
+def info_message(code: str, content: str, path: str | None = None) -> dict[str, Any]:
+    out: dict[str, Any] = {"type": "info", "code": code, "content": content}
     if path is not None:
         out["path"] = path
     return out

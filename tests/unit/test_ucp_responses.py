@@ -6,6 +6,7 @@ from countersign.canonical.models import Checkout, Item
 from countersign.canonical.money import Money
 from countersign.protocols.ucp import messages as m
 from countersign.protocols.ucp.checkout_state import Status
+from countersign.protocols.ucp.profile import payment_handlers
 from countersign.protocols.ucp.responses import checkout_response, rfc3339
 
 
@@ -23,7 +24,9 @@ def test_shape_and_required_members() -> None:
     body = checkout_response(_checkout(), Status.READY_FOR_COMPLETE, 1_700_000_000_000_000)
     assert {"ucp", "id", "line_items", "status", "currency", "totals", "links"} <= set(body)
     assert body["status"] == "ready_for_complete" and body["links"] == []
-    assert body["ucp"]["status"] == "success" and body["ucp"]["payment_handlers"] == {}
+    assert (
+        body["ucp"]["status"] == "success" and body["ucp"]["payment_handlers"] == payment_handlers()
+    )
     assert body["totals"] == [
         {"type": "subtotal", "amount": 500},
         {"type": "total", "amount": 500},

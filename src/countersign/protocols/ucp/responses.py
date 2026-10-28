@@ -7,7 +7,7 @@ Countersign's own code (`messages.py`).
 
 Shape (vendored `shopping/checkout.json`): required `ucp`, `id`, `line_items`, `status`,
 `currency`, `totals`, `links`. `ucp` carries the version, `status: success`, the checkout
-capability and an empty `payment_handlers` (required by the response schema). `links` is an empty
+capability and the `payment_handlers` registry (required by the response schema). `links` is an empty
 array: Countersign has no legal pages to link (docs/LIMITATIONS.md). `expires_at` is RFC 3339 UTC.
 """
 
@@ -18,7 +18,7 @@ from typing import Any
 
 from countersign.canonical.models import Checkout
 from countersign.protocols.ucp.checkout_state import Status
-from countersign.protocols.ucp.profile import CHECKOUT_CAPABILITY, UCP_VERSION
+from countersign.protocols.ucp.profile import CHECKOUT_CAPABILITY, UCP_VERSION, payment_handlers
 
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
@@ -34,6 +34,7 @@ def checkout_response(
     status: Status,
     expires_us: int,
     messages: list[dict[str, Any]] | None = None,
+    continue_url: str | None = None,
 ) -> dict[str, Any]:
     """The checkout resource as returned by every operation."""
     body: dict[str, Any] = {
@@ -41,7 +42,7 @@ def checkout_response(
             "version": UCP_VERSION,
             "status": "success",
             "capabilities": {CHECKOUT_CAPABILITY: [{"version": UCP_VERSION}]},
-            "payment_handlers": {},
+            "payment_handlers": payment_handlers(),
         },
         **checkout.to_ucp(),
         "status": status.value,
@@ -50,4 +51,6 @@ def checkout_response(
     }
     if messages:
         body["messages"] = list(messages)
+    if continue_url is not None:
+        body["continue_url"] = continue_url
     return body

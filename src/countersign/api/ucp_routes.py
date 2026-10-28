@@ -35,6 +35,7 @@ from countersign.protocols.ucp.requests import (
     check_content_type,
     ignored_members,
     parse_checkout_request,
+    parse_complete_request,
     parse_json_object,
     read_body,
 )
@@ -117,8 +118,9 @@ def install(app: FastAPI, service: UcpService, base_path: str, key: MerchantKey)
 
     @router.post("/checkout-sessions/{checkout_id}/complete")
     async def complete(checkout_id: str, request: Request) -> JSONResponse:
-        await prepare(request, body="required")
-        return _respond(await run_in_threadpool(service.complete, checkout_id), key)
+        data = await prepare(request, body="required")
+        req = parse_complete_request(data)
+        return _respond(await run_in_threadpool(service.complete, checkout_id, req), key)
 
     @router.post("/checkout-sessions/{checkout_id}/cancel")
     async def cancel(checkout_id: str, request: Request) -> JSONResponse:

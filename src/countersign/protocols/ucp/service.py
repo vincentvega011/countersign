@@ -27,7 +27,7 @@ import secrets
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
 from sqlalchemy import Connection, Engine
 
@@ -43,7 +43,7 @@ from countersign.protocols.ucp.checkout_state import (
     transition,
     updatable,
 )
-from countersign.protocols.ucp.requests import CheckoutRequest, LineRequest
+from countersign.protocols.ucp.requests import CheckoutRequest, CompleteRequest, LineRequest
 from countersign.protocols.ucp.responses import checkout_response
 
 TTL_US = 6 * 3600 * 1_000_000  # the spec's default session lifetime, 6 hours
@@ -52,6 +52,29 @@ MAX_QUANTITY = 99
 ID_PATTERN = re.compile(r"chk_[A-Za-z0-9_-]{22}")
 
 Message = dict[str, Any]
+
+
+@dataclass(frozen=True)
+class CompletionOutcome:
+    """What the completion port reports; the service turns it into status, messages and a link.
+
+    `kind` is `rejected`, `approval_required`, `pending`, `authorized` or `in_progress`.
+    `messages` are the UCP error messages of a rejection. `consumed` says whether the checkout's
+    single-use keys were reserved before the rejection (then the checkout is spent and canceled).
+    """
+
+    kind: str
+    messages: tuple[Message, ...] = ()
+    continue_url: str | None = None
+    consumed: bool = False
+
+
+class CompletionPort(Protocol):
+    """Merchant verification, then the Credential Provider (wired in `countersign.completion`)."""
+
+    def complete(
+        self, *, checkout: Checkout, mandate: str | None, payment_token: str | None, resume: bool
+    ) -> CompletionOutcome: ...
 
 
 def now_us() -> int:
@@ -70,12 +93,17 @@ class Result:
     http_status: int
     record: store.CheckoutRecord | None
     messages: tuple[Message, ...] = ()
+    continue_url: str | None = None
 
     def body(self) -> dict[str, Any]:
         if self.record is None:
             return m.error_response(list(self.messages))
         return checkout_response(
-            self.record.checkout, self.record.status, self.record.expires_us, list(self.messages)
+            self.record.checkout,
+            self.record.status,
+            self.record.expires_us,
+            list(self.messages),
+            self.continue_url,
         )
 
 
@@ -88,9 +116,11 @@ class UcpService:
         policy_hash: bytes,
         clock_us: Callable[[], int] = now_us,
         new_id: Callable[[], str] = new_checkout_id,
+        completion: CompletionPort | None = None,
         ttl_us: int = TTL_US,
     ) -> None:
         self._engine = engine
+        self._completion = completion
         self._catalog = catalog
         self._policy_hash = policy_hash
         self._clock = clock_us
@@ -279,8 +309,89 @@ class UcpService:
             )
             return Result(200, new)
 
-    def complete(self, checkout_id: str) -> Result:
-        """Stub: never completes. See the module docstring."""
+    def complete(self, checkout_id: str, request: CompleteRequest | None = None) -> Result:
+        """Complete a checkout: Merchant verification, then the Credential Provider.
+
+        Three steps so that no database lock is held while PayPal is called: (1) under the row
+        lock, move `ready_for_complete` to `complete_in_progress` and log it; (2) run the completion
+        port with no transaction open; (3) under the row lock again, record the outcome. Without a
+        completion port configured, nothing is verified and the only answer is `mandate_required`
+        (INV-3, INV-10).
+        """
+        if self._completion is None:
+            return self._complete_stub(checkout_id)
+        request = request or CompleteRequest(None, None)
+        with self._engine.begin() as conn:
+            record = self._open(conn, checkout_id, lock=True)
+            if record is None:
+                return self._not_found()
+            resume = record.status is Status.COMPLETE_IN_PROGRESS
+            if not resume and record.status is not Status.READY_FOR_COMPLETE:
+                return self._refuse(conn, "complete", record, *_not_ready(record.status))
+            if not resume:
+                started = record.advanced(
+                    status=transition(record.status, Status.COMPLETE_IN_PROGRESS),
+                    now_us=self._clock(),
+                )
+                store.save(conn, started)
+                self._log(conn, "checkout.complete_started", started)
+                record = started
+        outcome = self._completion.complete(
+            checkout=record.checkout,
+            mandate=request.checkout_mandate,
+            payment_token=request.payment_token,
+            resume=resume,
+        )
+        return self._finish_complete(checkout_id, outcome)
+
+    def _finish_complete(self, checkout_id: str, outcome: CompletionOutcome) -> Result:
+        with self._engine.begin() as conn:
+            record = self._open(conn, checkout_id, lock=True)
+            if record is None:
+                return self._not_found()
+            if outcome.kind == "in_progress":
+                text = "The checkout is being completed."
+                msg = m.error_message(m.UPDATE_DURING_COMPLETION, text, "recoverable")
+                return Result(200, record, (msg,))
+            if outcome.kind == "rejected":
+                messages = list(outcome.messages)
+                if outcome.consumed:
+                    # The single-use keys of this checkout are spent; it cannot be completed again.
+                    new = record.advanced(
+                        status=transition(record.status, Status.CANCELED), now_us=self._clock()
+                    )
+                    text = "The payment was rejected; create a new checkout to try again."
+                    messages.append(
+                        m.error_message(m.CHECKOUT_CANCELED_AFTER_REJECTION, text, "unrecoverable")
+                    )
+                else:
+                    new = record.advanced(
+                        status=transition(record.status, Status.READY_FOR_COMPLETE),
+                        now_us=self._clock(),
+                    )
+                if new.status is not record.status:
+                    store.save(conn, new)
+                self._log(
+                    conn, "checkout.complete_rejected", new,
+                    codes=[x["code"] for x in outcome.messages], consumed=outcome.consumed,
+                )  # fmt: skip
+                return Result(200, new, tuple(messages))
+            if outcome.kind == "approval_required":
+                text = "The payer must approve the payment on PayPal, then complete again."
+                info = m.info_message(m.PAYER_APPROVAL_REQUIRED, text)
+                self._log(conn, "checkout.payer_approval_required", record)
+                return Result(200, record, (info,), outcome.continue_url)
+            if outcome.kind == "pending":
+                text = "The payer has not approved the payment on PayPal yet."
+                info = m.info_message(m.PAYER_APPROVAL_REQUIRED, text)
+                return Result(200, record, (info,), outcome.continue_url)
+            text = "The payment is authorized and waits for the capture gate."
+            info = m.info_message(m.PAYMENT_AUTHORIZED, text)
+            self._log(conn, "checkout.payment_authorized", record)
+            return Result(200, record, (info,))
+
+    def _complete_stub(self, checkout_id: str) -> Result:
+        """No completion configured: never completes."""
         with self._engine.begin() as conn:
             record = self._open(conn, checkout_id, lock=True)
             if record is None:

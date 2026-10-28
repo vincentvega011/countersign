@@ -86,15 +86,14 @@ blockchain and is not described as one.
 ### L9. The application role on the hosted database
 
 The grants that stop the application rewriting history hold only if the deployed service connects as
-the restricted role. Whether the hosted Postgres allows a second, restricted login role was not
-checked ([ENV.md](ENV.md) section 4 does not say). Check at the Render deploy that the service uses
-the restricted role; if it cannot, record the fallback here and rely on the anchors in L8.
-
-Locally the default `DATABASE_URL` and `.env.example` still connect as the table owner, which can
-update or delete log rows and disable the trigger. Until P2.4 the application is not run under the
-restricted role anywhere, so no tamper-resistance is claimed for the log: P2.4 switches the runtime
-to the INSERT and SELECT role (migrations keep running as the owner) and this entry is rewritten with
-what the hosted database allows.
+the restricted role. The role has SELECT and INSERT on the decision log and no UPDATE, DELETE or
+TRUNCATE on it; since migration 0003 it has SELECT, INSERT and UPDATE (never DELETE or TRUNCATE) on the
+reservation, spend, attempt and checkout tables, where triggers restrict which updates are legal.
+The integration tests connect as that role and assert these grants (`tests/integration/test_cp_database.py`),
+and the Credential Provider and the UCP service run as it. Whether the hosted Postgres allows a second,
+restricted login role was not checked ([ENV.md](ENV.md) section 4 does not say). Check at the Render
+deploy that the service uses the restricted role; if it cannot, record the fallback here and rely on
+the anchors in L8.
 
 ### L10. Throughput and clocks
 
@@ -102,6 +101,25 @@ All appends take one advisory lock, so the log is a single-writer bottleneck by 
 (tens of entries per purchase) this is irrelevant. Timestamps come from the writer's clock and are
 not required to be monotonic, so a day tree is defined by `ts_us` and ordered by `seq`. A log
 `append` joins the caller's transaction, so INV-12 callers must commit it before responding.
+
+### L14. The payment handler name is a placeholder
+
+The profile and every checkout response declare a payment handler named
+`dev.countersign.payment.ap2_payment_mandate` ([PROTOCOL.md](PROTOCOL.md) Decision 39). UCP wants a
+reverse-domain name of a domain the author controls. Countersign is a working name and the project
+does not own `countersign.dev`, so the name is a **placeholder**, and no `spec` or `schema` document is
+published for the handler. A platform that checks handler names against a registry will not know it.
+It must be renamed to a domain we control (and its specification published) before any use beyond the
+demo.
+
+### L15. Failures after a payment mandate verified
+
+Two outcomes have no UCP checkout message. A decision-log failure after the reservation cleans up
+(voids any authorization, releases the reservation) and ends as HTTP 500 `internal_error`, not as a
+checkout with an error message, because nothing could be recorded about it. And an attempt whose
+PayPal state cannot be read or confirmed is marked `unresolved` and keeps the budget and the open
+mandate reserved until `recover` reads PayPal; until then the agent sees a rejection and must use a
+new checkout. Nothing runs `recover` on a schedule yet.
 
 ## UCP checkout binding
 

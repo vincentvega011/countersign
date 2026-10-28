@@ -1510,6 +1510,279 @@ Resolves: the open item of Decision 8 ("Human Present mode ... fixed when the ma
   Surface ([Decision 5](#decision-5-trusted-platform-provider-with-a-device-consent-signature)).
   The chain primitive treats link 0 like any issuer-signed credential (`dc+sd-jwt`, `exp` required).
 
+### Decision 30: Constraint engine structure and interface
+
+Resolves: where each native constraint is evaluated, and how the engine plugs into the Merchant role.
+
+- **Two evaluators, one engine.** `CheckoutConstraintEvaluator` evaluates the open Checkout Mandate
+  (`checkout.line_items`, `checkout.allowed_merchants`) for the Merchant role (step M7).
+  `PaymentConstraintEvaluator` evaluates the open Payment Mandate (the eight `payment.*` types) for
+  the Credential Provider (P2.4). The Merchant never sees a Payment Mandate, so the payment
+  constraints cannot run inside M7.
+- **Open against closed.** The open mandate holds the constraints (what the customer allowed). The
+  closed values they bind are: for the Checkout Mandate, the checkout the closed mandate commits to
+  (already matched to the session at M3 to M5); for the Payment Mandate, `payee`, `payment_amount`,
+  `payment_instrument`, `pisp` and `execution_date`.
+- **Structural interface.** `merchant/constraints.py` now defines `ConstraintOutcome` (a
+  `runtime_checkable` Protocol with `satisfied`, `reason`, `unresolved`) as the result type, so
+  `constraints/` returns its own `ConstraintResult` without importing `merchant/`. The Merchant
+  accepts only a result whose `satisfied` is exactly `True`; any other object is a rejection. The
+  default when no evaluator is injected stays `DenyAllConstraints`.
+- **Merchant identity.** `allowed_merchants` is matched on the merchant `id` the evaluator is built
+  with, never on `name` or `website`. Likewise payees match on `id`, instruments on `id` and `type`,
+  PISPs on all three names.
+
+### Decision 31: Strict reading of constraints
+
+Resolves: "unknown constraints MUST be treated as failing evaluation", and places where the schemas are
+open.
+
+- A constraint with a member the engine does not evaluate (the schemas do not set
+  `additionalProperties: false`) is `unresolved_constraint`. A member that is not understood might
+  restrict the mandate further, so it is never ignored. A foreign mandate with extra members is
+  therefore refused.
+- A `type` that belongs to the other mandate (a `payment.*` type in a Checkout Mandate or the
+  reverse) is `unresolved_constraint`.
+- Two constraints of one `type` in one mandate are refused (`duplicate_constraint`). The spec does
+  not say how to combine them.
+- The schema-required constraints are required: `checkout.line_items` in an open Checkout Mandate,
+  `payment.reference` in an open Payment Mandate. `checkout.allowed_merchants` is not required by the
+  schema, so a mandate without it allows any merchant, as the spec reads. Countersign's own issuer
+  includes it ([Decision 3](#decision-3-line-items-in-the-mandate-categories-in-merchant-policy)).
+- AP2 processing rule 2: every claim of the open content other than `vct`, `constraints`, `cnf`,
+  `iat`, `exp`, `nbf` must be present and equal, with the same JSON type, in the closed content
+  (1, 1.0 and true differ). A closed mandate that carries `constraints` is refused.
+- A single-link (Human Present) mandate has no open mandate and no constraints: the customer signed
+  the exact checkout on the Trusted Surface ([Decision 29](#decision-29-human-present-closed-mandate)).
+  A `constraints` claim in it is refused.
+- Quantities and amounts are JSON integers. `true`, `1.0` and `"1"` are malformed, never coerced.
+  `checkout.line_items` follows the spec's maximal flow formulation; an empty `acceptable_items`
+  (nothing revealed) simply matches nothing.
+
+### Decision 32: Payment constraint interpretations
+
+Resolves: gaps in the Payment Mandate text.
+
+- `payment.amount_range`: `max` and `min` are non-negative integers with `min <= max`; the currency
+  must equal the payment's; the payment amount must be a positive integer (zero and negative amounts
+  are invalid). Bounds are inclusive.
+- `payment.budget`: as [Decision 2](#decision-2-strict-single-use-and-add-only-budget). `max` that is
+  not a JSON integer (a fraction, `100.0`, an exponent, a string, a boolean) makes the mandate
+  invalid. The vendored schema types `max` as `number` and accepts a fraction; the engine does not.
+  `payment.budget` is evaluated even without `payment.agent_recurrence` (stricter than the spec's
+  "to be used with").
+- `payment.agent_recurrence`: valid only with `max_occurrences` of exactly 1; any frequency is
+  accepted in that case because one occurrence makes the frequency moot. Missing, other or
+  non-integer `max_occurrences` is `unresolved_constraint`; an unknown `frequency` is invalid.
+- `payment.execution_date`: values are `YYYY-MM-DD` (a UTC day) or a full ISO 8601 timestamp with
+  `Z` or an offset. A timestamp without an offset is ambiguous and invalid. For `not_after`, a date
+  without a time means the end of that UTC day; for `not_before` the start. Bounds are inclusive. The
+  execution time is the closed mandate's `execution_date` or, when absent, the injected clock.
+- **Countersign executes immediately.** A closed `execution_date` later than now plus the 60 second
+  skew is refused (`execution_date:in_future`) even when no constraint mentions it, because the
+  system would otherwise capture before the date the customer approved. This goes beyond the spec.
+- `payment.reference`: the digest must equal the `sd_hash`-style digest of an open Checkout Mandate
+  link of the Checkout Mandate chain presented with the payment. A digest of the closed link does not
+  count. The check that `transaction_id` equals the checkout hash stays with the Credential Provider.
+
+### Decision 33: Spend view, accounting and category policy
+
+Resolves: how the add-only budget of Decision 2 is fed to the evaluator.
+
+- **The view is an argument.** `SpendView(currency, captured_minor, in_flight_minor)` is built by the
+  caller from PayPal capture and void outcomes and verified webhooks (INV-7). The evaluator never
+  reads an amount the agent states. Without a view, a mandate that has `payment.budget` fails.
+- **The view excludes the presentation being evaluated.** The Credential Provider evaluates, then
+  reserves atomically; the gate re-evaluates with its own reservation removed
+  (`BudgetAccount.view_excluding`). Otherwise a purchase would count against itself.
+- **Rules** (`BudgetAccount`, also the contract for the Postgres implementation): `reserve` adds to
+  in-flight; `capture` moves in-flight to captured; `void` releases an uncaptured reservation and is
+  the only event that raises headroom; `refund` changes nothing in the view. Refusing an event
+  changes nothing. These are property tested.
+- **Single use is separate.** One purchase per open mandate is enforced by the reservation store
+  ([Decision 28](#decision-28-reservation-abort-release-and-consume)); the budget stops a purchase
+  that would exceed the ceiling. After a void before capture the mandate can be retried; after
+  capture, even if refunded, it cannot.
+- **Category limits are merchant policy.** `check_category_policy` takes the checkout, a
+  `CategoryPolicy` and a catalog lookup, and is separate from mandate evaluation. An unknown category
+  is refused when a policy exists. The unmandated cap and velocity limits of the architecture are not
+  implemented yet. It is not wired into the Merchant verifier in P2.3.
+
+### Decision 34: The evidence reference in `custom_id`
+
+Resolves: the "evidence reference encoding" listed as still to be written in section 5.
+
+- `custom_id` = `cs1.` + the unpadded base64url of `SHA-256("cs.evidence.ref.v1" || 0x00 || R)`, where
+  `R` is the JCS bytes of `{"v": 1, "checkout_hash": H, "checkout_mandate": C, "payment_mandate": P}`.
+  `H` is the hash of the checkout JWT (equal to `transaction_id`), `C` the `sd_hash`-style digest of
+  the closed Checkout Mandate and `P` that of the closed Payment Mandate (both over the final
+  link of the chain, Decision 7).
+- It is 47 characters, so the full 256 bit digest fits PayPal's 255 and nothing is truncated. The
+  evidence bundle (P3) holds `H`, `C` and `P`, so the reference can be recomputed from the bundle and
+  matched to the PayPal order, and a change to the checkout or to either mandate changes it.
+- `invoice_id` stays the checkout id ([Decision 20](#decision-20-canonical-checkout-to-paypal-order-and-back)).
+  The live order's `custom_id` is part of the terms the pre-authorize check compares.
+
+### Decision 35: Credential Provider steps and rejections
+
+Resolves: the CP verification order of [architecture.md](architecture.md) 5.5 and the error mapping.
+
+C1 token present; C2 both chains (Payment Mandate with audience `credential-provider`, Checkout
+Mandate with `merchant`, one trusted platform key, same mode); C3 `transaction_id` equals the hash of
+the checkout JWT embedded in the Checkout Mandate and equals its `checkout_hash`; C4 payee `id`, amount
+(integer, exact) and currency equal this merchant and the current checkout total; C5 constraints
+([Decision 30](#decision-30-constraint-engine-structure-and-interface)); C6 single-use reservation;
+C7 PayPal order; C8 pre-authorize check and authorization.
+
+- Mandate failures use the same codes as the Merchant role ([Decision 26](#decision-26-merchant-verification-steps-and-the-ucp-error-mapping)):
+  `mandate_required` (C1), `agent_missing_key`, `mandate_expired`, `mandate_invalid_signature`
+  (chains), `mandate_scope_mismatch` (C3 to C6, C8).
+- Everything that fails after the mandates verified (a PayPal error, an order that needs payer action
+  in vault mode, an internal error) is **`payment_failed`**, a standard UCP error ("Payment processing
+  failed", vendored `shopping/checkout/index.md`, "Standard Errors"; listed in `error_code.json`),
+  `severity` `recoverable` as the spec recommends, message text "The payment could not be processed."
+  It is not one of the seven AP2 mandate codes, and the AP2 extension's code list is not closed for
+  messages (`error_code.json` permits any code). A log failure after the reservation cleans up and
+  raises `DecisionLogError`; the API answers HTTP 500 `internal_error`, because no checkout
+  outcome can be reported when the decision could not be recorded (INV-12).
+- A rejection is answered with a signed Payment Receipt: `typ` `payment-receipt+jwt`, claims
+  `status` `Error`, `iss`, `iat`, `reference` (the digest of the presented Payment Mandate, or the hash
+  of the presented text as in [Decision 27](#decision-27-checkout-receipts)), `payment_id` (the
+  checkout id), `error`, `error_description`. The success Payment Receipt needs the capture and is the
+  gate's (P2.5).
+- The CP verifies the Checkout Mandate chain itself (it needs the open Checkout Mandate digest for
+  `payment.reference` and the embedded checkout JWT), but does not repeat the Merchant's M4 and M5:
+  the merchant signature on the checkout and the terms comparison are the Merchant role's, run
+  before the CP in UCP complete. The CP compares amount and currency with the current checkout.
+
+### Decision 36: One transaction, row lock, and the Postgres schema
+
+Resolves: race safety of the budget and of single use (INV-6, INV-7).
+
+- **Transaction.** C5 and C6 are one database transaction: lock the open Payment Mandate's row in
+  `open_payment_mandates` (`SELECT ... FOR UPDATE`, creating it first), read the spend view (it does
+  not yet contain this presentation, [Decision 33](#decision-33-spend-view-accounting-and-category-policy)),
+  evaluate the constraints, reserve the single-use keys, insert the in-flight spend entry and the
+  payment attempt, and append the decision to the log. A second presentation for the same open mandate
+  waits on the row lock and then reads a view that includes the first. Any rejection or error rolls
+  everything back except the rejection's own log entry. PayPal is called after the commit, never under
+  the lock.
+- **Where the budget race is tested.** One purchase per open mandate means the single-use key
+  already admits only one presentation end to end. The budget race is therefore tested on the
+  check-and-reserve transaction itself (20 parallel transactions against a budget that fits three give
+  exactly three), with a negative control that removes the lock and over-spends. End to end, 20 parallel
+  completes of one mandate give one order and one authorization.
+- **Schema** (migration 0003). `reservations` per role (`merchant`, `cp`) with partial unique indexes
+  on checkout id, checkout hash, the scoped nonce (all while the row is not `aborted`) and on the open
+  mandate while `reserved` or `consumed`. The checkout id is its own key because the checkout hash is
+  not unique per checkout (re-signing). `spend_entries` (add-only, trigger enforced),
+  `open_payment_mandates`, `payment_attempts` (one row per checkout id), `payer_vault`. Triggers make
+  keys immutable, allow only the legal state changes, and forbid a refund from lowering a captured
+  entry.
+- **Roles.** The runtime role has SELECT, INSERT and UPDATE on these tables, no DELETE and no
+  TRUNCATE, and only SELECT and INSERT on the decision log. Tests run as that role and check the grants.
+  Aborted and released rows stay as history.
+- The in-memory store remains for unit tests; `PostgresReservationStore` honours the same contract
+  (the same tests run against both).
+
+### Decision 37: The checkout JWT the Merchant compares in UCP complete
+
+Resolves: what "the checkout JWT of this session" is when the service keeps no copy.
+
+Each response is signed with ES256, whose signatures differ every time, so two responses to the same
+checkout have different hashes and the service stores none of them. In UCP complete the Merchant is
+called without an `issued_checkout`: M3 compares `checkout_hash` with the hash of the JWT the mandate
+itself embeds (the consistency AP2 requires), M4 verifies our signature on it, and M5 compares its terms
+with the current session state. Freshness therefore comes from M4 and M5, not from remembering what was
+issued. A stale response with identical terms is accepted, which is harmless; the checkout id key
+([Decision 36](#decision-36-one-transaction-row-lock-and-the-postgres-schema)) stops it buying twice.
+Tests that pass an `issued_checkout` still exercise the stricter comparison.
+
+### Decision 38: UCP complete, statuses and resumption
+
+Resolves: how complete drives two roles and a payer approval inside the UCP lifecycle.
+
+- `countersign.completion.CompleteCoordinator` runs the Merchant verification, then the CP, and the
+  UCP service reaches it only through a port it defines, so `cp/` and `merchant/` import no protocol
+  adapter.
+- The service works in three steps with no database lock held over PayPal: move `ready_for_complete`
+  to `complete_in_progress` (logged), run the coordinator, record the outcome.
+- A missing payment token is refused before the Merchant reserves anything, and the checkout stays
+  completable. A rejection before the Merchant's reservation leaves the checkout `ready_for_complete`.
+- A rejection after the Merchant reserved (CP rejection, failed pre-authorize check, PayPal failure)
+  releases the Merchant reservation (the open mandate is usable again) and **cancels the checkout**
+  with `checkout_canceled_after_rejection`: its hash and id are consumed ([Decision 1](#decision-1-single-use-keys)),
+  so the agent creates a new checkout.
+- Payer approval (redirect mode) answers with status `complete_in_progress`, `continue_url` set to the
+  PayPal approval link and an info message `payer_approval_required`. UCP requires `continue_url`
+  with `requires_escalation`, but `ready_for_complete` has no edge to it ([Decision 17](#decision-17-ucp-checkout-rest-binding)),
+  so the link rides on `complete_in_progress`. **To confirm.**
+- After the payer approves, a second `POST .../complete` (the body may be empty) continues the same
+  attempt: the mandates are not verified again. It runs the pre-authorize check and authorizes, and
+  answers `payment_authorized`. The checkout stays `complete_in_progress`: capture, and the move to
+  `completed`, belong to the capture gate (P2.5). A concurrent complete is told
+  `complete_in_progress`.
+- Without a completion port configured, complete never succeeds (fail closed).
+
+### Decision 39: The payment handler that carries the Payment Mandate token
+
+Resolves: item 7 (the empty `payment_handlers`).
+
+- The vendored AP2 extension shows `"payment_handlers": {}` in its profile example, and its complete
+  request puts the mandate in `ap2.checkout_mandate` and the Payment Mandate in
+  `payment.instruments[*].credential.token` ([Decision 8](#decision-8-payment-mandate-credentialtoken-format)).
+  UCP ties an instrument to a handler by `handler_id`, which "corresponds to the `id` field in the Payment
+  Handler definition" (`payment_instrument.json`). Without a handler there is no `handler_id` to put on
+  the instrument, so the profile now declares one.
+- Handler: registry key `dev.countersign.payment.ap2_payment_mandate`, one entry `{id:
+  "countersign_ap2_payment_mandate", version, config: {credential_type: "ap2_payment_mandate"}}`. It
+  is also returned in every checkout response (`ucp.payment_handlers`). `spec` and `schema` are omitted
+  (optional in the business schema) because no document is published for them. The reverse-domain name
+  is a **placeholder** (no registered domain) and the whole handler is a Countersign construct, not
+  something the specs define ([LIMITATIONS.md](LIMITATIONS.md) L14). **To confirm.**
+- Request parsing: the instrument whose `handler_id` is ours and whose credential `type` is
+  `ap2_payment_mandate` carries the token. Instruments of other handlers are ignored. Two of ours, a
+  credential of another type, or a token that is not a string is HTTP 400 `invalid_request`.
+- The Node interop verifier checks only `merchant_authorization` over the whole response, so it
+  verifies responses that now carry the handler without a change; `make interop` still passes.
+
+### Decision 40: Payer approval, the vaulted path, cleanup and recovery
+
+Resolves: item 3 (cleanup), item 6 (honest payer approval) and the outcome-unknown rules.
+
+- **Redirect mode** (default): the order is created with the experience context; the payer approves on
+  PayPal; `finish` re-fetches the order, requires `APPROVED` (still `CREATED` or `PAYER_ACTION_REQUIRED`
+  is "pending", nothing changes), runs the pre-authorize check
+  ([Decision 11](#decision-11-pre-authorize-check)) and authorizes only on an exact match. An order that is
+  never approved is abandoned by `recover`, never authorized.
+- **Vault mode** (sandbox only): if the principal (the thumbprint of the agent key named in the open
+  mandate) has a vault id, the order is created from it with the stored-credential form recorded in
+  [4.7](#47-vaulting-a-sandbox-wallet) and no payer approval. PayPal created and authorized in one call
+  in the sandbox, so there is no patch window; the order is fetched and its terms and the authorization
+  are verified, and a mismatch is voided. If PayPal asks for payer action instead, the attempt is
+  rejected (`vault_requires_payer_action`) rather than presented as autonomous. Enrolment: with
+  `enroll_vault` the redirect order asks PayPal to vault the wallet, and the vault id PayPal reports
+  is stored for the principal. The principal is the agent key because no customer id exists in the
+  mandates yet (INV-5 asks for customer id and agent key); the Trusted Surface (P3) supplies it.
+  **Nothing here claims production availability** ([LIMITATIONS.md](LIMITATIONS.md) L1).
+- **Cleanup** after a reservation (any exception, PayPal error, schema error, rejection or log failure):
+  void every authorization PayPal reports for the order and confirm each with a GET (a void response
+  body can be incomplete); void the spend entry; release the mandate; mark the attempt `voided` (an
+  authorization existed) or `abandoned`. If PayPal cannot be read, or a void cannot be confirmed, the
+  attempt becomes `unresolved` and the spend and the mandate stay reserved, because money might be
+  held; `recover` settles it when PayPal answers. A crash that skips cleanup leaves the attempt
+  `reserved`, `order_created` or `authorizing`, and `recover` handles those too.
+- **Outcome unknown.** A create that fails after the client's three attempts with the same
+  Request-Id is not retried further: no order id is known, an unapproved order is harmless, and the
+  attempt is abandoned. An authorize with an unknown outcome is resolved by GET first; if the
+  authorization exists it is used, otherwise one more attempt with the same Request-Id replays the
+  first result if it lands late. A void is always followed by a GET. No path issues a second
+  authorization or order for a checkout.
+- **Cassettes.** Only the redirect happy path is recorded from the real sandbox. A vault id appears in
+  request bodies, which the recorder keeps verbatim, and `payment_source` is dropped from responses, so
+  the vaulted path is tested against the simulator in `tests/paypal_sim.py`, which models the
+  behaviour of section 4. This is a limit of the evidence, not of the code.
+
 ---
 
 ## 4. Confirmed PayPal facts

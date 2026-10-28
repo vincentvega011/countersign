@@ -30,6 +30,7 @@ from countersign.paypal.limits import (
     check_custom_id,
     check_invoice_id,
     check_item_text,
+    check_path_id,
 )
 
 MAX_ITEM_QUANTITY = 9_999_999_999  # PayPal: `^[1-9][0-9]{0,9}$`
@@ -139,6 +140,19 @@ class Order(_View):
     intent: str
     purchase_units: Annotated[tuple[PurchaseUnit, ...], Field(min_length=1)]
     links: tuple[Link, ...] = ()
+    payment_source: dict[str, Any] | None = None
+
+    @property
+    def vault_id(self) -> str | None:
+        """The vault id PayPal reports for a vaulted wallet, if the order carries one."""
+        paypal = (self.payment_source or {}).get("paypal")
+        vault = (
+            ((paypal or {}).get("attributes") or {}).get("vault")
+            if isinstance(paypal, dict)
+            else None
+        )
+        found = vault.get("id") if isinstance(vault, dict) else None
+        return found if isinstance(found, str) else None
 
     @property
     def authorizations(self) -> tuple[Authorization, ...]:
@@ -214,6 +228,28 @@ class ExperienceContext:
 
 
 @dataclass(frozen=True)
+class VaultEnroll:
+    """Ask PayPal to vault the payer's wallet when this (payer-approved) order is authorized.
+
+    Exactly the attributes recorded in the sandbox runs (docs/PROTOCOL.md 4.7).
+    """
+
+
+@dataclass(frozen=True)
+class VaultCharge:
+    """Create the order from an earlier vaulted wallet, merchant initiated, no payer approval.
+
+    Exactly the stored-credential form recorded in the sandbox runs (docs/PROTOCOL.md 4.7).
+    Sandbox only: production availability is unverified (docs/LIMITATIONS.md L1).
+    """
+
+    vault_id: str
+
+    def __post_init__(self) -> None:
+        check_path_id(self.vault_id, "vault id")
+
+
+@dataclass(frozen=True)
 class OrderRequest:
     """One purchase unit, intent AUTHORIZE. `amount` must equal items plus tax."""
 
@@ -227,6 +263,7 @@ class OrderRequest:
     shipping: Money | None = None
     handling: Money | None = None
     discount: Money | None = None  # a positive amount that is subtracted
+    vault: VaultEnroll | VaultCharge | None = None
 
     def __post_init__(self) -> None:
         check_invoice_id(self.invoice_id)
@@ -291,18 +328,36 @@ class OrderRequest:
         if self.description is not None:
             unit["description"] = self.description
         ctx = self.experience_context
+        paypal: dict[str, Any]
+        if isinstance(self.vault, VaultCharge):
+            paypal = {
+                "vault_id": self.vault.vault_id,
+                "stored_credential": {
+                    "payment_initiator": "MERCHANT",
+                    "payment_type": "UNSCHEDULED",
+                    "usage": "SUBSEQUENT",
+                },
+            }
+        else:
+            paypal = {
+                "experience_context": {
+                    "return_url": ctx.return_url,
+                    "cancel_url": ctx.cancel_url,
+                    "user_action": ctx.user_action,
+                    "shipping_preference": ctx.shipping_preference,
+                    "payment_method_preference": ctx.payment_method_preference,
+                }
+            }
+            if isinstance(self.vault, VaultEnroll):
+                paypal["attributes"] = {
+                    "vault": {
+                        "store_in_vault": "ON_SUCCESS",
+                        "usage_type": "MERCHANT",
+                        "customer_type": "CONSUMER",
+                    }
+                }
         return {
             "intent": "AUTHORIZE",
             "purchase_units": [unit],
-            "payment_source": {
-                "paypal": {
-                    "experience_context": {
-                        "return_url": ctx.return_url,
-                        "cancel_url": ctx.cancel_url,
-                        "user_action": ctx.user_action,
-                        "shipping_preference": ctx.shipping_preference,
-                        "payment_method_preference": ctx.payment_method_preference,
-                    }
-                }
-            },
+            "payment_source": {"paypal": paypal},
         }

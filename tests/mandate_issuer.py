@@ -200,6 +200,8 @@ def issue(
         open_content["nbf"] = open_nbf
     if edit_open_content:
         edit_open_content(open_content)
+    if d_item not in compact_json(open_content):  # edited constraints no longer use the item
+        open_disclosures.remove(item_disc)
     open_disc, d_open = disclosure(open_content)
     open_disclosures.append(open_disc)
     delegate: list[Any] = [{"...": d_open}]

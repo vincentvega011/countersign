@@ -22,6 +22,24 @@ AP2_CAPABILITY = "dev.ucp.common.payment.ap2_mandate"
 SHOPPING_SERVICE = "dev.ucp.shopping"
 # Base path of the REST binding; the OpenAPI paths (`/checkout-sessions`, ...) are appended to it.
 REST_BASE_PATH = "/ucp/v1"
+# The payment handler that carries the AP2 Payment Mandate token (docs/PROTOCOL.md Decision 39).
+# The name is a placeholder in reverse-domain form: Countersign has no registered domain yet.
+PAYMENT_HANDLER_NAME = "dev.countersign.payment.ap2_payment_mandate"
+PAYMENT_HANDLER_ID = "countersign_ap2_payment_mandate"
+PAYMENT_CREDENTIAL_TYPE = "ap2_payment_mandate"
+
+
+def payment_handlers() -> dict[str, Any]:
+    """A fresh `payment_handlers` registry: one handler whose instruments hold the mandate token."""
+    return {
+        PAYMENT_HANDLER_NAME: [
+            {
+                "id": PAYMENT_HANDLER_ID,
+                "version": UCP_VERSION,
+                "config": {"credential_type": PAYMENT_CREDENTIAL_TYPE},
+            }
+        ]
+    }
 
 
 class ProfileError(Exception):
@@ -75,7 +93,7 @@ def build_profile(*, public_base_url: str, key: MerchantKey) -> dict[str, Any]:
                     }
                 ],
             },
-            "payment_handlers": {},
+            "payment_handlers": payment_handlers(),
         },
         "keys": [_public_jwk(key)],
     }

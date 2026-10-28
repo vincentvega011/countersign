@@ -110,18 +110,28 @@ recorded request ids again, so:
   M8 with UCP error codes and internal reasons, signed acceptance and rejection receipts, atomic
   single-use reservation interface with an in-memory store, fail-closed constraint interface, decision
   log hook with a ledger adapter. Decisions 26 to 29 in [PROTOCOL.md](PROTOCOL.md).
+- P2.3: constraint engine (`src/countersign/constraints/`) over the ten native AP2 constraint types:
+  checkout and payment evaluators, maximal flow for line items, add-only spend accounting, category
+  policy as a separate function, structural interface to the Merchant role. Decisions 30 to 33 in
+  [PROTOCOL.md](PROTOCOL.md).
+- P2.4: Credential Provider (`src/countersign/cp/`): Payment Mandate verification, constraints and
+  reservation in one locked transaction, PayPal order, pre-authorize check and authorization, fail
+  closed cleanup and recovery; Postgres single-use store and spend ledger (migration 0003); UCP complete
+  wired to the Merchant then the CP; payment handler in the profile. Decisions 34 to 40 in
+  [PROTOCOL.md](PROTOCOL.md). The real-sandbox cassette is recorded separately
+  (`scripts/record_cp_cassette.py`).
 
 ## P2 carry-over tasks
 
 Findings from the P1 review that belong to P2 and are not optional there:
 
-- **P2.4, single use on the checkout id.** A unique constraint on the checkout id in the
+- **P2.4, single use on the checkout id (done in P2.4).** A unique constraint on the checkout id in the
   authorization table. `checkout_hash` is not unique per checkout (signature malleability and
   re-signing), so it cannot carry single use alone ([PROTOCOL.md](PROTOCOL.md) Decision 1 and 18).
-- **P2.4, restricted runtime database role.** The application connects as an INSERT and SELECT role
+- **P2.4, restricted runtime database role (done in P2.4).** The application connects as an INSERT and SELECT role
   and migrations as the owner; the default `DATABASE_URL` and `.env.example` change accordingly.
   [LIMITATIONS.md](LIMITATIONS.md) L9 is updated in the same change.
-- **P2.4 and P2.5, ledger writes by the callers.** The PayPal client writes only to the process log.
+- **P2.4 and P2.5, ledger writes by the callers (the CP half done in P2.4; the gate's half is P2.5).** The PayPal client writes only to the process log.
   The CP role (P2.4) and the gate (P2.5) append a ledger entry before and after every PayPal call
   and before responding (INV-12); a failed append fails the operation.
 - **P2.5 and P2.6, import-guard tests.** At P2.5: verification and gate modules never import the LLM

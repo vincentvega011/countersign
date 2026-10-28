@@ -349,6 +349,15 @@ Checkout Mandate. Receipts use the schema in [PROTOCOL.md](PROTOCOL.md) section 
 - Acceptance: the happy path against recorded cassettes; 20 parallel `complete` calls with one
   mandate yield exactly one PayPal order; an order patched after approval is not authorized.
 
+Implementation (`src/countersign/cp/`, P2.4): `verify.py` (C1 to C4, pure), `provider.py` (C5 and C6 in
+one transaction, then the PayPal order, `finish` with the pre-authorize check, cleanup and `recover`),
+`ledger.py` (the Postgres spend ledger), `evidence.py` (the `custom_id` encoding), `rejection.py`,
+`config.py`. The Postgres single-use store is `merchant/pg_reservations.py`; the schema is migration
+0003; the ablation switches are `countersign/ablations.py`. The UCP service reaches the Merchant and the
+CP through `countersign/completion.py`. Decisions 34 to 40 in [PROTOCOL.md](PROTOCOL.md). The package
+imports no protocol adapter or web framework (import guard test), never captures and never mints a
+capture approval (the gate is P2.5), and a rejected payment cancels its checkout.
+
 ### 5.6 constraints
 
 Only native AP2 constraint types are used or evaluated ([PROTOCOL.md](PROTOCOL.md) Decision 4). The
@@ -378,6 +387,15 @@ verified webhooks, and the gate re-evaluates it from fresh state just before cap
 An open mandate backs exactly one successful purchase. Its states are `unused`, `in_flight`,
 `consumed` (a capture succeeded), and `revoked` or `expired`. Repeat use under a recurrence
 constraint is future work.
+
+Implementation (`src/countersign/constraints/`, P2.3): `checkout.py` and `payment.py` hold the per
+type evaluators, `flow.py` the maximal flow for line items, `engine.py` the two evaluators and the
+rules common to every mandate, `budget.py` the spend view and the add-only account, `policy.py` the
+category policy. Decisions 30 to 33 in [PROTOCOL.md](PROTOCOL.md). The package imports neither
+`merchant/` nor any adapter (import guard test); `CheckoutConstraintEvaluator` satisfies the
+Merchant's `ConstraintOutcome` interface structurally, and `PaymentConstraintEvaluator` is for the
+Credential Provider (P2.4). The checkout constraints run inside Merchant step M7; the payment
+constraints cannot, because the Merchant never receives a Payment Mandate.
 
 Category and similar limits are merchant policy, evaluated by a policy function outside the mandates:
 allowed categories per agent, an unmandated purchase cap, velocity limits. Policy changes are

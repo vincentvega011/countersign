@@ -73,7 +73,7 @@ from countersign.merchant.authorization import (
 )
 from countersign.merchant.constraints import (
     ConstraintEvaluator,
-    ConstraintResult,
+    ConstraintOutcome,
     DenyAllConstraints,
 )
 from countersign.merchant.decision_log import DecisionLog, DecisionLogError
@@ -204,12 +204,25 @@ class CheckoutMandateVerifier:
             raise _map_mandate_error(error) from None
         return chain, mode
 
-    def _m3_hash(self, chain: VerifiedChain, issued: Mapping[str, Any], current: Checkout) -> str:
+    def _m3_hash(
+        self, chain: VerifiedChain, issued: Mapping[str, Any] | None, current: Checkout
+    ) -> str:
         claim = chain.final.content.get("checkout_hash")
         if not isinstance(claim, str):
             raise Rejection("M3", "checkout_hash_missing", MANDATE_SCOPE_MISMATCH)
         try:
-            session = hash_checkout_jwt(checkout_jwt(issued))
+            if issued is None:
+                # The service keeps no copy of the responses it signed (each signature differs),
+                # so the checkout JWT is the one the mandate embeds; M4 verifies our signature on
+                # it and M5 compares its terms with the current state (docs/PROTOCOL.md Decision 37).
+                embedded = chain.final.content.get("checkout_jwt")
+                if embedded is None:
+                    raise Rejection("M4", "checkout_jwt_absent", MERCHANT_AUTHORIZATION_MISSING)
+                if not isinstance(embedded, str):
+                    raise Rejection("M4", "checkout_jwt_not_text", MERCHANT_AUTHORIZATION_INVALID)
+                session = hash_checkout_jwt(embedded)
+            else:
+                session = hash_checkout_jwt(checkout_jwt(issued))
         except (AuthorizationError, HashInputError):
             raise Rejection("M3", "session_checkout_unavailable", MANDATE_SCOPE_MISMATCH) from None
         if claim != session:
@@ -269,14 +282,15 @@ class CheckoutMandateVerifier:
 
     def _m7_constraints(self, chain: VerifiedChain, current: Checkout, now: float) -> None:
         result = self._constraints.evaluate(chain=chain, checkout=current, now=now)
-        if not isinstance(result, ConstraintResult) or result.satisfied is not True:
-            reason = result.reason if isinstance(result, ConstraintResult) else "bad_result"
-            unresolved = isinstance(result, ConstraintResult) and result.unresolved
+        if not isinstance(result, ConstraintOutcome) or result.satisfied is not True:
+            ok_shape = isinstance(result, ConstraintOutcome)
+            reason = result.reason if ok_shape and isinstance(result.reason, str) else "bad_result"
+            unresolved = ok_shape and result.unresolved is True
             raise Rejection(
                 "M7",
                 "constraint_unresolved" if unresolved else "constraint_violated",
                 MANDATE_SCOPE_MISMATCH,
-                detail=reason,
+                detail=reason[:80],
             )
 
     def _m8_reserve(
@@ -298,9 +312,10 @@ class CheckoutMandateVerifier:
     # ---- entry point ----
 
     def verify(
-        self, *, mandate: object, issued_checkout: Mapping[str, Any], current: Checkout
+        self, *, mandate: object, issued_checkout: Mapping[str, Any] | None, current: Checkout
     ) -> Accepted | Rejected:
-        """Verify `mandate` for the session whose last signed response is `issued_checkout`.
+        """Verify `mandate` for the session whose last signed response is `issued_checkout`
+        (None: the checkout JWT embedded in the mandate stands in for it, see `_m3_hash`).
 
         `current` is the session state from the store. Raises `DecisionLogError` if the decision
         could not be logged; no result exists in that case.

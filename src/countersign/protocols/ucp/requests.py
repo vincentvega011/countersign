@@ -30,6 +30,7 @@ from countersign.protocols.ucp.messages import (
     INVALID_REQUEST,
     ProtocolError,
 )
+from countersign.protocols.ucp.profile import PAYMENT_CREDENTIAL_TYPE, PAYMENT_HANDLER_ID
 
 MAX_TEXT = 127
 MAX_SAFE_INT = 9_007_199_254_740_991  # the schema maximum for `quantity`
@@ -157,3 +158,59 @@ def ignored_members(body: Mapping[str, Any], response: Mapping[str, Any]) -> lis
                     if member in item and item[member] != got[i]["item"][member]:
                         out.append((f"$.line_items[{i}].item.{member}", member))
     return out
+
+
+@dataclass(frozen=True)
+class CompleteRequest:
+    """The two credentials a complete request may carry. Either may be absent."""
+
+    checkout_mandate: str | None
+    payment_token: str | None
+
+
+def parse_complete_request(body: Mapping[str, Any]) -> CompleteRequest:
+    """Read `ap2.checkout_mandate` and the Payment Mandate token; ignore everything else.
+
+    The token is `credential.token` of the instrument whose `handler_id` is Countersign's handler
+    and whose credential `type` is `ap2_payment_mandate` (docs/PROTOCOL.md Decisions 8 and 39).
+    Instruments of other handlers are ignored. More than one instrument of ours, or a value of the
+    wrong type, is a protocol error: the request is ambiguous and nothing is guessed.
+    """
+    ap2 = body.get("ap2")
+    mandate: str | None = None
+    if ap2 is not None:
+        if not isinstance(ap2, dict):
+            raise _bad("$.ap2", "ap2 must be an object")
+        value = ap2.get("checkout_mandate")
+        if value is not None and not isinstance(value, str):
+            raise _bad("$.ap2.checkout_mandate", "the checkout mandate must be a string")
+        mandate = value
+    token: str | None = None
+    payment = body.get("payment")
+    if payment is not None:
+        if not isinstance(payment, dict):
+            raise _bad("$.payment", "payment must be an object")
+        instruments = payment.get("instruments", [])
+        if not isinstance(instruments, list):
+            raise _bad("$.payment.instruments", "instruments must be an array")
+        found: list[str | None] = []
+        for index, instrument in enumerate(instruments):
+            if (
+                not isinstance(instrument, dict)
+                or instrument.get("handler_id") != PAYMENT_HANDLER_ID
+            ):
+                continue
+            credential = instrument.get("credential")
+            where = f"$.payment.instruments[{index}].credential"
+            if not isinstance(credential, dict):
+                raise _bad(where, "credential must be an object")
+            if credential.get("type") != PAYMENT_CREDENTIAL_TYPE:
+                raise _bad(f"{where}.type", f"type must be {PAYMENT_CREDENTIAL_TYPE}")
+            candidate = credential.get("token")
+            if not isinstance(candidate, str):
+                raise _bad(f"{where}.token", "token must be a string")
+            found.append(candidate)
+        if len(found) > 1:
+            raise _bad("$.payment.instruments", "more than one Countersign payment instrument")
+        token = found[0] if found else None
+    return CompleteRequest(mandate, token)
