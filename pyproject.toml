@@ -55,6 +55,6 @@ python_version = "3.12"
 module = [
   "countersign.merchant.*", "countersign.cp.*", "countersign.mpp.*", "countersign.gate.*",
   "countersign.lock.*", "countersign.constraints.*", "countersign.canonical.*",
-  "countersign.ledger.*", "countersign.evidence.*",
+  "countersign.ledger.*", "countersign.evidence.*", "countersign.mandates.*",
 ]
 strict = true

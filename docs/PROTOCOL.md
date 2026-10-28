@@ -1322,6 +1322,194 @@ and both of its orders reverse to the checkout that was sent. Create answered HT
 and replay detection does not use the status code. Item order was observed only for orders of two
 items ([LIMITATIONS.md](LIMITATIONS.md) L13).
 
+### Decision 21: Issuer JWT `typ`
+
+Resolves: the open item in [ENV.md](ENV.md) section 1.5 ("the `typ` of the issuer-signed JWT is
+unspecified").
+
+- The issuer-signed JWT (link 0) must carry `typ` `dc+sd-jwt`, the media type of an SD-JWT VC.
+  Anything else, including the `example+sd-jwt` of the AP2 worked examples and `JWT`, is rejected
+  with `typ_mismatch`.
+- Why: no vendored file fixes the value, and an accepted-by-default `typ` lets a key-binding JWT or
+  a checkout JWT be replayed as an issuer credential. `dc+sd-jwt` is also the format name in the
+  profile (`vp_formats_supported`).
+- Risk: a third-party platform that issues open mandates with another `typ` is refused until the
+  value is widened. The allowed values are one tuple, `ISSUER_JWT_TYP` in `mandates/chain.py`.
+- **Status after review (P2.2).** The vendored AP2 text does not normatively require `dc+sd-jwt`
+  as the issuer JWT `typ`. It appears only as a credential `format` identifier (in
+  `agent_authorization.md` and the UCP `vp_formats_supported`), while the worked examples show
+  `example+sd-jwt`, and no vendored file states a required `typ`. `dc+sd-jwt` is therefore a
+  Countersign choice (explicit typing, RFC 9901 recommends it), not an AP2 requirement.
+- Key-binding links follow the Delegate SD-JWT draft verification text: `kb-sd-jwt+kb` for a link
+  that another link follows, `kb+sd-jwt` for the last link. The older `kb+sd-jwt+kb` is not
+  accepted (draft history, -01).
+
+### Decision 22: Time claims in mandates
+
+Resolves: gap 7 for the primitives, and the "RECOMMENDED" `exp` of AP2.
+
+- `exp`, `nbf` and `iat` are checked with the 60 second skew of [Decision 10](#decision-10-provisional-rules-for-open-gaps),
+  held as `CLOCK_SKEW_SECONDS`. Exactly 60 seconds outside passes, 61 fails. Applies to `exp`
+  (expired), `nbf` (not yet valid) and `iat` (issued in the future).
+- They must be JSON integers. Booleans, floats and strings are rejected (`time_claim_type`).
+- `exp` is **required** on every link except a final key-binding link. AP2 only recommends it for
+  open mandates. A mandate that never expires is a standing authority with no end, so the
+  primitive refuses it. A final key-binding link has `iat` (required) and may have `exp`.
+- The checks run on the disclosed delegate payload and on the signed JWT payload, because the draft
+  moves issuer claims into the delegate payload while the key-binding `iat` stays in the JWT.
+- No maximum age is applied to the key-binding `iat`. Replay is bounded by the single-use nonce
+  ([Decision 1](#decision-1-single-use-keys)), which belongs to the caller.
+
+### Decision 23: Accepted chain forms
+
+Resolves: places where the Delegate SD-JWT draft allows more than AP2 mandates need.
+
+- Every link carries its content (`vct`, `cnf`, claims) in a disclosed `delegate_payload` element,
+  as in all AP2 examples. Every element of the signed `delegate_payload` array must be a `{"...": digest}`
+  object and exactly one must be disclosed. Plaintext elements are rejected.
+- A trailing delegate key-binding JWT (`dSD-JWT+KB`) is rejected (`structure_trailing_kb`). AP2
+  mandates end with `~`.
+- A key-binding link must carry `sd_hash`. `issuer_jwt_hash` alone is rejected (`sd_hash_missing`),
+  because it does not cover the disclosures and would let a holder withhold constraint disclosures
+  that the signer had committed to.
+- `cnf` is accepted only as `{"jwk": <inline EC P-256 public key>}`. Other members, other key types
+  or curves, a private scalar `d`, or a point off the curve are rejected with a typed error.
+- Base64url must be canonical: re-encoding the decoded bytes must reproduce the text. Without this,
+  the unused bits in the last character of a signature segment can be flipped without changing the
+  decoded signature. With it, no single-character change to a valid mandate is harmless.
+- JOSE header parameters `crit`, `b64`, `zip`, `jwk`, `jku`, `x5u` and `x5c` are rejected. Keys come
+  only from the caller (issuer) or the previous link's `cnf`.
+- Size limit: 16 KiB for the whole string, the limit of Decision 8, applied to checkout mandates
+  too. Not a specification value.
+
+### Decision 24: What "both directions" means for the chain
+
+Resolves: the draft's "Without verifying the binding in both directions a malicious Delegate Holder
+may mis-match parts of the chain if the Holder `cnf` is reused" (Security Considerations). The draft
+does not define the two directions. Countersign's reading, which needs the maintainer's confirmation:
+
+- **Key binding to credential.** The key binding's `sd_hash` must equal the digest of the previous
+  link as presented, including its disclosures and trailing `~`. A holder cannot pair a key binding
+  with a different credential that reuses the same `cnf` key, and cannot drop a disclosure after
+  signing.
+- **Credential to key binding.** The key binding must be signed by the `cnf` key of the previous
+  link, and by no other key. A holder or third party cannot attach their own key binding.
+- **Review (P2.2): no other predecessor hash exists in the chain.** In the Delegate SD-JWT draft and
+  the vendored AP2 files, the only value that hashes a predecessor link is the key binding's
+  `sd_hash` (or `issuer_jwt_hash`, refused by Decision 23). The final-KB-JWT step of the draft
+  (hash over the final KB-SD-JWT+KB) applies only to the trailing `dSD-JWT+KB` form, which is
+  refused. The other hashes in AP2 link different credentials, not links of one chain:
+  `checkout_hash` and `transaction_id` (Merchant step M3 here, Credential Provider in P2.4) and the
+  Payment Mandate constraint `payment.reference.conditional_transaction_id`, the digest of the open
+  Checkout Mandate (evaluated with the constraints in P2.3).
+- There is no third `sd_hash` check pointing the other way: a credential cannot contain the hash of
+  something signed after it. The two directions are therefore one `sd_hash` comparison and one `cnf`
+  signature check, tested separately.
+
+### Decision 25: What `verify_chain` leaves to the caller
+
+Resolves: scope of P2.1 against the roles that use it.
+
+- The caller names the issuer key to trust, the exact `vct` list (so chain length and every `vct`
+  are fixed by the caller), the expected `aud` of the final key binding and optionally its `nonce`.
+  `aud` and `nonce` are checked on the final key binding only; earlier key bindings must carry them.
+- A verified link exposes `nonce` and `digest` (the `sd_hash` form of its serialization). Single
+  use of the nonce, the checkout hash binding, constraint evaluation, who counts as a trusted
+  issuer, and mapping the typed errors to the UCP error codes are the merchant and cp roles' work
+  (P2.2 onward).
+- The returned content is the resolved claims, with disclosures applied. It is not deeply
+  immutable; callers must not mutate it.
+
+### Decision 26: Merchant verification steps and the UCP error mapping
+
+Resolves: gap 6 for the Merchant role, and the order of [architecture.md](architecture.md) 5.4.
+
+The steps run in this fixed order; each has its own typed failure (`Rejection` with a step, an
+internal reason and a UCP code). The reason is a fixed string, never request text.
+
+| Step | Check | Failure reasons (internal) | UCP code |
+| ---- | ----- | -------------------------- | -------- |
+| M1 | a mandate is present | `mandate_missing` | `mandate_required` |
+| M2 | chain: trusted platform key, `cnf` key, `vct`, `aud`, expiry | `platform_key_missing`; `chain:<mandates code>` | `agent_missing_key` for no platform key and for any `cnf` problem; `mandate_expired` for `exp` past the skew; `mandate_invalid_signature` for everything else, including not-yet-valid, issued-in-future, and any code this table does not know |
+| M3 | `checkout_hash` claim equals the hash of the checkout JWT this session issued | `checkout_hash_missing`, `checkout_hash_mismatch`, `session_checkout_unavailable` | `mandate_scope_mismatch` |
+| M4 | embedded checkout JWT carries our valid `merchant_authorization` and is the session's JWT | `checkout_jwt_absent`, `signature_stripped` (missing); `checkout_jwt_not_text`, `checkout_jwt_malformed`, `embedded_checkout_*`, `merchant_authorization_unverified` (invalid); `embedded_checkout_is_not_this_session` (scope) | `merchant_authorization_missing`, `merchant_authorization_invalid`, `mandate_scope_mismatch` |
+| M5 | embedded terms equal the current session state (id, currency, line items, totals) | `terms_mismatch` with the first differing path, `embedded_checkout_malformed` | `mandate_scope_mismatch` |
+| M6 | principal lock | added in P2.6 | |
+| M7 | every constraint evaluates true | `constraint_violated`, `constraint_unresolved` | `mandate_scope_mismatch` |
+| M8 | single-use keys reserved atomically | `checkout_hash_reused` (hash or checkout id), `nonce_replayed`, `open_mandate_in_use` | `mandate_scope_mismatch` |
+
+Interpretations to confirm:
+
+- The vendored extension has seven codes and no code for replay or constraints. Reuse of a key and
+  constraint outcomes use `mandate_scope_mismatch` ("bound to a different checkout"), and an unknown
+  constraint type does too; the AP2 `unresolved_constraint` of [architecture.md](architecture.md) 5.4
+  is kept as the internal reason, not a UCP code.
+- A missing agent key (`cnf`) maps to `agent_missing_key`, whose description in the extension is
+  about the platform profile; the name is the closest fit.
+- Severity: `recoverable` for `mandate_required`, `mandate_scope_mismatch` and both
+  `merchant_authorization_*` codes (the agent can fetch the checkout again); `unrecoverable` for
+  `mandate_invalid_signature`, `mandate_expired` and `agent_missing_key`.
+- M4 distinguishes missing from invalid: a mandate with no `checkout_jwt` disclosed, or one whose
+  signature segment is empty, is "missing"; any other defect in it is "invalid".
+- M3 and M5 take two inputs: the last signed response the session issued, and the current session
+  state from the store. They are equal in normal operation; a difference means state moved without
+  being re-signed, which must never be accepted. The checkout id is compared in M5.
+- Any unexpected exception inside the steps rejects with reason `internal_error` and the code
+  `mandate_invalid_signature` (INV-10), and aborts a reservation if one exists. A decision log
+  failure is not a rejection: the exception propagates and no result is returned (INV-12).
+
+### Decision 27: Checkout Receipts
+
+Resolves: receipt format and transport for the Merchant role (gap 4 in part).
+
+- A receipt is a compact JWS signed with the merchant key; its payload is the JCS bytes of the
+  claims (INV-8). Header: `alg` `ES256`, `kid`, `typ` `checkout-receipt+jwt`. The `typ` makes a
+  receipt unusable as a `merchant_authorization` (whose header is exactly `alg` and `kid`) and the
+  reverse.
+- Success claims: `status` `Success`, `iss` (configured merchant identifier), `iat` (Unix seconds,
+  injected clock), `reference`, `order_id`. Error claims: `status` `Error`, `iss`, `iat`,
+  `reference`, `error` (the UCP code), `error_description` (the internal reason).
+- `order_id` is the checkout id (the PayPal order does not exist yet at this step; the id is also
+  the PayPal `invoice_id`, [Decision 20](#decision-20-canonical-checkout-to-paypal-order-and-back)).
+- `reference` is the `sd_hash`-style digest of the final SD-JWT of the presented chain (Decision 7).
+  For a rejection where the string cannot be split into links, it is the SHA-256 of the presented
+  text (UTF-8, unpadded base64url), or of the empty string when nothing or a non-string was
+  presented. This fallback is a Countersign choice; the spec defines the reference only for a
+  parsed mandate.
+- The receipt reaches the agent through the API layer (P2.7+); the Merchant role only produces it.
+
+### Decision 28: Reservation, abort, release and consume
+
+Resolves: the atomicity requirement of Decision 1 for the Merchant role.
+
+- Reservation is the last step (M8) and takes every key in one call, so a failure at M1 to M7
+  consumes nothing, including nothing of the open mandate; the same closed mandate can be presented
+  again after a fix.
+- Keys: checkout hash, checkout id, nonce scoped to (agent key thumbprint, audience, nonce), and the
+  mandate digest (open mandate in autonomous mode, the mandate itself in Human Present mode). The
+  checkout id is a key of its own so that re-signing a checkout does not make it a new purchase.
+- `abort` frees every key (nothing outside the process happened, for example the decision log
+  failed). `release` frees only the mandate digest, for a rejection after the reservation such as a
+  void before capture; the hash, id and nonce stay consumed. `consume` makes the mandate digest
+  permanently used (capture). The Postgres store (P2.4) must keep these semantics with unique
+  constraints and transactions.
+- A consequence of "reserve last": a replayed mandate is reported at M8, after the constraints were
+  evaluated. Replay detection is not ordered before constraint evaluation.
+
+### Decision 29: Human Present closed mandate
+
+Resolves: the open item of Decision 8 ("Human Present mode ... fixed when the mandate issuer is built").
+
+- A Human Present Checkout Mandate is a single SD-JWT (one link) with `vct` `mandate.checkout.1`,
+  signed directly by the trusted platform key, content in a disclosed `delegate_payload` element,
+  with `checkout_hash`, a disclosed `checkout_jwt`, `iat` and a required `exp`. It has no key
+  binding, so it has no nonce.
+- Because it has no nonce, single use rests on the checkout hash, the checkout id and the mandate
+  digest (the digest of the mandate itself).
+- The platform must issue it only after the customer signed the exact checkout on the Trusted
+  Surface ([Decision 5](#decision-5-trusted-platform-provider-with-a-device-consent-signature)).
+  The chain primitive treats link 0 like any issuer-signed credential (`dc+sd-jwt`, `exp` required).
+
 ---
 
 ## 4. Confirmed PayPal facts

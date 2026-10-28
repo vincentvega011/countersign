@@ -284,6 +284,19 @@ entry in this document. Stack: Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, 
   `sd_hash` binding in both directions.
 - Strict structural validation of the mandate string ([PROTOCOL.md](PROTOCOL.md) Decision 9).
 - Test-only issuers produce valid and invalid open and closed mandates.
+- Layout (`src/countersign/mandates/`): `structure` (string split, canonical base64url), `jws`
+  (ES256 allowlist, header rules, strict JSON, signature), `disclosures` (RFC 9901 section 7.1),
+  `cnf` (confirmation key), `timecheck` (`exp`, `nbf`, `iat`, 60 second skew, injected clock),
+  `chain` (`verify_chain`, `vct` and `sd_hash` binding), `errors` (typed errors with stable codes).
+  Imports only `countersign.canonical`; a test forbids `protocols`, `paypal`, `gate`, `lock`, `mpp`,
+  `api`, `llm` and web frameworks.
+- Rules the primitives apply are in [PROTOCOL.md](PROTOCOL.md) Decisions 9 and 21 to 25. Nothing is
+  returned unless every check passed; every failure is a `MandateError` subclass with a stable
+  `code` (INV-10).
+- Verification evidence: 144 shared vectors in `tests/vectors/mandates/` checked by Python
+  (`tests/unit/test_mandate_vectors.py`) and by an independent Node implementation
+  (`scripts/mandate_chain_check.mjs`, `make interop`); a Hypothesis mutation test over valid
+  credentials; a manual mutation check of every verifier check.
 - The production issuer is the Trusted Surface backend (after consent verification) for open
   mandates, and the agent library for closed ones.
 
@@ -306,6 +319,14 @@ Verification on `complete`, in order. Each step has a stable code in the decisio
 7. Every constraint evaluates true ([5.6](#56-constraints)), else `unresolved_constraint` for unknown
    types or `mandate_scope_mismatch` for violated ones.
 8. Single-use keys reserved ([PROTOCOL.md](PROTOCOL.md) Decision 1).
+
+Implementation (`src/countersign/merchant/`, P2.2): `verify.py` runs M1 to M8 as above with M6 (lock)
+left for P2.6; `rejection.py` (UCP code, step, fixed reason), `receipts.py`, `reservations.py` (atomic
+single-use store interface and in-memory implementation), `constraints.py` (the interface P2.3
+implements; the default denies everything), `decision_log.py` (log before return, ledger adapter).
+Reservation is last, so a failed verification consumes nothing. Decisions 26 to 29 in
+[PROTOCOL.md](PROTOCOL.md). The package imports `mandates` for chains and no protocol adapter,
+PayPal module or web framework (import guard test).
 
 On any failure the Merchant returns the UCP error and a signed rejection Checkout Receipt. On
 success it returns a signed acceptance Checkout Receipt whose `reference` is the hash of the closed

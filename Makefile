@@ -1,4 +1,4 @@
-.PHONY: setup node-deps keys dev demo db test test-safety sandbox-smoke eval interop tamper-demo lint deploy
+.PHONY: interop-mandates interop-ucp setup node-deps keys dev demo db test test-safety sandbox-smoke eval interop tamper-demo lint deploy
 
 setup: node-deps
 	uv sync
@@ -32,7 +32,15 @@ sandbox-smoke:
 eval:
 	@echo "not implemented yet"
 
-interop:
+# Two independent checks: Python and Node must agree on every shared mandate vector, and the live
+# merchant signatures must verify with the Node verifier.
+interop: interop-mandates interop-ucp
+
+interop-mandates:
+	uv run pytest tests/unit/test_mandate_vectors.py -q
+	node scripts/mandate_chain_check.mjs
+
+interop-ucp:
 	bash scripts/interop.sh
 
 tamper-demo:

@@ -99,6 +99,18 @@ recorded request ids again, so:
   `make test` and `make interop` pass, and the second security review had no blocking finding, so
   the gate has passed.
 
+## P2 log
+
+- P2.1: SD-JWT mandate primitives (`src/countersign/mandates/`): chain parsing with the `~~` rule,
+  strict structure, ES256-only JWS, selective disclosure resolution, `cnf`, exact `vct`, `sd_hash`
+  binding, `exp`/`nbf`/`iat` with skew. 144 shared vectors checked by Python and by the Node script
+  `scripts/mandate_chain_check.mjs`; mutation property test; manual mutation check. Decisions 21 to
+  25 in [PROTOCOL.md](PROTOCOL.md).
+- P2.2: Merchant role Checkout Mandate verification (`src/countersign/merchant/`): ordered steps M1 to
+  M8 with UCP error codes and internal reasons, signed acceptance and rejection receipts, atomic
+  single-use reservation interface with an in-memory store, fail-closed constraint interface, decision
+  log hook with a ledger adapter. Decisions 26 to 29 in [PROTOCOL.md](PROTOCOL.md).
+
 ## P2 carry-over tasks
 
 Findings from the P1 review that belong to P2 and are not optional there:
