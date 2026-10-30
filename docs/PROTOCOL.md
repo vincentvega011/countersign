@@ -2038,9 +2038,9 @@ Resolves: how the UCP adapter, which does not fetch platform profiles (L11), tak
   principal on any protocol or session is processed under it.
 - **What it cannot do.** An agent that sends no delegation is unidentified. The lock cannot apply to
   it; only the merchant policy can (`all`, or over the threshold). That is the stated limit of the
-  design ([LIMITATIONS.md](LIMITATIONS.md) L20). The real ACP adapter (P2.7) will resolve a principal
-  from its own identity header and call the same function; until then a test-only second entry point
-  stands in.
+  design ([LIMITATIONS.md](LIMITATIONS.md) L20). The ACP adapter (P2.7, [Decision 51](#decision-51-the-acp-agent-identity-is-the-ucp-delegation-header)) reads the same
+  headers and calls the same function; the test-only second entry point of the lock tests remains as a
+  unit-level check.
 - **Denial** is the UCP code `mandate_required` for every lock reason (the reason is in the log and, for
   the gate, in the receipt). A denied create returns an error response with no resource.
 
@@ -2053,6 +2053,172 @@ Resolves: how the UCP adapter, which does not fetch platform profiles (L11), tak
 - A store that cannot be read, a policy whose hash does not match its row, an exception, or a log
   that cannot be written all deny (INV-10, INV-12). A lock recorded in a transaction whose log entry
   fails is not recorded.
+
+### Decision 51: The ACP agent identity is the UCP delegation header
+
+Resolves: how an ACP request names its principal (architecture 5.7: "a documented Countersign agent
+identity header").
+
+- ACP defines no agent identity that Countersign can verify (its `Authorization` bearer names an API
+  client, not a customer). The ACP adapter therefore reads the same two request headers as the UCP
+  adapter ([Decision 49](#decision-49-entry-points-and-the-ucp-signals)): `Countersign-Delegation` (an
+  open Checkout Mandate naming the principal) and `Countersign-Capabilities` (AP2 negotiated when it
+  lists `dev.ucp.common.payment.ap2_mandate`). Both are a **Countersign extension**, not part of ACP.
+- Both adapters hand the header to `PrincipalLock.principal_from_delegation`, so the same delegation
+  gives the same `Principal` whatever the protocol. The ACP adapter decides nothing itself: it builds a
+  `LockRequest` and reads `verdict.allowed`, at create, update, complete and for delegated payment.
+- Consequences, as on UCP: an agent that presents no delegation is unidentified, and only the merchant
+  policy reaches it ([LIMITATIONS.md](LIMITATIONS.md) L20). A principal that negotiated AP2 on UCP is
+  denied on a new ACP session that does not negotiate it (the new session escape and the protocol
+  downgrade), and negotiating on ACP records the same lock. **For the owner to confirm.**
+
+### Decision 52: ACP request and response mapping
+
+Resolves: field, status and money mapping, checked against the vendored OpenAPI and JSON Schema
+(`spec/vendor/acp/spec/2026-04-17`).
+
+- **Paths and verbs** as the OpenAPI: `POST /checkout_sessions` (201), `GET` and `POST
+  /checkout_sessions/{id}` (update), `POST .../complete`, `POST .../cancel` (405 when not cancelable),
+  `POST /agentic_commerce/delegate_payment`. Every POST needs `Idempotency-Key` (400
+  `idempotency_key_required`, the text of the vendored example). An `API-Version` other than
+  `2026-04-17` is refused.
+- **Request bodies** have `additionalProperties: false`, so an unknown top-level member is
+  `invalid_field`. Create requires `line_items`, `currency` and `capabilities`. The published `Item` is
+  `{id, name, unit_amount}` with no `quantity`, although its description and the OpenAPI examples use
+  one: **an integer `quantity` (default 1, at most 99) is accepted as the single extension**, a
+  fractional or boolean value is refused (whole items only). `unit_amount` is integer minor units
+  (INV-9) and is compared with the catalog price and refused on a difference; prices and names always
+  come from the catalog. Coupons and discount codes are refused. More than 20 lines is `line_limit`.
+- **Responses** are `CheckoutSession` with the required members `id`, `status`, `currency`,
+  `line_items`, `totals`, `fulfillment_options`, `messages`, `links`, `capabilities`, plus `protocol`
+  and RFC 3339 timestamps. Amounts are the canonical integers. The currency is written in lower case
+  as in the vendored examples. `Total` types are the canonical ones (all are in the ACP enum). Status:
+  `ready_for_complete` is `ready_for_payment`; the other lifecycle names are equal. A completed session
+  carries `order` (`id` and `checkout_session_id` are the session id, `permalink_url` its URL).
+- **Same canonical model.** Lines are priced from the catalog with `Checkout.from_lines` and numbered
+  `li_1`, `li_2` as on UCP; sessions live in the same table (the storage moved to `countersign.checkout`
+  so both adapters share it). An equivalent cart has identical canonical bytes and terms hash (500
+  example property test). ACP only members are added around the checkout and are not in its bytes.
+- **Errors.** `Error` is `{type, code, message, param?}` with fixed text. `type` is `invalid_request`
+  (400, 403, 404, 405, 409) or `processing_error` (500). `code` is open in the checkout schema, which
+  is where the stable Countersign codes live ([Decision 53](#decision-53-acp-complete-delegated-payment-and-the-unmandated-seam)).
+
+### Decision 53: ACP complete, delegated payment and the unmandated seam
+
+Resolves: what an ACP complete does in `CS_MODE=full`. **Flagged for the owner.**
+
+- ACP's complete carries `payment_data` and no AP2 mandate, so an ACP complete is an unmandated request.
+  The adapter asks the shared lock (`complete`, no mandate, the capability header, the total). A
+  denial is **403 `Error`, `type` `invalid_request`, `code` `mandate_required`**, `param` `$.ap2`. Nothing
+  is reserved, authorized or captured, and the denial is logged before it is returned.
+- If the lock does not deny (no lock applies and the policy does not require AP2), the request goes to
+  `UnmandatedCompletion.complete`, whose default `DenyUnmandated` returns **403
+  `unmandated_checkout_not_allowed`**. Reason: the Credential Provider and the capture gate both require
+  mandates, and the unmandated cap is deferred, so there is nothing safe to do with the request. A
+  merchant policy that explicitly allows unmandated checkouts does not exist yet; when it does, it is
+  another implementation of the Protocol. The adapter accepts only an `UnmandatedDenied` back: anything
+  else is an internal error (500), so a permissive outcome needs a deliberate change here.
+- **Baseline seam.** The naive baseline (P2.9: accept the complete without a mandate, authorize and
+  capture at once) plugs in at this Protocol. Nothing of it is built.
+- **Delegated payment** is rejected and nothing more. `POST /agentic_commerce/delegate_payment` reads
+  its body through the strict loader and answers 403: `mandate_required` for a locked principal or a
+  require-all policy, `delegated_payment_unsupported` otherwise. The vendored delegate payment `Error`
+  has a closed `code` enum that cannot hold either, so this response is outside that endpoint's schema
+  and uses the checkout `Error` shape ([LIMITATIONS.md](LIMITATIONS.md) L24).
+- **Alternatives considered** for the unmandated case: allow it and let the Credential Provider fail
+  later (it would fail with a PayPal-facing error after a reservation was attempted, and turns the
+  adapter into a place where "allowed" is decided); allow it under a threshold (the cap is deferred).
+  Deny with a documented reason was chosen as the only option that cannot move money.
+
+### Decision 54: Fail closed and logging on ACP
+
+- Any exception in an ACP route becomes a 500 `Error` of type `processing_error`, code `internal_error`,
+  with no detail, and is caught in the ACP route so the UCP-shaped global handler never answers for ACP.
+- State changes append their log entry in the same transaction (`acp.session_created`,
+  `acp.session_updated`, `acp.session_canceled`, `acp.session_expired`); denials append
+  `acp.create_denied`, `acp.update_denied`, `acp.complete_denied` or `acp.delegated_payment_rejected`
+  before the answer. A failed append fails the request and, for a create, leaves no session.
+- The lock additionally logs its own `lock.decision` for every ACP decision.
+
+### Decision 55: A verified webhook is a hint, never a source of truth
+
+Resolves: INV-7 and INV-10 for webhooks. **For the owner to confirm.**
+
+- Order of work in `POST /webhooks/paypal` (`countersign.webhooks`): read the body with a 64 KiB limit and
+  the strict JSON loader (INV-8); require the five signature headers (`PAYPAL-TRANSMISSION-ID`, `-TIME`,
+  `-SIG`, `PAYPAL-CERT-URL`, `PAYPAL-AUTH-ALGO`); ask PayPal's `verify-webhook-signature`; only then
+  dedupe and work. The verify request carries the notification bytes unchanged (they are embedded, not
+  re-serialized, because PayPal's check is over those bytes) and the webhook id from `PAYPAL_WEBHOOK_ID`.
+  `verification_status` `SUCCESS` is genuine, `FAILURE` is not, anything else is an error.
+- **Answers.** 200 verified and accepted (including a duplicate, an event for something we do not know,
+  and a verified type we do not act on, so PayPal does not retry them for days); **400** malformed
+  headers or body (nothing could be checked); **401** unverified (a `FAILURE`, an empty webhook id, or a
+  certificate URL that is not on `paypal.com`); **503** PayPal could not be asked, or the gate is
+  working on that attempt, so PayPal delivers again; **500** internal error or a log failure, so PayPal
+  delivers again. 401 rather than 403: the sender is not authenticated. 400 for shape, 401 for
+  authenticity, so the log can tell a broken sender from a spoofer.
+- Every refusal appends `webhook.rejected` (reason, status, and the event id only if it is a plain
+  token), never a body or a header. If that append fails the answer is 500.
+- **The body is a hint.** The event type and one id are read to choose which PayPal resource to read
+  again. The attempt is found from our own records (`payment_attempts` by authorization, capture or
+  order id; for a capture we did not make, by the `up` link of PayPal's own capture record). The ledger
+  is then reconciled from `GET` of the order, with our credentials, by a pure function
+  (`webhooks.reconcile.plan`) of the attempt's recorded state and that fetched state. An amount, a
+  status or an order id in the body is never read. A webhook cannot capture, void, authorize or refund:
+  the module references none of those client methods (import guard test) and every webhook test asserts
+  zero money moving requests.
+- No local secret comparison exists (the signature check is PayPal's), so there is no constant-time
+  comparison to make. The webhook id is configuration, empty by default, and an empty id means every
+  event is unverified.
+
+### Decision 56: Dedupe and idempotency
+
+- `webhook_events` (migration 0006) has the PayPal event id as its primary key. The handler inserts the
+  row (`ON CONFLICT DO NOTHING`), locks it, does the work, marks it `done` or `ignored`, appends
+  `webhook.processed` and commits, all in one transaction. A parallel delivery of the same id waits on
+  the key and then finds the row finished, so 20 at once apply once; a crash or a raised error rolls the
+  row back with the work, so PayPal's retry starts clean. A trigger lets a row move only from
+  `processing` to a final state.
+- `unknown_resource` and `unhandled_type` events are recorded as `ignored` and answered 200.
+- Verification is done before the row is claimed, so an unverified sender cannot claim an event id.
+  (A flood of unverified requests costs one PayPal call each; there is no rate limit yet,
+  [LIMITATIONS.md](LIMITATIONS.md) L26.)
+
+### Decision 57: Reconciliation rules
+
+Add-only accounting ([Decisions 2 and 33](#decision-2-strict-single-use-and-add-only-budget)); every rule
+is a function of the fetched order, so out-of-order, late and repeated events converge.
+
+- **Void or expiry before capture** (`authorized` attempt, own authorization `VOIDED`, `EXPIRED` or
+  `DENIED`, no capture): the same release as the gate's fail path, in the event's transaction: the spend
+  entry voided, both reservations released (the open mandate can be used with a new checkout), the
+  attempt `voided` with code `W-VOID` and no receipt. A later `complete` finds a gate-voided attempt and
+  rejects cleanly.
+- **Capture present** on an `authorized` attempt, or any gate-`unresolved` attempt with a capture or an
+  ended authorization: the handler asks the gate to settle (`CaptureGate.settle`), after the event row
+  commits. The gate reads PayPal itself and finalizes, so the Success receipt, the spend capture and the
+  consumed reservations come from the same code as the normal path. The handler asks only when its own
+  read shows the authorization already captured or ended, so the gate has nothing left to void.
+- **Capture completed** on an attempt the gate already captured confirms it: no change.
+- **Refund after capture**: `refunded_minor` rises to the sum of `COMPLETED` refunds PayPal reports
+  (capped at the capture) and never falls; a captured entry stays captured, so the spend view and the
+  headroom do not change. A `PENDING` refund is not counted until it completes. (`payments.refunds` on
+  an order is documented by PayPal and has not been observed here.)
+- **Reversed, denied, declined capture** on a captured attempt: recorded in the log entry
+  (`anomalies`), no ledger change (money that was spent stays spent in the budget).
+- **Unknown order or authorization**: logged, ignored. **Attempt `gating` or `capturing`**: 503, not
+  recorded, so PayPal redelivers once the gate is done. **Attempt unresolved by the Credential
+  Provider** (not the gate): ignored; the Credential Provider's recovery owns it.
+- Not done: a webhook that arrives for an `authorized` attempt whose authorization PayPal still shows
+  open changes nothing (`authorization_still_open`); only the gate or `recover` ever voids.
+
+### Decision 58: Settling after commit, and what is lost if that fails
+
+The settle request runs after the event's transaction commits, because the gate takes its own locks on
+the attempt. If the process dies between the commit and the settle, the event is recorded as processed
+and the settle is not repeated by PayPal. The attempt stays `authorized` or `unresolved` with its money
+reserved, and `CaptureGate.recover` (which reads PayPal and never captures) finishes it
+([LIMITATIONS.md](LIMITATIONS.md) L26).
 
 ---
 
@@ -2203,6 +2369,6 @@ delivery delay) was not read and is not assumed.
 
 Added by later work, not yet present in this file:
 
-- Live webhook confirmation (deferred to the Render deploy).
+- Live webhook confirmation (deferred to the Render deploy; steps in [ENV.md](ENV.md) section 11).
 - Human Present token format and receipt transport (see Decisions 8 and gap 4).
 - Gate step codes, principal lock semantics and the evidence reference encoding.

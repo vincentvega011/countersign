@@ -34,17 +34,17 @@ from sqlalchemy import Connection, Engine
 
 from countersign.canonical.models import Checkout
 from countersign.catalog.catalog import Catalog
-from countersign.ledger import store as ledger
-from countersign.lock import LockRequest, LockVerdict, Principal
-from countersign.protocols.ucp import messages as m
-from countersign.protocols.ucp import store
-from countersign.protocols.ucp.checkout_state import (
+from countersign.checkout import store
+from countersign.checkout.state import (
     FINAL,
     Status,
     cancelable,
     transition,
     updatable,
 )
+from countersign.ledger import store as ledger
+from countersign.lock import LockPort, LockRequest, Principal
+from countersign.protocols.ucp import messages as m
 from countersign.protocols.ucp.profile import AP2_CAPABILITY
 from countersign.protocols.ucp.requests import CheckoutRequest, CompleteRequest, LineRequest
 from countersign.protocols.ucp.responses import checkout_response
@@ -89,14 +89,6 @@ class CompletionPort(Protocol):
         principal: Principal | None = None,
         negotiated: bool = False,
     ) -> CompletionOutcome: ...
-
-
-class LockPort(Protocol):
-    """The shared lock function (`countersign.lock.PrincipalLock`); the adapter only calls it."""
-
-    def principal_from_delegation(self, token: str | None) -> Principal | None: ...
-
-    def decide(self, request: LockRequest) -> LockVerdict: ...
 
 
 @dataclass(frozen=True)

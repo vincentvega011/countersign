@@ -273,7 +273,7 @@ class CaptureGate:
     def _stored_rejected(row: Any) -> GateRejected:
         ucp = ucp_code_for(row.gate_code, row.gate_reason or "")
         return GateRejected(
-            row.checkout_id, row.gate_code, row.gate_reason or "", ucp, row.receipt,
+            row.checkout_id, row.gate_code, row.gate_reason or "", ucp, row.receipt or "",
             (_message(ucp),),
         )  # fmt: skip
 
@@ -281,6 +281,32 @@ class CaptureGate:
         """The Checkout Mandate the Credential Provider verified for this checkout, if recorded."""
         tokens = self._store.tokens(checkout_id)
         return None if tokens is None else tokens[1]
+
+    def settle(self, checkout_id: str) -> bool:
+        """Settle one attempt by reading PayPal, as `recover` does. True if this call took it on.
+
+        Only for an attempt that is `authorized` or `unresolved` (by the gate). It captures nothing:
+        a captured authorization is finalized as captured, an ended one is released, and a live one
+        would be voided, which is why a caller that must never move money (the webhook handler) calls
+        this only after its own read showed the authorization already captured or ended.
+        """
+        row = self._store.row(checkout_id)
+        if row is None:
+            return False
+        if row.state == "authorized":
+            won = self._store.claim(checkout_id, expect=("authorized",))
+        elif row.state == "unresolved" and row.gate_code:
+            won = self._store.claim(
+                checkout_id, expect=("unresolved",), seen_updated_us=row.updated_us,
+                require_gate_code=True,
+            )  # fmt: skip
+        else:
+            return False
+        if not won:
+            return False
+        run = _Run(checkout_id, None, self._store.row(checkout_id))
+        self._fail(run, GateFailure(G_STATUS, "settled_from_webhook"))
+        return True
 
     def recover(self, *, older_than_us: int) -> list[str]:
         """Settle attempts a crash or an unreadable PayPal left behind, by reading PayPal.

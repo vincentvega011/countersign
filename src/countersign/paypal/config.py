@@ -41,10 +41,20 @@ class PayPalConfig:
     backoff_s: float = 0.5
     token_skew_s: float = 60.0
     authorization_expiry_skew_s: float = 60.0
+    webhook_id: str = (
+        ""  # the id of the webhook registered in the developer portal; empty means none
+    )
 
     def __post_init__(self) -> None:
         _clean(self.client_id, "PAYPAL_CLIENT_ID")
         _clean(self.client_secret, "PAYPAL_CLIENT_SECRET")
+        if self.webhook_id and (
+            len(self.webhook_id) > 64
+            or any(ord(c) < 0x21 or ord(c) > 0x7E for c in self.webhook_id)
+        ):
+            raise PayPalConfigError(
+                "PAYPAL_WEBHOOK_ID has spaces, control characters or is too long"
+            )
         if not 1 <= self.max_attempts <= 5:
             raise PayPalConfigError("max_attempts must be from 1 to 5")
         if self.authorization_expiry_skew_s < 0:
@@ -73,7 +83,7 @@ class PayPalConfig:
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> PayPalConfig:
-        """Read PAYPAL_API_BASE (or PAYPAL_BASE_URL), PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET."""
+        """Read PAYPAL_API_BASE (or PAYPAL_BASE_URL), PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET and PAYPAL_WEBHOOK_ID."""
         source = os.environ if env is None else env
         base = source.get("PAYPAL_API_BASE") or source.get("PAYPAL_BASE_URL") or SANDBOX_URL
         return cls(
@@ -81,4 +91,5 @@ class PayPalConfig:
             client_secret=source.get("PAYPAL_CLIENT_SECRET", ""),
             base_url=base.rstrip("/"),
             allow_non_sandbox=source.get("PAYPAL_ALLOW_NON_SANDBOX") == "1",
+            webhook_id=source.get("PAYPAL_WEBHOOK_ID", "").strip(),
         )

@@ -6,10 +6,18 @@ gate does not import this package either: it is wired to it at the composition r
 
 from countersign.lock.policy import MerchantPolicy, PolicyError
 from countersign.lock.principal import Principal, principal_from_chain, principal_from_delegation
-from countersign.lock.service import LockRequest, LockVerdict, PrincipalLock
+from countersign.lock.service import (
+    AP2_CAPABILITY,
+    LockPort,
+    LockRequest,
+    LockVerdict,
+    PrincipalLock,
+)
 from countersign.lock.store import LockStore, LockStoreError
 
 __all__ = [
+    "AP2_CAPABILITY",
+    "LockPort",
     "LockRequest",
     "LockStore",
     "LockStoreError",

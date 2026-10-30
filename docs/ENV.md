@@ -480,3 +480,34 @@ than skip, when Postgres is unreachable. In CI a Postgres 16 service container p
   application role name from `LEDGER_APP_ROLE` (default `countersign_app`).
 - The migration creates the role `NOLOGIN` if it is missing. Giving it a login and password is an
   operator step, not part of the migration, so no secret is stored in the repository.
+
+## 11. Webhooks: live confirmation is PENDING (P5.1)
+
+**Nothing about live webhook delivery has been confirmed.** What exists is code and tests against a
+simulator that answers `verify-webhook-signature` with a verdict the test sets, plus a recording script
+for the failure answer. The notification events, headers and the verification request and response are
+as the documentation describes them ([PROTOCOL.md](PROTOCOL.md) 4.8). No webhook id is configured yet
+(`PAYPAL_WEBHOOK_ID` is empty), so the app treats every event as unverified.
+
+To confirm once the app has a public HTTPS URL (the Render deploy):
+
+1. In the sandbox developer portal, add a webhook on the app with URL `<public base>/webhooks/paypal`
+   and the events `PAYMENT.AUTHORIZATION.CREATED`, `PAYMENT.AUTHORIZATION.VOIDED`,
+   `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.REFUNDED` (and, to see them, `PAYMENT.CAPTURE.DENIED`,
+   `PAYMENT.CAPTURE.REVERSED`). Put the webhook id in `PAYPAL_WEBHOOK_ID` on the service and redeploy.
+2. Record the failure answer: `PAYPAL_RECORD_CASSETTES=1 uv run python
+   scripts/record_webhook_failure_cassette.py`. It sends a fabricated event with fake headers and
+   saves PayPal's real failure answer to `tests/cassettes/webhook_verify_failure.json`, which the
+   replay test `tests/integration/test_webhook_verify_cassette.py` then checks.
+3. Run a sandbox purchase through the hosted demo (authorize, gate capture). Read the service log for
+   `webhook.processed` entries: expect `PAYMENT.AUTHORIZATION.CREATED` and `PAYMENT.CAPTURE.COMPLETED`
+   with outcome `already_captured` and no ledger change.
+4. Void a second authorization from the PayPal side (or let the demo void one) and confirm
+   `PAYMENT.AUTHORIZATION.VOIDED` arrives, verifies (`SUCCESS`) and releases the reservation
+   (outcome `released`). Refund a capture in the sandbox and confirm `PAYMENT.CAPTURE.REFUNDED` records
+   `refund_recorded` with headroom unchanged.
+5. Record in this file: the headers actually received, the delay between the call and the delivery,
+   whether events arrive out of order, whether a retry follows a non-2xx answer, and whether
+   `payments.refunds` appears on a fetched order (the refund reconciliation reads it; PayPal documents it
+   but it has not been observed here). Until step 3 to 5 are done, do not claim live delivery.
+

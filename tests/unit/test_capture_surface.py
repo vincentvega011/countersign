@@ -28,11 +28,13 @@ LIBRARY_MINTERS = ("gate/",)
 LIBRARY_CAPTURERS = ("gate/", "mpp/")
 # Outside the package: the recording harness and tests that stand in for the gate.
 OUTSIDE_MINTERS = {
+    "tests/unit/test_webhooks_import_guard.py",  # lists the names the webhook code must never use
     "tests/ungated_capture_cycle.py",
     "tests/unit/test_capture_approval.py",
     "tests/unit/test_paypal_client.py",
 }
 OUTSIDE_CAPTURERS = {
+    "tests/unit/test_webhooks_import_guard.py",  # lists the method names the webhook code must never use
     "tests/integration/test_gate_flow.py",  # checks that the client refuses a capture without a gate approval
     "tests/ungated_capture_cycle.py",
     "tests/unit/test_paypal_client.py",

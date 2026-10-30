@@ -10,12 +10,17 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from sqlalchemy import Engine, create_engine
 
+from countersign.api.acp_routes import install as install_acp
 from countersign.api.ucp_routes import install as install_ucp
+from countersign.api.webhook_routes import install as install_webhooks
 from countersign.catalog.catalog import Catalog, load_catalog
+from countersign.lock import LockPort
 from countersign.merchant.keys import MerchantKey, load_merchant_key
 from countersign.merchant.policy import policy_hash
+from countersign.protocols.acp.service import AcpService
 from countersign.protocols.ucp.profile import REST_BASE_PATH, build_profile
-from countersign.protocols.ucp.service import CompletionPort, LockPort, UcpService, now_us
+from countersign.protocols.ucp.service import CompletionPort, UcpService, now_us
+from countersign.webhooks import WebhookService
 
 DEFAULT_KEY_PATH = "secrets/merchant_es256.jwk.json"
 DEFAULT_BASE_URL = "http://localhost:8000"
@@ -31,6 +36,7 @@ def create_app(
     clock_us: Callable[[], int] | None = None,
     completion: CompletionPort | None = None,
     lock: LockPort | None = None,
+    webhooks: WebhookService | None = None,
 ) -> FastAPI:
     """Create the app. Without an explicit `key`, load `MERCHANT_KEY_PATH` or fail.
 
@@ -67,4 +73,18 @@ def create_app(
         order_base_url=f"{base.rstrip('/')}{REST_BASE_PATH}/checkout-sessions",
     )
     install_ucp(app, service, REST_BASE_PATH, key)
+    if webhooks is not None:
+        install_webhooks(app, webhooks)
+    if lock is not None:
+        # ACP needs the shared lock to decide anything; without one it is not served (fail closed).
+        acp = AcpService(
+            engine,
+            catalog or load_catalog(),
+            policy_hash=policy_hash(),
+            lock=lock,
+            clock_us=clock_us or now_us,
+            order_base_url=f"{base.rstrip('/')}/checkout_sessions",
+        )
+        app.state.acp = acp
+        install_acp(app, acp)
     return app

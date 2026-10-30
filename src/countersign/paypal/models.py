@@ -107,9 +107,20 @@ class Payee(_View):
     merchant_id: str | None = None
 
 
+class Refund(_View):
+    """A refund in `purchase_units[].payments.refunds` (documented by PayPal, not yet observed)."""
+
+    id: str
+    status: str
+    amount: PayPalMoney
+    invoice_id: str | None = None
+    custom_id: str | None = None
+
+
 class Payments(_View):
     authorizations: tuple[Authorization, ...] = ()
     captures: tuple[Capture, ...] = ()
+    refunds: tuple[Refund, ...] = ()
 
 
 class PurchaseUnit(_View):
@@ -163,6 +174,10 @@ class Order(_View):
     @property
     def captures(self) -> tuple[Capture, ...]:
         return tuple(c for u in self.purchase_units if u.payments for c in u.payments.captures)
+
+    @property
+    def refunds(self) -> tuple[Refund, ...]:
+        return tuple(r for u in self.purchase_units if u.payments for r in u.payments.refunds)
 
 
 # ---- requests ----

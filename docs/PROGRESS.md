@@ -138,6 +138,23 @@ recorded request ids again, so:
   47 to 50 in [PROTOCOL.md](PROTOCOL.md). Deferred to the policy view (P4): the unmandated cap and the
   velocity limits.
 
+- P2.7: ACP thin adapter (`src/countersign/protocols/acp/`, `api/acp_routes.py`): create, get, update,
+  complete, cancel and a rejecting delegated payment endpoint against the vendored 2026-04-17 schemas,
+  strict JSON on every body, the same canonical model and session storage as UCP (moved to
+  `countersign.checkout`), the same two principal headers, and the same `PrincipalLock.decide` at create,
+  update and complete. ACP complete never pays: `mandate_required` for locked principals or require-all,
+  `unmandated_checkout_not_allowed` otherwise, through a named seam for the baseline mode. Decisions 51
+  to 54 in [PROTOCOL.md](PROTOCOL.md).
+
+- P2.8: webhooks and budget reconciliation (`src/countersign/webhooks/`, `api/webhook_routes.py`,
+  `PayPalClient.verify_webhook_signature`, migration 0006): `POST /webhooks/paypal` verifies through
+  PayPal's endpoint, dedupes by event id in one transaction with the work, and reconciles from the live
+  order; void before capture releases the reservation, refund after capture is recorded and never
+  restores headroom, an attempt the gate left unresolved is settled through the gate's own read. A
+  webhook moves no money. Tested against a simulator only: **live delivery is not confirmed** and no
+  webhook id is configured (steps in [ENV.md](ENV.md) section 11, pending for P5.1). The failure-path
+  recording script exists and has not been run. Decisions 55 to 58 in [PROTOCOL.md](PROTOCOL.md).
+
 ## P2 carry-over tasks
 
 Findings from the P1 review that belong to P2 and are not optional there:
@@ -159,6 +176,11 @@ Findings from the P1 review that belong to P2 and are not optional there:
   entry before and after every PayPal call and before responding) is done too.
 - **P2.5, import-guard (done in P2.5).** `gate/` imports no protocol adapter, lock, web framework or
   model code (`tests/unit/test_gate_import_guard.py`).
+
+## Carried forward
+
+- **P3.3:** make the `sub` claim mandatory in mandates once the Trusted Surface backend writes it; remove the
+  sub-less leniency of Decision 47 and L19.
 
 ## Open risks
 

@@ -63,6 +63,15 @@ class GateStore:
                 select(payment_attempts).where(payment_attempts.c.checkout_id == checkout_id)
             ).first()
 
+    def row_where(self, column: str, value: str) -> Any:
+        """The attempt whose `authorization_id`, `capture_id` or `order_id` is `value`, if any."""
+        if column not in ("authorization_id", "capture_id", "order_id"):
+            raise ValueError("unknown attempt column")
+        with self.engine.connect() as conn:
+            return conn.execute(
+                select(payment_attempts).where(payment_attempts.c[column] == value)
+            ).first()
+
     def tokens(self, checkout_id: str) -> tuple[str, str] | None:
         with self.engine.connect() as conn:
             found = conn.execute(
@@ -187,28 +196,47 @@ class GateStore:
         spend_id: str,
         code: str,
         reason: str,
-        receipt: str,
+        receipt: str | None,
         log: Callable[[Connection], None],
     ) -> None:
         """Spend voided, both reservations released, attempt `voided`, log entry: one transaction."""
         with self.engine.begin() as conn:
-            self.ledger.void(conn, spend_id)
-            for role, reservation in self._handles(conn, checkout_id):
-                self._stores[role].release_in(conn, reservation)
-            result = conn.execute(
-                update(payment_attempts)
-                .where(
-                    payment_attempts.c.checkout_id == checkout_id,
-                    payment_attempts.c.state.in_(("gating", "capturing", "unresolved", "authorized")),
-                )
-                .values(
-                    state="voided", gate_code=code, gate_reason=reason[:80], receipt=receipt,
-                    updated_us=self._clock(),
-                )
+            self.release_in(
+                conn, checkout_id, spend_id=spend_id, code=code, reason=reason, receipt=receipt,
+                log=log,
             )  # fmt: skip
-            if result.rowcount != 1:
-                raise RuntimeError("the attempt is not in a state that can be released")
-            log(conn)
+
+    def release_in(
+        self,
+        conn: Connection,
+        checkout_id: str,
+        *,
+        spend_id: str,
+        code: str,
+        reason: str,
+        receipt: str | None,
+        log: Callable[[Connection], None],
+    ) -> None:
+        """`finish_released` inside the caller's transaction (the webhook handler's)."""
+        self.ledger.void(conn, spend_id)
+        for role, reservation in self._handles(conn, checkout_id):
+            self._stores[role].release_in(conn, reservation)
+        result = conn.execute(
+            update(payment_attempts)
+            .where(
+                payment_attempts.c.checkout_id == checkout_id,
+                payment_attempts.c.state.in_(
+                    ("gating", "capturing", "unresolved", "authorized")
+                ),
+            )
+            .values(
+                state="voided", gate_code=code, gate_reason=reason[:80], receipt=receipt,
+                updated_us=self._clock(),
+            )
+        )  # fmt: skip
+        if result.rowcount != 1:
+            raise RuntimeError("the attempt is not in a state that can be released")
+        log(conn)
 
     def stale_attempts(self, states: tuple[str, ...], cutoff_us: int) -> list[tuple[str, str]]:
         with self.engine.connect() as conn:

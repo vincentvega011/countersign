@@ -31,6 +31,7 @@ Security reasoning.
 
 from __future__ import annotations
 
+import json
 import threading
 import time
 from collections.abc import Callable
@@ -393,6 +394,76 @@ class PayPalClient:
     def get_capture(self, capture_id: str) -> Capture:
         path = f"/v2/payments/captures/{check_path_id(capture_id, 'capture id')}"
         return self._parse(Capture, self._call("GET", path, op="get_capture", ok=(200,)))
+
+    # ------------------------------------------------------------------ webhook verification
+
+    def verify_webhook_signature(
+        self,
+        *,
+        transmission_id: str,
+        transmission_time: str,
+        transmission_sig: str,
+        cert_url: str,
+        auth_algo: str,
+        webhook_id: str,
+        raw_event: bytes,
+    ) -> bool:
+        """Ask PayPal whether a notification is genuine (`verify-webhook-signature`).
+
+        Returns True only for `verification_status` `SUCCESS`. `FAILURE` is False. Anything else (an
+        error status, a missing or unknown status, a body the strict loader refuses) raises, so the
+        caller can tell "not genuine" from "could not check". The request is a read: it changes no
+        state at PayPal, so it is retried like a GET and carries no Request-Id.
+
+        `raw_event` is the notification body exactly as received. PayPal's own check is over those
+        bytes, so they are embedded in the request unchanged (after the caller's strict parse proved
+        them valid JSON) and never re-serialized.
+        """
+        head = json.dumps(
+            {
+                "auth_algo": auth_algo,
+                "cert_url": cert_url,
+                "transmission_id": transmission_id,
+                "transmission_sig": transmission_sig,
+                "transmission_time": transmission_time,
+                "webhook_id": webhook_id,
+            },
+            separators=(",", ":"),
+        ).encode()
+        content = head[:-1] + b',"webhook_event":' + raw_event.strip() + b"}"
+
+        def send() -> httpx.Response:
+            headers = {
+                "Authorization": f"Bearer {self._access_token()}",
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            }
+            return self._http.request(
+                "POST",
+                "/v1/notifications/verify-webhook-signature",
+                content=content,
+                headers=headers,
+            )
+
+        response = self._attempts(
+            send,
+            op="verify_webhook",
+            path="/v1/notifications/verify-webhook-signature",
+            mutating=False,
+            refresh_on_401=self._invalidate_token,
+        )
+        if response.status_code != 200:
+            raise map_error(response, mutating=False)
+        status = self._object(response).get("verification_status")
+        if status == "SUCCESS":
+            return True
+        if status == "FAILURE":
+            return False
+        raise PayPalResponseError(
+            "the verification response has no known verification_status",
+            status=response.status_code,
+            debug_id=debug_id_of(response, {}),
+        )
 
     # ------------------------------------------------------------------ state-changing calls
 

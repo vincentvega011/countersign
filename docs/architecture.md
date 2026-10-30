@@ -268,10 +268,17 @@ entry in this document. Stack: Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, 
   respectively ([PROTOCOL.md](PROTOCOL.md) Decision 7).
 - Validation of `ap2.checkout_mandate` does not use the vendored UCP pattern
   ([PROTOCOL.md](PROTOCOL.md) Decision 9).
-- ACP: a thin adapter (create, get, update, complete, cancel) that maps into the same canonical
-  model. It exists so the cross-protocol lock can be demonstrated. For a locked principal, `complete`
-  returns a typed error with the same meaning as `mandate_required`. No delegated payment is
-  implemented.
+- ACP (`src/countersign/protocols/acp/`, `api/acp_routes.py`, P2.7): a thin adapter at the vendored
+  paths (`/checkout_sessions`, `.../complete`, `.../cancel`, plus a rejecting
+  `/agentic_commerce/delegate_payment`) that maps into the same canonical model and the same session
+  storage (`countersign.checkout`, shared with UCP). It resolves the principal from the same
+  `Countersign-Delegation` and `Countersign-Capabilities` headers as UCP and calls the one shared
+  `PrincipalLock.decide` at create, update and complete; it holds no lock logic. Complete never pays:
+  a locked principal, or any principal under a policy that requires AP2, gets `mandate_required`
+  (403 `Error`); everyone else gets `unmandated_checkout_not_allowed` from a named seam
+  (`UnmandatedCompletion`, default deny) where the baseline mode's permissive path will plug in. Strict
+  JSON on every body, fixed error text, every decision logged. Decisions 51 to 54 in
+  [PROTOCOL.md](PROTOCOL.md).
 - Acceptance: schema conformance against the vendored schemas; `merchant_authorization` verifies
   with an independent implementation (a small Node script using `jose`); a cart created through ACP
   and through UCP yields identical canonical bytes.
@@ -449,8 +456,14 @@ import `lock/` (import guard tests).
 - Reverse translation turns a live PayPal order into canonical terms (amount, breakdown, items,
   currency, payee, `custom_id`, `invoice_id`). Fields PayPal cannot carry are listed in
   [PROTOCOL.md](PROTOCOL.md) and are covered by the evidence reference.
-- Webhooks: `POST /webhooks/paypal`, verified through PayPal's verification endpoint, deduplicated by
-  event id, reconciling the spend view. Unverified events are logged and ignored.
+- Webhooks (`src/countersign/webhooks/`, `api/webhook_routes.py`, P2.8): `POST /webhooks/paypal`,
+  verified through PayPal's verification endpoint (`PayPalClient.verify_webhook_signature`, which sends the
+  notification bytes unchanged), deduplicated by event id in one transaction with the work (migration 0006),
+  and reconciled from the live order, never from the event body. The handler can update bookkeeping and ask
+  the gate to settle an attempt by reading; it has no code path to a capture, void, authorize or refund.
+  Unverified or malformed events are logged and answered non-2xx. A void before capture releases the
+  reservation, a refund after capture is recorded and never restores headroom. Decisions 55 to 58 in
+  [PROTOCOL.md](PROTOCOL.md); live delivery is not yet confirmed ([ENV.md](ENV.md) section 11).
 - Unit tests mock PayPal with `respx`. Integration tests use recorded cassettes with tokens scrubbed,
   or the live sandbox.
 

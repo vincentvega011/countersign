@@ -112,3 +112,15 @@ lock_events = Table(
     Column("checkout_id", Text),
     Column("created_us", BigInteger, nullable=False),
 )
+
+webhook_events = Table(
+    "webhook_events",
+    metadata,
+    Column("event_id", Text, primary_key=True),
+    Column("event_type", Text, nullable=False),
+    Column("state", Text, nullable=False),
+    Column("outcome", Text),
+    Column("checkout_id", Text),
+    Column("received_us", BigInteger, nullable=False),
+    Column("finished_us", BigInteger),
+)

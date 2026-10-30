@@ -167,21 +167,23 @@ carry none (the test issuer adds one). A mandate without it is an unknown custom
 for all agents", or when a matching lock names a customer, it is denied. The vault principal of
 Decision 40 is still the agent key alone.
 
-### L20. An agent that does not identify itself is not locked
+### L20. The principal is what the agent presents
 
-The lock keys on the principal, and the principal comes from the delegation the agent presents. An
-agent that sends none is unidentified, so only the merchant policy can reach it ("require AP2 for all
-agents", or over the threshold). That is why the demo policy is "all". A locked principal that presents
-its delegation but not the capability is denied, which is the new-session escape; an agent that hides
-its identity entirely is not an escape under "all".
+The lock keys on the principal, and the principal is whatever delegation the agent puts in
+`Countersign-Delegation`, on UCP and on ACP alike. An agent that presents none is unidentified, and an
+agent can choose not to identify itself. So omission is caught only by the merchant policy ("require
+AP2 for all agents", or over the threshold), not by the lock. That is why the demo policy is "all". A
+locked principal that presents its delegation but not the capability is denied (the new-session
+escape, on both protocols); an agent that hides its identity entirely is not an escape under "all".
 
 ### L21. Negotiation is a request header
 
 Countersign does not fetch the platform profile (L11), so "negotiated `dev.ucp.common.payment.ap2_mandate`"
 is read from `Countersign-Capabilities`, and identity from `Countersign-Delegation`. Both are
-Countersign extensions, not UCP. A platform that negotiates by profile only would not be recognised as
-negotiating until the profile fetch exists. The real ACP adapter (P2.7) has not exercised the shared
-function yet; a test-only second entry point does.
+Countersign extensions, on UCP and on ACP; neither protocol defines them. A platform that negotiates by
+profile only would not be recognised as negotiating until the profile fetch exists. ACP has no
+negotiation of its own for AP2: its `capabilities.extensions` list was not used, to keep one signal for
+both protocols.
 
 ### L22. Lock behaviour at the edges
 
@@ -193,6 +195,60 @@ function yet; a test-only second entry point does.
   policy view, P4).
 - The matching rule lets an unknown part match anything, so a nameless mandate under an agent key that
   any locked customer used is held to the strict rule (denied) rather than guessed.
+
+## ACP adapter
+
+### L23. ACP never completes a payment
+
+ACP has no slot for an AP2 mandate and Countersign implements no ACP delegated payment, so an ACP
+`complete` is always an unmandated request. A locked principal, or any principal under a policy that
+requires AP2, is denied `mandate_required`; every other principal is denied
+`unmandated_checkout_not_allowed`, because the Credential Provider and the capture gate need mandates and
+the unmandated cap is not built ([PROTOCOL.md](PROTOCOL.md) Decision 53). The seam for the permissive
+path of the baseline mode exists and is not implemented. An agent that wants to buy must use UCP.
+
+### L24. What the ACP binding does not do
+
+- `Authorization` (bearer) is not validated; the endpoints are open, as the UCP ones are. The
+  idempotency header is required on POSTs but replays are not cached, so a repeated create makes a
+  second session and `Idempotent-Replayed` is never sent.
+- The vendored request `Item` schema has no `quantity` although its examples use it; Countersign
+  accepts an integer `quantity` as the one extension and refuses fractional quantities (whole items
+  only, L6). Fulfillment, buyer, affiliate, risk and marketing members are accepted when they match the
+  schema and then ignored; coupons and discount codes are refused rather than ignored.
+- `POST /agentic_commerce/delegate_payment` is answered with the checkout `Error` shape. The vendored
+  delegate payment `Error` has a closed `code` list that cannot carry `mandate_required`, so the
+  response is outside that endpoint's schema on purpose.
+- ACP sessions and UCP sessions share one table, so a session id made on one protocol can be read on the
+  other. Nothing is paid through either without a mandate.
+
+### L25. The ACP integer `quantity` is an extension
+
+The vendored ACP request `Item` (`id`, `name`, `unit_amount`) has no `quantity`, although its description and
+the OpenAPI examples use one. Countersign accepts an integer `quantity` (default 1, at most 99) as the one
+extension to the published schema ([PROTOCOL.md](PROTOCOL.md) Decision 52). The accepted request is
+therefore not valid against the vendored request schema when it carries a quantity (a test asserts this),
+and a client that sends the item id repeatedly instead gets one line per repeat. Fractional quantities
+(which the ACP changelog allows for B2B) are refused: Countersign sells whole items only (L6).
+
+## Webhooks
+
+### L26. What the webhook handling does not do
+
+- **Live delivery is unconfirmed.** Everything is tested against a simulator. The success path of
+  `verify-webhook-signature`, the headers PayPal actually sends, delivery delay, ordering and retry
+  behaviour were not observed; no webhook id is configured. Steps are in [ENV.md](ENV.md) section 11
+  (pending, P5.1). Do not claim otherwise. `payments.refunds` on a fetched order is likewise documented,
+  not observed.
+- **Settle after commit.** A request to settle an attempt runs after the event row commits; if the
+  process dies in between, PayPal is not told to resend and `CaptureGate.recover` has to finish it
+  ([PROTOCOL.md](PROTOCOL.md) Decision 58). Nothing runs `recover` on a schedule yet.
+- **No rate limit.** Each unverified request costs one call to PayPal's verification endpoint.
+- **The notification is verified as received.** Any proxy that rewrites the body before it reaches the
+  service makes verification fail (a refusal, never a false accept).
+- **Unknown or unhandled events are acknowledged with 200** so PayPal does not retry them; they are
+  recorded as `ignored`. A refund, capture or void of something Countersign did not authorize is
+  therefore ignored, not alerted on, until the dashboard has a protection view.
 
 ## UCP checkout binding
 

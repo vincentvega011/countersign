@@ -44,7 +44,12 @@ class PayPalSim:
         self.auth_amount_override: str | None = None
         self.vault_mutation: dict[str, str] | None = None
         self.captures: dict[str, dict[str, Any]] = {}
+        self.refunds: dict[str, dict[str, Any]] = {}
+        self.webhook_verdict: str | int = (
+            "SUCCESS"  # SUCCESS, FAILURE, an HTTP error status, or "junk"
+        )
         self.fail_when: dict[str, Callable[[PayPalSim], bool]] = {}
+        self.verify_requests: list[dict[str, Any]] = []
         self.capture_status = "COMPLETED"
         self.capture_amount_override: str | None = None
         self.auth_status_after_capture = "CAPTURED"
@@ -87,6 +92,32 @@ class PayPalSim:
             unit["invoice_id"] = invoice_id
         if item_name is not None:
             unit["items"][0]["name"] = item_name
+
+    def refund(self, capture_id: str, amount: str, status: str = "COMPLETED") -> str:
+        """A refund appears at PayPal (made outside Countersign, as the sandbox merchant could)."""
+        capture = self.captures[capture_id]
+        refund_id = self._id("REF")
+        self.refunds[refund_id] = {
+            "id": refund_id, "order": capture["order"], "status": status,
+            "amount": {"currency_code": capture["amount"]["currency_code"], "value": amount},
+        }  # fmt: skip
+        return refund_id
+
+    def void_now(self, authorization_id: str) -> None:
+        """The authorization is voided at PayPal by someone else (or it expired)."""
+        self.authorizations[authorization_id]["status"] = "VOIDED"
+
+    def money_calls(self) -> int:
+        """Requests that could move money or create something: none may come from a webhook."""
+        return sum(
+            1
+            for method, path, _ in self.calls
+            if method == "POST"
+            and (
+                path == "/v2/checkout/orders"
+                or path.endswith(("/authorize", "/capture", "/void", "/refund", "/reauthorize"))
+            )
+        )
 
     def inject(self, op: str, hook: Hook, *, times: int = 1) -> None:
         """Run `hook` instead of the normal handler for the next `times` calls of `op`."""
@@ -132,6 +163,9 @@ class PayPalSim:
                 unit["payments"]["authorizations"] = [self._auth_json(a) for a in auths]
             if caps:
                 unit["payments"]["captures"] = [self._auth_json(c) for c in caps]
+            refunds = [r for r in self.refunds.values() if r["order"] == order_id]
+            if refunds:
+                unit["payments"]["refunds"] = [self._auth_json(r) for r in refunds]
         body: dict[str, Any] = {
             "id": order_id,
             "status": order["status"],
@@ -215,6 +249,8 @@ class PayPalSim:
             return "void"
         if method == "PATCH" and path.startswith("/v2/checkout/orders/"):
             return "patch"
+        if method == "POST" and path == "/v1/notifications/verify-webhook-signature":
+            return "verify_webhook"
         if method == "POST" and path.endswith("/capture"):
             return "capture"
         if method == "GET" and path.startswith("/v2/payments/captures/"):
@@ -311,6 +347,16 @@ class PayPalSim:
                 )  # fmt: skip
             auth["status"] = "VOIDED"
             return httpx.Response(204, headers=debug)
+        if method == "POST" and path == "/v1/notifications/verify-webhook-signature":
+            self.verify_requests.append(json.loads(request.content))
+            verdict = self.webhook_verdict
+            if isinstance(verdict, int):
+                return httpx.Response(
+                    verdict, headers=debug, json={"name": "INTERNAL_SERVER_ERROR"}
+                )
+            if verdict == "junk":
+                return httpx.Response(200, headers=debug, json={"verification_status": "MAYBE"})
+            return httpx.Response(200, headers=debug, json={"verification_status": verdict})
         if method == "POST" and path.endswith("/capture"):
             auth = self.authorizations.get(path.split("/")[-2])
             if auth is None:
@@ -343,6 +389,12 @@ class PayPalSim:
                 "final_capture": bool(body.get("final_capture")),
                 "invoice_id": auth["invoice_id"],
                 "custom_id": auth["custom_id"],
+                "links": [
+                    {
+                        "rel": "up",
+                        "href": f"https://api.sandbox.paypal.com/v2/payments/authorizations/{auth['id']}",
+                    }
+                ],
             }
             self.captures[capture["id"]] = capture
             auth["status"] = self.auth_status_after_capture

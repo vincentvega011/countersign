@@ -32,7 +32,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, Protocol
 
 import structlog
 from joserfc.jwk import ECKey
@@ -51,6 +51,8 @@ log = structlog.get_logger("countersign.lock")
 
 Operation = Literal["create", "update", "complete", "capture"]
 MANDATE_REQUIRED = "mandate_required"
+# The capability whose negotiation means AP2 is in use (UCP `dev.ucp.common.payment.ap2_mandate`).
+AP2_CAPABILITY = "dev.ucp.common.payment.ap2_mandate"
 
 ALLOWED_NOT_REQUIRED = "allowed:not_required"
 ALLOWED_MANDATE = "allowed:mandate_valid"
@@ -86,6 +88,14 @@ class LockVerdict:
     required: bool = False
     policy_version: int = 0
     ucp_code: str = MANDATE_REQUIRED
+
+
+class LockPort(Protocol):
+    """What a protocol adapter may do with the lock: identify a principal and ask for a decision."""
+
+    def principal_from_delegation(self, token: str | None) -> Principal | None: ...
+
+    def decide(self, request: LockRequest) -> LockVerdict: ...
 
 
 class PrincipalLock:

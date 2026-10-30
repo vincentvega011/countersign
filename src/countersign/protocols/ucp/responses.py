@@ -17,7 +17,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from countersign.canonical.models import Checkout
-from countersign.protocols.ucp.checkout_state import Status
+from countersign.checkout.state import Status
 from countersign.protocols.ucp.profile import CHECKOUT_CAPABILITY, UCP_VERSION, payment_handlers
 
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)

@@ -52,7 +52,7 @@ def request(
 
 
 def second_protocol_entry(lock: PrincipalLock, who: Principal | None, **kw: Any) -> bool:
-    """A test-only entry point that stands for another protocol adapter (the real ACP adapter, P2.7).
+    """A test-only entry point that stands for another protocol adapter (the real ACP adapter is exercised in tests/integration/test_acp.py).
 
     It builds its own `Principal` and calls the SAME shared function the UCP adapter calls. It holds
     no policy of its own, which is the point of the test.
