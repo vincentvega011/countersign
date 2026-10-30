@@ -87,6 +87,11 @@ from countersign.tables import attempt_mandates, payer_vault, payment_attempts
 log = structlog.get_logger("countersign.cp")
 
 FINAL_STATES = frozenset({"abandoned", "voided", "failed"})
+# The states an owner may clean up from. `start` owns the attempt from the reservation on; `finish`
+# owns it only after winning the claim, so it can never be in `reserved` or `order_created` there.
+OWNED_BY_START = ("reserved", "order_created", "authorizing", "authorized")
+OWNED_BY_FINISH = ("authorizing", "authorized")
+OWNED_BY_RECOVER = ("reserved", "order_created", "authorizing", "unresolved")
 PAYMENT_RECEIPT_TYP = receipts.PAYMENT_RECEIPT_TYP
 
 
@@ -103,6 +108,7 @@ class CpRejected:
     ucp_code: str
     detail: str
     reference: str
+    cleaned: bool = False  # True only when this call owned the attempt and cleaned it up
 
 
 @dataclass(frozen=True)
@@ -131,7 +137,16 @@ class CpAuthorized:
     mode: str
 
 
-CpOutcome = CpRejected | CpApprovalRequired | CpPending | CpAuthorized
+@dataclass(frozen=True)
+class CpInProgress:
+    """Another request owns this attempt right now. This call touched nothing: no PayPal call, no
+    state change, no reservation released (docs/PROTOCOL.md Decision 67)."""
+
+    checkout_id: str
+    state: str
+
+
+CpOutcome = CpRejected | CpApprovalRequired | CpPending | CpAuthorized | CpInProgress
 
 
 @dataclass(frozen=True)
@@ -492,7 +507,16 @@ class CredentialProvider:
         return self._verify_and_record_authorization(attempt, current, order, mode="vault")
 
     def finish(self, *, checkout_id: str, current: Checkout) -> CpOutcome:
-        """Continue after the payer approved on PayPal: pre-authorize check, then authorize."""
+        """Continue after the payer approved on PayPal: pre-authorize check, then authorize.
+
+        Ownership (Decision 67). The attempt is claimed first, with one conditional update
+        (`order_created` to `authorizing`), before any PayPal call and before any decision that
+        could lead to a cleanup. Of N concurrent calls exactly one wins; the others return
+        `CpInProgress` without calling PayPal, changing a row or releasing anything. Only the winner
+        may reject, clean up, void or release, and it does so for the objects of its own attempt.
+        The claim is given back (`authorizing` to `order_created`) when the payer has not approved
+        yet, so a later call can try again.
+        """
         row = self._row(checkout_id)
         if row is None:
             return self._reject(
@@ -503,12 +527,17 @@ class CredentialProvider:
                 checkout_id, row.order_id, row.authorization_id, self._total(current),
                 row.custom_id, row.mode,
             )  # fmt: skip
-        if row.state == "authorizing":
-            return CpPending(checkout_id, row.order_id, "AUTHORIZING")
-        if row.state != "order_created" or row.mode != "redirect":
+        if row.state in ("reserved", "authorizing") or (
+            row.state == "order_created" and row.mode != "redirect"
+        ):
+            return CpInProgress(checkout_id, row.state)  # someone else is working on it
+        if row.state != "order_created":
             return self._reject(
                 CpRejection("C8", "attempt_not_pending", MANDATE_SCOPE_MISMATCH), "", checkout_id
             )
+        if not self._set_state(checkout_id, "authorizing", expect=("order_created",)):
+            return CpInProgress(checkout_id, "authorizing")  # lost the claim
+        # From here on this call owns the attempt.
         attempt = self._attempt_from_row(row)
         order_id: str = row.order_id
         try:
@@ -516,6 +545,7 @@ class CredentialProvider:
                 checkout_id, "get_order", lambda: self._paypal.get_order(order_id)
             )
             if order.status in ("CREATED", "PAYER_ACTION_REQUIRED"):
+                self._set_state(checkout_id, "order_created", expect=("authorizing",))
                 return CpPending(checkout_id, order_id, order.status)
             if order.status != "APPROVED" or order.authorizations:
                 raise CpRejection("C8", f"order_not_approvable:{order.status.lower()}"[:60],
@@ -527,8 +557,6 @@ class CredentialProvider:
                 )  # fmt: skip
                 if problem is not None:
                     raise CpRejection("C8", f"preauthorize_{problem}", MANDATE_SCOPE_MISMATCH)
-            if not self._set_state(checkout_id, "authorizing", expect=("order_created",)):
-                return CpPending(checkout_id, order_id, "AUTHORIZING")
             self._authorize(checkout_id, order_id)
             authorized = self._paypal_call(
                 checkout_id, "get_order", lambda: self._paypal.get_order(order_id)
@@ -537,16 +565,16 @@ class CredentialProvider:
                 attempt, current, authorized, mode="redirect"
             )
         except CpRejection as rejection:
-            self._cleanup(checkout_id, rejection.reason)
-            return self._reject(rejection, "", checkout_id, attempt.payment_reference)
+            self._cleanup(checkout_id, rejection.reason, owned=OWNED_BY_FINISH)
+            return self._reject(rejection, "", checkout_id, attempt.payment_reference, cleaned=True)
         except DecisionLogError:
-            self._cleanup(checkout_id, "log_failure")
+            self._cleanup(checkout_id, "log_failure", owned=OWNED_BY_FINISH)
             raise
         except Exception as error:  # noqa: BLE001 - INV-10
-            self._cleanup(checkout_id, f"c8:{type(error).__name__}")
+            self._cleanup(checkout_id, f"c8:{type(error).__name__}", owned=OWNED_BY_FINISH)
             return self._reject(
                 CpRejection("C8", "internal_error", PAYMENT_FAILED), "", checkout_id,
-                attempt.payment_reference,
+                attempt.payment_reference, cleaned=True,
             )  # fmt: skip
 
     def _authorize(self, checkout_id: str, order_id: str) -> None:
@@ -655,10 +683,33 @@ class CredentialProvider:
             return False
         return bool(current.status == "VOIDED")
 
-    def _cleanup(self, checkout_id: str, reason: str) -> None:
-        """Void what exists, release what was reserved, or mark the attempt unresolved."""
+    def _cleanup(
+        self,
+        checkout_id: str,
+        reason: str,
+        *,
+        owned: tuple[str, ...] = OWNED_BY_START,
+        fence_us: int | None = None,
+    ) -> None:
+        """Void what exists, release what was reserved, or mark the attempt unresolved.
+
+        Only the owner of an attempt calls this (Decision 67): `start` after it reserved, `finish`
+        after it won the claim, `recover` after it took a stale attempt over. As a second line of
+        defense it refuses to act unless the attempt is still in a state the caller `owned` (and, for
+        `recover`, unchanged since `fence_us`), checked before any PayPal call and again, as part of the
+        same statement that ends the attempt, before any reservation is released. A call that is not
+        the owner does nothing and says so in the log.
+        """
         row = self._row(checkout_id)
         if row is None or row.state in FINAL_STATES:
+            return
+        if row.state not in owned or (fence_us is not None and row.updated_us != fence_us):
+            try:
+                self._log(
+                    None, "cp.cleanup.skipped", checkout_id, reason=reason[:80], state=row.state
+                )
+            except DecisionLogError:
+                pass  # nothing was changed; there is nothing to fail closed about
             return
         authorization_ids: list[str] = [row.authorization_id] if row.authorization_id else []
         unresolved = False
@@ -679,14 +730,26 @@ class CredentialProvider:
         final = "voided" if authorization_ids else "abandoned"
         try:
             with self._engine.begin() as conn:
-                if unresolved:
-                    self._set_state_in(conn, checkout_id, "unresolved")
-                else:
+                ended = conn.execute(
+                    update(payment_attempts)
+                    .where(
+                        payment_attempts.c.checkout_id == checkout_id,
+                        payment_attempts.c.state.in_(owned),
+                    )
+                    .values(
+                        state="unresolved" if unresolved else final, updated_us=self._clock_us()
+                    )
+                )
+                if ended.rowcount != 1:
+                    # Not ours any more: nothing is released, voided or rewritten.
+                    self._append(conn, "cp.cleanup.skipped", checkout_id,
+                                 {"reason": reason[:80], "state": "changed"})  # fmt: skip
+                    return
+                if not unresolved:
                     self._ledger.void(conn, row.spend_id)
                     reservation = self._store.load(conn, row.reservation_handle)
                     if reservation is not None:
                         self._store.release_in(conn, reservation)
-                    self._set_state_in(conn, checkout_id, final)
                 self._append(
                     conn, "cp.cleanup", checkout_id,
                     {"reason": reason[:80], "result": "unresolved" if unresolved else final,
@@ -694,7 +757,10 @@ class CredentialProvider:
                 )  # fmt: skip
         except Exception:  # noqa: BLE001 - a cleanup that cannot finish leaves the attempt as is
             log.error("cp_cleanup_incomplete", checkout_id=checkout_id)
-            self._set_state(checkout_id, "unresolved")
+            try:
+                self._set_state(checkout_id, "unresolved", expect=owned)
+            except Exception:  # noqa: BLE001 - e.g. the attempt is already final: leave it
+                log.error("cp_cleanup_unresolved_not_recorded", checkout_id=checkout_id)
 
     def _set_state_in(self, conn: Connection, checkout_id: str, state: str) -> None:
         conn.execute(
@@ -709,7 +775,11 @@ class CredentialProvider:
         cutoff = self._clock_us() - older_than_us
         with self._engine.connect() as conn:
             rows = conn.execute(
-                select(payment_attempts.c.checkout_id, payment_attempts.c.state).where(
+                select(
+                    payment_attempts.c.checkout_id,
+                    payment_attempts.c.state,
+                    payment_attempts.c.updated_us,
+                ).where(
                     payment_attempts.c.state.in_(
                         ("reserved", "order_created", "authorizing", "unresolved")
                     ),
@@ -717,15 +787,21 @@ class CredentialProvider:
                 )
             ).all()
         touched = []
-        for checkout_id, state in rows:
-            self._cleanup(checkout_id, f"recover:{state}")
+        for checkout_id, state, seen_us in rows:
+            self._cleanup(checkout_id, f"recover:{state}", owned=OWNED_BY_RECOVER, fence_us=seen_us)
             touched.append(checkout_id)
         return touched
 
     # ------------------------------------------------------------------ rejection
 
     def _reject(
-        self, rejection: CpRejection, presented: object, checkout_id: str, reference: str = ""
+        self,
+        rejection: CpRejection,
+        presented: object,
+        checkout_id: str,
+        reference: str = "",
+        *,
+        cleaned: bool = False,
     ) -> CpRejected:
         reference = reference or receipts.reference_for(presented)
         receipt = receipts.sign_receipt(
@@ -750,5 +826,5 @@ class CredentialProvider:
             )  # fmt: skip
         return CpRejected(
             receipt, [rejection.message()], rejection.step, rejection.reason,
-            rejection.ucp_code, rejection.detail, reference,
+            rejection.ucp_code, rejection.detail, reference, cleaned,
         )  # fmt: skip

@@ -461,6 +461,18 @@ class UcpService:
             if record is None:
                 return self._not_found()
             if outcome.kind == "in_progress":
+                # Another request is completing this checkout (or already did). Logged before the
+                # answer (INV-12); nothing else changes.
+                text = "The checkout is being completed."
+                msg = m.error_message(m.UPDATE_DURING_COMPLETION, text, "recoverable")
+                self._log(conn, "checkout.complete_in_progress", record)
+                return Result(200, record, (msg,))
+            if record.status in FINAL:
+                # A concurrent request already ended this checkout; this one reports it and does not
+                # try a transition the lifecycle has no edge for.
+                self._log(conn, "checkout.complete_after_end", record, outcome=outcome.kind)
+                if record.status is Status.COMPLETED and outcome.kind == "captured":
+                    return Result(200, record, receipts=dict(outcome.receipts))
                 text = "The checkout is being completed."
                 msg = m.error_message(m.UPDATE_DURING_COMPLETION, text, "recoverable")
                 return Result(200, record, (msg,))

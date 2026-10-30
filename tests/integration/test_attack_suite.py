@@ -93,6 +93,14 @@ def test_in_baseline_the_three_headline_attacks_succeed_and_the_rest_are_reporte
     assert all(r["log_chain_ok"] for r in baseline.values())
 
 
+def test_the_concurrent_burst_always_completes_the_legitimate_purchase(
+    rows: list[dict[str, Any]],
+) -> None:
+    burst = [r for r in rows if r["case"] == "double_complete_retry"]
+    assert len(burst) == 2 and all(r["side_effects"] == [] for r in burst)
+    assert all(r["paypal_captures"] == 1 and r["paypal_authorizations"] == 1 for r in burst)
+
+
 def test_the_suite_is_deterministic(dbs: Databases, rows: list[dict[str, Any]]) -> None:
     assert run_all(dbs) == rows
 

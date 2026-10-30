@@ -2374,18 +2374,94 @@ PayPal simulator and the real Postgres; no case needed a new sandbox recording.
   nothing and the test says so: the principal lock alone is backed by the merchant's refusal of
   unmandated checkouts, and the pre-authorize check alone by the gate.
 
-### Decision 66: A concurrent burst of `complete` can void the winner's authorization
+### Decision 66: A concurrent burst of `complete` voided the winner's authorization (RESOLVED)
 
-**Flagged for the owner; not fixed here.** Found by the attack suite while writing
-`double_complete_retry`. With ten concurrent completes after the payer approved, about one run in
-twenty (observed in both `full` and `baseline`) ends with the authorization voided and no capture: a
-losing request sees the order already `COMPLETED`, takes the Credential Provider's cleanup path and
-voids the authorization the winner made; one request answers 500 (an `IntegrityError` while recording
-the cleanup). It never creates a second PayPal object or a second capture, and it fails closed, so it
-is not a money finding. It is a liveness defect that anyone holding a checkout id can trigger, and the
-fix is in `cp/provider.py` (an invariant module), so it needs an ADR and a decision from the owner. The
-deterministic suite uses sequential replays; the burst is in `tests/integration/test_complete_race.py`,
-which asserts the safety half only. See [LIMITATIONS.md](LIMITATIONS.md) L28.
+**Status: resolved in P2.11a by [Decision 67](#decision-67-ownership-of-a-payment-attempt).** Found by the
+attack suite while writing `double_complete_retry`. With ten concurrent completes after the payer
+approved, about one run in twenty (both `full` and `baseline`) ended with the authorization voided, no
+capture, and one request answering 500.
+
+**The real cause (the hypothesis in the task was refuted in part).** Deterministic `PayPal-Request-Id`s
+did not make racers share objects: they are what kept a repeated `authorize` from creating a second
+one. The racers shared objects because there is exactly one payment attempt per checkout (a row keyed by
+the checkout id), and the Credential Provider's `finish` decided before it claimed. Each racer:
+
+1. read the attempt row (`order_created`);
+2. read the live order from PayPal;
+3. decided what to do from that read, and only then
+4. tried to claim the attempt (`order_created` to `authorizing`).
+
+A request that read the order after the winner had authorized it saw `COMPLETED` instead of `APPROVED`,
+treated that as "this order cannot be authorized", and ran the failure cleanup. The cleanup looked up the
+authorization from the attempt row and the order, which is the winner's authorization, and voided it. If
+the winner had already captured, the void was refused and the cleanup tried to write `unresolved` over a
+finished attempt, which the table's guard trigger rejects: that `IntegrityError` was the 500. A second,
+related path: a request that arrived while the first was still creating the order saw the attempt
+`reserved`, rejected it, and the coordinator released the Merchant's reservation and cancelled a checkout
+that was healthy. A third: two requests that both reached the gate after the capture both tried to move
+the checkout to `completed`, and the second raised on a transition the lifecycle has no edge for.
+
+So the defect was ownership, not identity: nothing established which request owned the attempt before
+one of them acted on it.
+
+### Decision 67: Ownership of a payment attempt
+
+**Flagged for the owner.** One request owns an attempt at a time, and only the owner acts on PayPal
+objects, reservations or the attempt's state.
+
+- **Claim first.** `CredentialProvider.finish` claims the attempt with one conditional update
+  (`order_created` to `authorizing`) before it calls PayPal or decides anything. The existing
+  uniqueness (one row per checkout id, one reservation per checkout) already gives `start` ownership
+  from the reserving transaction. The owner gives the claim back (`authorizing` to `order_created`) when
+  the payer has not approved yet, so a later call can try again.
+- **A request that does not own the attempt does nothing.** It gets `CpInProgress` (a new outcome) and
+  makes no PayPal call, writes nothing, voids nothing and releases nothing. This covers a lost claim, an
+  attempt another request is creating (`reserved`), and one it is authorizing (`authorizing`).
+- **Cleanup is the owner's only.** `_cleanup` takes the states its caller owns (`start` from the
+  reservation, `finish` after the claim, `recover` for stale attempts). It refuses to act unless the
+  attempt is still in one of them, before any PayPal call; the statement that ends the attempt is
+  conditional on the same states, so a release or a rewrite never happens for an attempt that changed
+  hands; a failed cleanup records `unresolved` only under the same condition and never raises.
+  `recover` is also fenced by the `updated_us` it read: an attempt its owner touched since is left alone.
+  These are the same rules for the Merchant reservation (the coordinator releases it only for a
+  rejection whose `cleaned` flag says the rejecting call owned and cleaned the attempt), for the CP
+  reservation (released inside the owner's cleanup transaction) and for the gate (its own conditional
+  claim, unchanged).
+- **No schema change and no ownership token column.** Ownership is winning the state transition, which
+  the database enforces, plus the guard trigger that makes finished attempts final. A token would add a
+  migration for a guarantee the state machine already gives; the fence on `recover` covers the one actor
+  that does not win a transition.
+- **Idempotency and request ids are untouched.** No `PayPal-Request-Id` derivation changed, so the
+  cassettes are valid as recorded. Fail-closed behavior (INV-10) is unchanged: an owner failure still
+  voids and releases, an unreadable PayPal still leaves `unresolved`.
+- **Late requests.** A request that reaches `_finish_complete` after another ended the checkout reports
+  the ended checkout (the completed one, with its receipts) and does not attempt a transition the
+  lifecycle does not have.
+
+### Decision 68: What the loser is told
+
+**Flagged for the owner.** HTTP 200, status `complete_in_progress` (a vendored UCP checkout status) with
+the message code `complete_in_progress` and severity `recoverable`, the same typed answer the service
+already gave while another request was verifying. The decision is logged before the response
+(`checkout.complete_in_progress`, INV-12), so a burst of N requests writes N-1 small entries. A request
+that arrives after the purchase completed gets the completed checkout. Never a 500. For the baseline's
+ACP path, a repeated complete answers with the first result (`completed`).
+
+### Decision 69: How the interleavings are tested
+
+- `tests/interleave.py` holds a request at an exact PayPal call (`PausingTransport`, `Rendezvous`) or
+  schedules N request threads one at a time at PayPal-call granularity from a drawn list of picks
+  (`TokenScheduler`). No transaction is held across a PayPal call, so a thread never waits on a lock held
+  by a thread without the token.
+- Three reproductions force the bad interleavings (the stale read, an attempt being created, a late
+  loser at the gate). Each fails on the code before this change and passes after it.
+- A Hypothesis property (500 examples, `full` and `baseline`, with and without a failing owner, with and
+  without a concurrent start) asserts that a non-owner never voids and money stays within the signed total.
+- A stress test runs 200 iterations of 10 or 20 concurrent completes over HTTP on Postgres for `full`
+  and `baseline`, and for the baseline's ACP path: exactly one order, one authorization and one capture,
+  no void, every answer 200, every non-winner `complete_in_progress`.
+- The `double_complete_retry` attack case is a real concurrent burst again. It records no winner, only
+  what PayPal ended up holding.
 
 ---
 

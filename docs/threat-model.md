@@ -52,7 +52,7 @@ defense itself.
 | `duplicate_json_keys` | duplicate_json_keys | malicious agent | INV-8 | `test_canonical_jsonstrict.py`, `test_acp.py` |
 | `decimal_ambiguity` | decimal_ambiguity | malicious agent | INV-8, INV-9 | `test_canonical_jsonstrict.py` |
 | `webhook_spoof` | webhook_spoof | network attacker | INV-4, INV-7, INV-10 | `test_webhooks.py` |
-| `double_complete_retry` | double_complete_retry | malicious agent | INV-6, INV-11 | `test_ucp_complete_gate.py`, `test_complete_race.py` |
+| `double_complete_retry` | double_complete_retry | malicious agent | INV-6, INV-11 | `test_complete_ownership.py`, `test_complete_stress.py` |
 
 Notes on what the cases do and do not cover:
 
@@ -64,7 +64,20 @@ Notes on what the cases do and do not cover:
   policy (Decision 3) is not built, so it has no case yet.
 - `webhook_spoof` runs against the simulator's verification verdict. Live delivery is not confirmed
   ([LIMITATIONS.md](LIMITATIONS.md) L26).
-- A concurrent burst of `complete` calls can void the winner's own authorization
-  ([LIMITATIONS.md](LIMITATIONS.md) L28); it is a liveness defect, not a money one, and it is outside
-  the deterministic suite.
+- A concurrent burst of `complete` calls used to be able to void the winner's own authorization; that was
+  fixed by the ownership rule ([PROTOCOL.md](PROTOCOL.md) Decision 67, [LIMITATIONS.md](LIMITATIONS.md)
+  L28) and `double_complete_retry` is a real concurrent burst again.
+
+## Review of the phase 2 implementation
+
+The whole phase 2 change set was reviewed against the invariants. Result: no finding that moves money
+outside what was signed, bypasses a mandate or the lock, alters the log, or enables a degraded mode
+remotely. Five accepted notes, recorded in [LIMITATIONS.md](LIMITATIONS.md) L30 to L34: cancel during
+completion (INV-10, INV-12), the open mandate identity (INV-6), the payer vault key (INV-5), the default
+of the ablation refusal, and two liveness and logging gaps (INV-12). Areas examined and sound: the
+algorithm allowlist, `typ` and `vct` matching, chain splitting and the `~~` rule, disclosure handling,
+key binding and `cnf`, the customer id source, the identity headers, single use under races, the sealed
+capture approval, the gate claim and fail path, the ownership rule, webhook verification and
+reconciliation, the baseline code's isolation, the PayPal client's money handling, the log's
+append-only role, and the API surface.
 

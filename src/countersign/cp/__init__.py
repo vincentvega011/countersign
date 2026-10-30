@@ -6,6 +6,7 @@ from countersign.cp.ledger import SpendLedger
 from countersign.cp.provider import (
     CpApprovalRequired,
     CpAuthorized,
+    CpInProgress,
     CpOutcome,
     CpPending,
     CpRejected,
@@ -19,6 +20,7 @@ __all__ = [
     "CpApprovalRequired",
     "CpAuthorized",
     "CpConfig",
+    "CpInProgress",
     "CpOutcome",
     "CpPending",
     "CpRejected",

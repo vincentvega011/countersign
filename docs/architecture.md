@@ -366,6 +366,11 @@ CP through `countersign/completion.py`. Decisions 34 to 40 in [PROTOCOL.md](PROT
 imports no protocol adapter or web framework (import guard test), never captures and never mints a
 capture approval (the gate is P2.5), and a rejected payment cancels its checkout.
 
+**Ownership (P2.11a).** One request owns a payment attempt at a time. `finish` claims the attempt before it
+calls PayPal; a request that does not own it gets `CpInProgress` and touches nothing; cleanup runs only
+for the states its caller owns and is fenced for `recover`; the loser of a race is answered with the
+typed `complete_in_progress`. Decisions 66 to 69 in [PROTOCOL.md](PROTOCOL.md).
+
 ### 5.6 constraints
 
 Only native AP2 constraint types are used or evaluated ([PROTOCOL.md](PROTOCOL.md) Decision 4). The

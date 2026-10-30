@@ -57,5 +57,8 @@ module = [
   "countersign.lock.*", "countersign.constraints.*", "countersign.canonical.*",
   "countersign.ledger.*", "countersign.evidence.*", "countersign.mandates.*",
   "countersign.protocols.acp.*", "countersign.webhooks.*",
+  "countersign.protocols.ucp.*", "countersign.paypal.*", "countersign.degraded.*",
+  "countersign.checkout.*", "countersign.completion", "countersign.composition",
+  "countersign.runtime", "countersign.ablations",
 ]
 strict = true

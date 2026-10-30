@@ -36,6 +36,7 @@ from countersign.canonical.models import Checkout
 from countersign.cp import (
     CpApprovalRequired,
     CpAuthorized,
+    CpInProgress,
     CpPending,
     CpRejected,
     CredentialProvider,
@@ -199,6 +200,10 @@ class CompleteCoordinator:
             return CompletionOutcome("rejected", (_ATTEMPT_ENDED,), consumed=True)
         result = self._cp.finish(checkout_id=checkout.id, current=checkout)
         if isinstance(result, CpRejected):
+            if not result.cleaned:
+                # This call did not own the attempt and changed nothing: it releases nothing and
+                # does not end the checkout (Decision 67).
+                return CompletionOutcome("in_progress")
             self._release_merchant(checkout)
             return CompletionOutcome("rejected", tuple(result.messages), consumed=True)
         return self._outcome(result, checkout)
@@ -227,8 +232,12 @@ class CompleteCoordinator:
         self._merchant_store.release_checkout(checkout.id)
 
     def _outcome(
-        self, result: CpApprovalRequired | CpPending | CpAuthorized, checkout: Checkout
+        self,
+        result: CpApprovalRequired | CpPending | CpAuthorized | CpInProgress,
+        checkout: Checkout,
     ) -> CompletionOutcome:
+        if isinstance(result, CpInProgress):
+            return CompletionOutcome("in_progress")
         if isinstance(result, CpApprovalRequired):
             return CompletionOutcome("approval_required", continue_url=result.approval_url)
         if isinstance(result, CpPending):

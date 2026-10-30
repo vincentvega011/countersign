@@ -72,6 +72,7 @@ class NaiveUnmandatedCompletion:
         self._orders: dict[
             str, tuple[str, str | None]
         ] = {}  # checkout id -> (order id, approval url)
+        self._paid: dict[str, UnmandatedPaid] = {}  # a repeated complete reports the first result
         self._mutex = threading.Lock()
 
     def _vault_from_table(self, principal: str) -> str | None:
@@ -98,6 +99,8 @@ class NaiveUnmandatedCompletion:
 
     def _complete(self, checkout: Checkout, principal: Principal | None) -> UnmandatedOutcome:
         cid = checkout.id
+        if cid in self._paid:
+            return self._paid[cid]
         total: Money = next(t.amount for t in checkout.totals if t.type == "total")
         custom_id = "bl0." + cid
         self._log("degraded.unmandated.started", cid, amount=f"{total.currency}:{total.minor}")
@@ -143,4 +146,5 @@ class NaiveUnmandatedCompletion:
         self._log(
             "degraded.unmandated.captured", cid, order_id=order.id, capture_id=made.resource_id
         )
-        return UnmandatedPaid(order.id, made.resource_id)
+        self._paid[cid] = UnmandatedPaid(order.id, made.resource_id)
+        return self._paid[cid]

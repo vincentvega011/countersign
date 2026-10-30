@@ -103,6 +103,7 @@ def create_app(
         lock=lock,
         order_base_url=f"{base.rstrip('/')}{REST_BASE_PATH}/checkout-sessions",
     )
+    app.state.ucp = service
     install_ucp(app, service, REST_BASE_PATH, key, json_loader)
     _label_server_errors(app, labels)
     if webhooks is not None:

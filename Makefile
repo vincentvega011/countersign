@@ -27,8 +27,14 @@ db:
 test: db
 	uv run pytest
 
-test-safety:
-	@echo "not implemented yet"
+# The tests of the modules that decide about money, identity and evidence, plus the structural guards
+# (import guards, the capture surface) and strict typing. Everything except the catalog and CI-file
+# tests, which are not safety relevant; scripts/safety_coverage.py checks that every invariant package
+# is imported by some test.
+test-safety: db
+	uv run mypy src
+	uv run python scripts/safety_coverage.py
+	uv run pytest tests --ignore=tests/unit/test_catalog.py --ignore=tests/properties/test_catalog_properties.py --ignore=tests/unit/test_ci_workflow.py
 
 sandbox-smoke:
 	uv run python scripts/sandbox_smoke.py

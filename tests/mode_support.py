@@ -8,9 +8,11 @@ immediate capture, lock, Postgres, decision log) is the real one. Only PayPal is
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+import httpx
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
@@ -82,13 +84,17 @@ class World:
 
 
 def make_world(
-    engine: Engine, settings: RuntimeSettings, *, webhook_id: str | None = None
+    engine: Engine,
+    settings: RuntimeSettings,
+    *,
+    webhook_id: str | None = None,
+    wrap_transport: Callable[[httpx.BaseTransport], httpx.BaseTransport] | None = None,
 ) -> World:
     key = validate_jwk(generate_jwk())
     keys, sim = Keys(), PayPalSim()
     paypal = PayPalClient(
         PayPalConfig(client_id="sim", client_secret="sim-secret"),
-        transport=sim.transport(),
+        transport=wrap_transport(sim.transport()) if wrap_transport else sim.transport(),
         sleep=lambda _: None,
         now=lambda: paypal_sim.NOW,
     )

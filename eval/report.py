@@ -36,7 +36,6 @@ def row(case: AttackCase, mode: str, run: CaseRun) -> dict[str, Any]:
         "paypal_captures": v.captures,
         "violations": v.violations,
         "side_effects": run.side_effects,
-        "log_entries": v.log_entries,
         "log_chain_ok": v.log_ok,
         "captures_without_log": v.captures_without_log,
         "error": run.error,

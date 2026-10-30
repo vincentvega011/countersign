@@ -311,12 +311,15 @@ which fails safe but would block a legitimate purchase.
 - **Local pair.** `make dev-pair` uses fixed passwords for its two local database roles and the
   compose administrator URL. It is a development convenience, not a deployment.
 
-### L28. Concurrent completes can void the legitimate authorization
+### L28. Concurrent completes (RESOLVED in P2.11a)
 
-A burst of `complete` calls after payer approval is safe (no second order, authorization or capture) but
-not always live: in a small share of runs a losing request voids the winner's authorization and the
-purchase is not completed, with one 500 for the loser. Triggerable by anyone who knows the checkout id.
-Cause and decision pending in [PROTOCOL.md](PROTOCOL.md) Decision 66. Measured only against the simulator.
+A burst of `complete` calls after payer approval used to void the winner's authorization about one run
+in twenty and answer 500 to one request. The cause was that a request acted on the attempt before it
+owned it, and the fix is the ownership rule of [PROTOCOL.md](PROTOCOL.md) Decisions 66 to 69. What
+remains: the interleavings are tested against the PayPal simulator and the real Postgres, not against
+live PayPal; the loser's answer costs one small log entry per request; a request that holds a claim
+and then dies leaves the attempt `authorizing` until `recover` runs, and `recover` is not scheduled yet
+(L26).
 
 ### L29. What the attack suite is and is not
 
@@ -327,4 +330,41 @@ Cause and decision pending in [PROTOCOL.md](PROTOCOL.md) Decision 66. Measured o
   delivery, or a PATCH after authorization (impossible in the sandbox).
 - Case level mutation checks use the ablations, so they show what each switch reopens, not every
   possible code defect.
+
+### L30. A checkout can be canceled while it is completing
+
+Cancel is allowed in every status that is not final, including `complete_in_progress`, and the capture gate
+does not re-read the checkout. Anyone holding the checkout id can therefore cancel a checkout between
+authorize and capture: the gate still captures, and the checkout then reads `canceled` without receipts,
+so the trail contradicts itself. A cancel during payer approval leaves the attempt, the budget and the
+mandate reserved until `recover` runs (L26). No money moves outside what was signed. Planned: refuse the
+cancel in that status and have the gate check the status under lock (P2.12).
+
+### L31. The open mandate digest depends on how the agent presents it
+
+The identity used for single use, the budget row and a revocation is the digest of the serialization the
+agent presents, and the agent can reorder or withhold the nested disclosures of link 0. Today the open
+Checkout Mandate digest is pinned by `payment.reference`, and the Merchant reservation and the gate's
+revocation check use the pinned digest, so no purchase escapes. It would matter if revocation were keyed
+on the Payment Mandate digest or if constraint elements became selectively disclosable. Planned before P3.
+
+### L32. The payer vault is keyed on the agent key only
+
+With vault enrollment on, a wallet vaulted by one customer under an agent key could be charged for another
+customer's valid mandate for the same key. Enrollment is off by default and the composition root never
+turns it on; it must not be turned on before the vault is keyed on (customer id, agent thumbprint) (P3).
+
+### L33. Ablation refusal depends on `APP_ENV`
+
+The refusal applies when `APP_ENV=demo`, and an unset `APP_ENV` is treated as `dev`. A hosted deployment
+that forgets to set it would accept an ablation from its environment. No request can enable one. Planned:
+refuse unless `APP_ENV` is explicitly `dev` or `eval`, and pin `APP_ENV=demo` in `render.yaml` (P5.1).
+
+### L34. Two liveness and logging gaps
+
+The answer "the payer has not approved yet" writes no decision entry of its own (the PayPal read is logged),
+and a crash or log failure in the first complete before the attempt row commits leaves the checkout
+`complete_in_progress` with no attempt, so later completes answer `in_progress` until it expires. Neither
+moves money. Planned: log the pending answer, and return such a checkout to `ready_for_complete` after a
+fence (P5.1).
 

@@ -12,7 +12,7 @@ from sqlalchemy import Engine, select
 from countersign.constraints import SpendView
 from countersign.constraints import payment as payment_constraints
 from countersign.constraints.payment import PaymentFacts
-from countersign.cp import CpApprovalRequired, CpAuthorized, CpPending, CpRejected
+from countersign.cp import CpApprovalRequired, CpAuthorized, CpInProgress, CpPending, CpRejected
 from countersign.cp.ledger import SpendLedger
 from countersign.tables import reservations, spend_entries
 from tests.cp_support import CpWorld, make_world
@@ -62,7 +62,8 @@ def test_twenty_parallel_completes_with_one_mandate_make_one_order_and_one_autho
         return world.provider.finish(checkout_id=world.checkout.id, current=world.checkout)
 
     done = run_parallel(finish, list(range(N)))
-    assert all(isinstance(r, (CpAuthorized, CpPending)) for r in done)
+    assert all(isinstance(r, (CpAuthorized, CpPending, CpInProgress)) for r in done)
+    assert not any(isinstance(r, CpRejected) for r in done)  # no racer rejects or cleans up
     assert sum(isinstance(r, CpAuthorized) for r in done) >= 1
     assert len(world.sim.authorizations) == 1
     assert len({rid for method, path, rid in world.sim.calls if path.endswith("/authorize")}) == 1
