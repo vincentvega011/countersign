@@ -134,8 +134,14 @@ def mandates(stack: Stack, body: dict[str, Any], **kw: Any) -> tuple[str, str]:
             checkout_constraints()[1],
         ]
 
+    sub = kw.get("sub")
+
+    def edit_payload(payload: dict[str, Any]) -> None:
+        if sub is not None:
+            payload["sub"] = sub
+
     cm = issue("checkout", keys=stack.keys, checkout_jwt_value=jwt, nonce="nc-1",
-               edit_open_content=edit_open)  # fmt: skip
+               edit_open_content=edit_open, edit_open_payload=edit_payload)  # fmt: skip
     from countersign.canonical import sd_hash
 
     digest = sd_hash(cm.open_token)
@@ -147,7 +153,8 @@ def mandates(stack: Stack, body: dict[str, Any], **kw: Any) -> tuple[str, str]:
         content.update(closed_payment_values(kw.get("amount", total), body["currency"]))
 
     pm = issue("payment", keys=stack.keys, audience="credential-provider", checkout_jwt_value=jwt,
-               nonce="np-1", edit_open_content=edit_payment, edit_kb_content=edit_closed)  # fmt: skip
+               nonce="np-1", edit_open_content=edit_payment, edit_kb_content=edit_closed,
+               edit_open_payload=edit_payload)  # fmt: skip
     return cm.token, pm.token
 
 

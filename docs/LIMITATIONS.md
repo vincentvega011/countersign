@@ -121,6 +121,79 @@ PayPal state cannot be read or confirmed is marked `unresolved` and keeps the bu
 mandate reserved until `recover` reads PayPal; until then the agent sees a rejection and must use a
 new checkout. Nothing runs `recover` on a schedule yet.
 
+## Capture gate
+
+### L16. The principal lock was provisional (resolved)
+
+The `# SHORTCUT:` adapter that stood in for the lock at G-LOCK is removed. G-LOCK now asks the real
+principal lock through `GateLockAdapter` (see L19 to L22 for what the lock cannot do).
+
+### L17. What the gate does when it cannot finish
+
+- With the decision log down the gate cannot write the "started" entry of a void, so it makes no PayPal
+  call and the attempt ends `unresolved`; the authorization expires by itself and the budget and the
+  open mandate stay reserved ([PROTOCOL.md](PROTOCOL.md) Decision 43).
+- An `unresolved` attempt keeps its money reserved until a later `complete` or `recover` reads PayPal.
+  Nothing runs `recover` on a schedule yet. A checkout still `complete_in_progress` past its 6 hour
+  lifetime is canceled when it is next touched, even if money may be held; the attempt row is what
+  records the truth.
+- A claim older than 60 seconds is taken over by a retry. A gate that is merely slow, not dead, could
+  overlap a taker; the deterministic Request-Ids and PayPal's own refusals (`PREVIOUSLY_CAPTURED`,
+  `AUTHORIZATION_ALREADY_CAPTURED`) stop a second capture or a void after a capture, but the overlap
+  would show up as extra rejected calls in the log.
+- The PayPal sandbox refuses an order PATCH after authorization, so the "order changed" attack that
+  reaches the gate does so through the window between payer approval and authorization with the
+  pre-authorize check switched off (`ABL_NO_PREAUTH_CHECK`), as in [L3](#l3-orders-can-be-changed-between-payer-approval-and-authorization).
+  Tests that change an order after authorization use the simulator, which allows it; that is not a
+  claim about PayPal.
+
+### L18. Receipts and the order on completion
+
+The complete response that captured carries the Payment Receipt in `ap2.payment_receipt` and the
+Checkout Receipt in `ap2.checkout_receipt` (Countersign members; UCP defines none). The Checkout Receipt
+is issued again at completion from the stored mandate, so it is not the receipt returned at acceptance
+and has a later `iat`. `network_confirmation_id` repeats the PayPal capture id, since PayPal reports no
+separate network reference to this client. The `order` of a completed checkout uses the checkout id as
+its id and the checkout URL as its permalink. The receipts appear only on the complete that captured,
+not on a later read.
+
+## Principal lock
+
+### L19. The customer id depends on the platform writing `sub`
+
+The lock's customer id is the `sub` claim of the platform-signed mandate ([PROTOCOL.md](PROTOCOL.md)
+Decision 47). The Trusted Surface backend that will write it is built in P3, so until then mandates
+carry none (the test issuer adds one). A mandate without it is an unknown customer: under "require AP2
+for all agents", or when a matching lock names a customer, it is denied. The vault principal of
+Decision 40 is still the agent key alone.
+
+### L20. An agent that does not identify itself is not locked
+
+The lock keys on the principal, and the principal comes from the delegation the agent presents. An
+agent that sends none is unidentified, so only the merchant policy can reach it ("require AP2 for all
+agents", or over the threshold). That is why the demo policy is "all". A locked principal that presents
+its delegation but not the capability is denied, which is the new-session escape; an agent that hides
+its identity entirely is not an escape under "all".
+
+### L21. Negotiation is a request header
+
+Countersign does not fetch the platform profile (L11), so "negotiated `dev.ucp.common.payment.ap2_mandate`"
+is read from `Countersign-Capabilities`, and identity from `Countersign-Delegation`. Both are
+Countersign extensions, not UCP. A platform that negotiates by profile only would not be recognised as
+negotiating until the profile fetch exists. The real ACP adapter (P2.7) has not exercised the shared
+function yet; a test-only second entry point does.
+
+### L22. Lock behaviour at the edges
+
+- A lock is recorded before the decision is logged. If the decision's log entry then fails, the answer
+  is a denial but the lock stays recorded (conservative). If the lock's own log entry fails, the lock is
+  not recorded.
+- Unlock is a merchant method with no UI or route yet; policy and unlock changes have no authorization
+  layer beyond the process that calls them. The unmandated cap and velocity limits are not built (the
+  policy view, P4).
+- The matching rule lets an unknown part match anything, so a nameless mandate under an agent key that
+  any locked customer used is held to the strict rule (denied) rather than guessed.
+
 ## UCP checkout binding
 
 ### L11. What the checkout endpoints do not do yet

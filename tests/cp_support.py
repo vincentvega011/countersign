@@ -112,6 +112,7 @@ def make_world(
         PayPalConfig(client_id="sim-client", client_secret="sim-secret"),
         transport=sim.transport(),
         sleep=lambda _: None,
+        now=lambda: paypal_sim.NOW,
     )
     merchant_key = validate_jwk(generate_jwk())
     keys = Keys()

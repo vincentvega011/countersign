@@ -421,6 +421,16 @@ closed; a recurrence other than one occurrence fails closed.
 - Acceptance: a property test that for every locked principal and every protocol path, no mandate
   implies denial.
 
+Implementation (`src/countersign/lock/`, P2.6): `principal.py` (`Principal`; the customer id is the `sub`
+claim of the platform-signed issuer JWT, Decision 47), `policy.py` (`MerchantPolicy`: `off`, `all`,
+`over_threshold` in integer minor units, versioned and hashed), `store.py` (Postgres, insert only,
+migration 0005; idempotent race-safe recording), `service.py` (`PrincipalLock.decide`, the one function
+every adapter calls, plus the merchant actions `set_policy` and `unlock`). The UCP adapter reads two
+request headers (`Countersign-Delegation`, `Countersign-Capabilities`) and asks the lock at create,
+update and complete; the gate is wired at the composition root. Decisions 47 to 50 in
+[PROTOCOL.md](PROTOCOL.md). `lock/` imports no protocol adapter or web framework, and the gate does not
+import `lock/` (import guard tests).
+
 ### 5.8 paypal
 
 - A typed `httpx` client over the sandbox REST API: OAuth with token caching, create order
@@ -469,6 +479,19 @@ The gate is the second layer behind the pre-authorize check in the Credential Pr
 sandbox rejects a PATCH after authorization, so the gate is not what stops an order raised after
 approval in `full` mode; it covers mandate revocation, budget state, evidence assembly and any path
 in which the pre-check was skipped (`ABL_NO_PREAUTH_CHECK`).
+
+Implementation (`src/countersign/gate/`, P2.5): `steps.py` (the pure checks and the sealed `LiveState`,
+which only `fetch_live` can build, so only freshly fetched PayPal state is ever compared), `gate.py`
+(`CaptureGate`: the claim, the steps in order, the capture and its confirmation, the fail path,
+`recover`), `store.py` (the claim, the finalizing transactions, reads), `policy.py` (`LockPolicy`, the
+default denies), `outcomes.py` (`GatePassed`, `GateRejected`, `GatePending`, `GateUnresolved`,
+`GateNotApplicable`). Only `gate/` mints the `CaptureApproval` and calls the capture (a structural
+test), and it imports no protocol adapter, lock, web framework or model code (import guard test).
+`countersign.completion` runs it after the Credential Provider and wires G-LOCK to the principal
+lock (`GateLockAdapter`). The attempt moves `authorized`, `gating`, `capturing`, `captured` (or
+`voided`, or `unresolved` with everything kept reserved). Decisions 41 to 46 in
+[PROTOCOL.md](PROTOCOL.md) give the rules; migration 0004 holds the new states, the stored mandates
+and the revocations.
 
 Acceptance: tests where the order is changed after payer approval and before authorization (the
 mutation window confirmed in PROTOCOL.md, Confirmed PayPal facts; in `full` mode nothing is

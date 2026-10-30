@@ -35,6 +35,7 @@ def checkout_response(
     expires_us: int,
     messages: list[dict[str, Any]] | None = None,
     continue_url: str | None = None,
+    order: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """The checkout resource as returned by every operation."""
     body: dict[str, Any] = {
@@ -53,4 +54,6 @@ def checkout_response(
         body["messages"] = list(messages)
     if continue_url is not None:
         body["continue_url"] = continue_url
+    if order is not None:
+        body["order"] = dict(order)
     return body

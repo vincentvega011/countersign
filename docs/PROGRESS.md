@@ -120,6 +120,23 @@ recorded request ids again, so:
   wired to the Merchant then the CP; payment handler in the profile. Decisions 34 to 40 in
   [PROTOCOL.md](PROTOCOL.md). The real-sandbox cassette is recorded separately
   (`scripts/record_cp_cassette.py`).
+- P2.5: capture gate (`src/countersign/gate/`): eight steps G-FETCH to G-LOCK on freshly fetched
+  PayPal state (sealed `LiveState`), claim by conditional UPDATE, capture with the sealed approval and
+  read-back confirmation, fail path that lets PayPal decide (void and confirm, or settle, or
+  `unresolved` with everything reserved), `recover`, `LockPolicy` with a deny default and a provisional
+  adapter, `ABL_NO_GATE`; migration 0004; UCP complete runs the gate and returns the order and the
+  signed Payment Receipt. Decisions 41 to 46 in [PROTOCOL.md](PROTOCOL.md). Simulator, concurrency,
+  crash and property tests pass; the real-sandbox gate cassette (`scripts/record_gate_cassette.py`, two
+  approvals) is written and not yet recorded.
+
+- P2.6: principal lock (`src/countersign/lock/`): `(customer id, agent key thumbprint)` recorded as
+  locked on AP2 negotiation (insert-only Postgres tables, migration 0005, idempotent and race safe),
+  merchant policy as versioned hashed data (`off`, `all`, `over_threshold` in minor units), one shared
+  `PrincipalLock.decide` called by UCP create, update and complete and by the capture gate (through
+  `GateLockAdapter` at the composition root), `ABL_NO_PRINCIPAL_LOCK`, log and store failures deny. The
+  provisional adapter and L16 are gone. The customer id is the platform-signed `sub` claim. Decisions
+  47 to 50 in [PROTOCOL.md](PROTOCOL.md). Deferred to the policy view (P4): the unmandated cap and the
+  velocity limits.
 
 ## P2 carry-over tasks
 
@@ -135,10 +152,13 @@ Findings from the P1 review that belong to P2 and are not optional there:
   The CP role (P2.4) and the gate (P2.5) append a ledger entry before and after every PayPal call
   and before responding (INV-12); a failed append fails the operation.
 - **P2.5 and P2.6, import-guard tests.** At P2.5: verification and gate modules never import the LLM
-  package (INV-1). At P2.6: `lock/` and policy code never import `protocols/` (INV-5). Both are
+  package (INV-1). At P2.6: `lock/` and policy code never import `protocols/` (INV-5; done in P2.6, `tests/unit/test_lock_import_guard.py`). Both are
   AST-based, like `tests/unit/test_capture_surface.py`.
-- **P2.5, gate mints the approval.** The gate is the only library code that calls
-  `mint_capture_approval`; the surface test already enforces that.
+- **P2.5, gate mints the approval (done in P2.5).** The gate is the only library code that calls
+  `mint_capture_approval`; the surface test enforces that. The gate's half of the ledger writes (an
+  entry before and after every PayPal call and before responding) is done too.
+- **P2.5, import-guard (done in P2.5).** `gate/` imports no protocol adapter, lock, web framework or
+  model code (`tests/unit/test_gate_import_guard.py`).
 
 ## Open risks
 

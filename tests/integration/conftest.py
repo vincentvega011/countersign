@@ -143,6 +143,8 @@ def clean_payments(admin_engine: Engine) -> None:
         conn.execute(
             text(
                 "TRUNCATE reservations, spend_entries, open_payment_mandates, "
-                "payment_attempts, payer_vault, checkout_sessions, decision_log CASCADE"
+                "payment_attempts, payer_vault, attempt_mandates, mandate_revocations, "
+                "lock_events, lock_policies, "
+                "checkout_sessions, decision_log CASCADE"
             )
         )

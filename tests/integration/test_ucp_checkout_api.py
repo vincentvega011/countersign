@@ -548,7 +548,9 @@ def test_each_operation_in_each_status(
     cid = fresh()
     r = client.post(f"{ROOT}/{cid}/complete", json=COMPLETE, headers=AGENT).json()
     valid_checkout(r)
-    assert codes(r) == [comp] and r["status"] == status and "order" not in r
+    assert codes(r) == [comp] and r["status"] == status
+    # Only a completed checkout carries its order confirmation.
+    assert ("order" in r) == (status == "completed")
     assert r["messages"][0]["severity"] == SEVERITY[status][1]
 
     cid = fresh()

@@ -17,6 +17,7 @@ from countersign.paypal.cassette import (
     CassetteTransport,
     RecordingTransport,
     check_clean,
+    find_violations,
     load_cassette,
     recording_enabled,
     scrub,
@@ -209,9 +210,11 @@ def test_save_refuses_to_write_when_something_leaks_through(tmp_path: Path) -> N
     with client_for(recorder) as client:
         run_cycle(client, CHECKOUT, approve=upstream.approve)
     target = tmp_path / "leaky.json"
-    with pytest.raises(CassetteError, match="e-mail"):
+    with pytest.raises(
+        CassetteError, match=r"entry \d+ POST /v2/checkout/orders at .*: email"
+    ) as raised:
         recorder.save(target)
-    assert not target.exists()
+    assert not target.exists() and "jane" not in str(raised.value)
 
 
 def test_a_known_secret_echoed_by_the_server_is_replaced_not_refused(tmp_path: Path) -> None:
@@ -420,3 +423,78 @@ def test_scrub_keeps_the_shipping_amount_in_a_breakdown_but_drops_the_address() 
     unit = out["purchase_units"][0]
     assert unit["amount"]["breakdown"]["shipping"] == {"currency_code": "USD", "value": "4.99"}
     assert unit["shipping"] == {}
+
+
+# ------------------------------------------------- JSON Patch paths and the located refusal
+
+PATCH_OPS = [
+    {"op": "replace", "path": "/purchase_units/@reference_id=='default'/items", "value": []},
+    {"op": "replace", "path": "/purchase_units/@reference_id=='default'/amount", "value": {}},
+]
+
+
+def recorded(request_body: object) -> RecordingTransport:
+    transport = RecordingTransport(
+        httpx.MockTransport(lambda request: httpx.Response(204)), secrets=[CLIENT_ID, SECRET]
+    )
+    client = httpx.Client(transport=transport, base_url="https://api-m.sandbox.paypal.com")
+    client.patch("/v2/checkout/orders/ORDER123", json=request_body)
+    return transport
+
+
+def test_a_json_patch_path_with_an_at_sign_is_saved_and_survives_replay(tmp_path: Path) -> None:
+    out = tmp_path / "c.json"
+    recorded(PATCH_OPS).save(out)
+    saved = json.loads(out.read_text())
+    assert saved["interactions"][0]["request"]["body"] == PATCH_OPS  # the path is kept verbatim
+    replay = httpx.Client(
+        transport=CassetteTransport(load_cassette(out)), base_url="https://api-m.sandbox.paypal.com"
+    )
+    assert replay.patch("/v2/checkout/orders/ORDER123", json=PATCH_OPS).status_code == 204
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["/a/@x=='y'/b@c.com", "/a/@x=='y'/b mail@example.com", "https://x/@y", "no-slash@x"],
+)
+def test_a_patch_like_path_of_another_shape_is_still_refused(tmp_path: Path, path: str) -> None:
+    out = tmp_path / "c.json"
+    with pytest.raises(CassetteError) as raised:
+        recorded([{"op": "replace", "path": path, "value": 1}]).save(out)
+    assert not out.exists() and path not in str(raised.value)
+
+
+def test_an_at_sign_outside_a_patch_path_is_still_refused(tmp_path: Path) -> None:
+    out = tmp_path / "c.json"
+    body = [{"op": "replace", "path": "/a/@x=='y'/b", "value": "mail jane@example.org"}]
+    with pytest.raises(CassetteError) as raised:
+        recorded(body).save(out)
+    message = str(raised.value)
+    assert not out.exists()
+    assert "entry 0" in message and "PATCH /v2/checkout/orders/{id}" in message
+    assert "$.request.body[0].value" in message and "email" in message
+    assert "jane" not in message and "example.org" not in message
+
+
+def test_find_violations_reports_where_and_which_rule_but_never_the_value() -> None:
+    interactions = [
+        {
+            "request": {"method": "GET", "path": "/v2/checkout/orders/ABC123", "body": None},
+            "response": {
+                "status": 200,
+                "body": {"note": "Bearer abcdef", "m": "x@y.z", "k": SECRET},
+            },
+        }
+    ]
+    found = find_violations(interactions, [CLIENT_ID, SECRET])
+    assert sorted((i, op, w, r) for i, op, w, r in found) == [
+        (0, "GET /v2/checkout/orders/{id}", "$.response.body.k", "secret"),
+        (0, "GET /v2/checkout/orders/{id}", "$.response.body.m", "email"),
+        (0, "GET /v2/checkout/orders/{id}", "$.response.body.note", "bearer"),
+    ]
+    assert "abcdef" not in repr(found) and SECRET not in repr(found)
+
+
+def test_check_clean_itself_is_unchanged_and_strict() -> None:
+    with pytest.raises(CassetteError):
+        check_clean("/purchase_units/@reference_id=='default'/items", [])

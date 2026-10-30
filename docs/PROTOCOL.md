@@ -1324,6 +1324,8 @@ items ([LIMITATIONS.md](LIMITATIONS.md) L13).
 
 ### Decision 21: Issuer JWT `typ`
 
+**Status: confirmed by the owner.**
+
 Resolves: the open item in [ENV.md](ENV.md) section 1.5 ("the `typ` of the issuer-signed JWT is
 unspecified").
 
@@ -1383,6 +1385,8 @@ Resolves: places where the Delegate SD-JWT draft allows more than AP2 mandates n
   too. Not a specification value.
 
 ### Decision 24: What "both directions" means for the chain
+
+**Status: confirmed by the owner.**
 
 Resolves: the draft's "Without verifying the binding in both directions a malicious Delegate Holder
 may mis-match parts of the chain if the Holder `cnf` is reused" (Security Considerations). The draft
@@ -1657,6 +1661,8 @@ C7 PayPal order; C8 pre-authorize check and authorization.
 
 ### Decision 36: One transaction, row lock, and the Postgres schema
 
+**Status: confirmed by the owner.**
+
 Resolves: race safety of the budget and of single use (INV-6, INV-7).
 
 - **Transaction.** C5 and C6 are one database transaction: lock the open Payment Mandate's row in
@@ -1687,6 +1693,8 @@ Resolves: race safety of the budget and of single use (INV-6, INV-7).
 
 ### Decision 37: The checkout JWT the Merchant compares in UCP complete
 
+**Status: confirmed by the owner.**
+
 Resolves: what "the checkout JWT of this session" is when the service keeps no copy.
 
 Each response is signed with ES256, whose signatures differ every time, so two responses to the same
@@ -1699,6 +1707,8 @@ issued. A stale response with identical terms is accepted, which is harmless; th
 Tests that pass an `issued_checkout` still exercise the stricter comparison.
 
 ### Decision 38: UCP complete, statuses and resumption
+
+**Status: confirmed by the owner.**
 
 Resolves: how complete drives two roles and a payer approval inside the UCP lifecycle.
 
@@ -1716,7 +1726,7 @@ Resolves: how complete drives two roles and a payer approval inside the UCP life
 - Payer approval (redirect mode) answers with status `complete_in_progress`, `continue_url` set to the
   PayPal approval link and an info message `payer_approval_required`. UCP requires `continue_url`
   with `requires_escalation`, but `ready_for_complete` has no edge to it ([Decision 17](#decision-17-ucp-checkout-rest-binding)),
-  so the link rides on `complete_in_progress`. **To confirm.**
+  so the link rides on `complete_in_progress`.
 - After the payer approves, a second `POST .../complete` (the body may be empty) continues the same
   attempt: the mandates are not verified again. It runs the pre-authorize check and authorizes, and
   answers `payment_authorized`. The checkout stays `complete_in_progress`: capture, and the move to
@@ -1725,6 +1735,8 @@ Resolves: how complete drives two roles and a payer approval inside the UCP life
 - Without a completion port configured, complete never succeeds (fail closed).
 
 ### Decision 39: The payment handler that carries the Payment Mandate token
+
+**Status: confirmed by the owner.**
 
 Resolves: item 7 (the empty `payment_handlers`).
 
@@ -1739,7 +1751,7 @@ Resolves: item 7 (the empty `payment_handlers`).
   is also returned in every checkout response (`ucp.payment_handlers`). `spec` and `schema` are omitted
   (optional in the business schema) because no document is published for them. The reverse-domain name
   is a **placeholder** (no registered domain) and the whole handler is a Countersign construct, not
-  something the specs define ([LIMITATIONS.md](LIMITATIONS.md) L14). **To confirm.**
+  something the specs define ([LIMITATIONS.md](LIMITATIONS.md) L14).
 - Request parsing: the instrument whose `handler_id` is ours and whose credential `type` is
   `ap2_payment_mandate` carries the token. Instruments of other handlers are ignored. Two of ours, a
   credential of another type, or a token that is not a string is HTTP 400 `invalid_request`.
@@ -1747,6 +1759,8 @@ Resolves: item 7 (the empty `payment_handlers`).
   verifies responses that now carry the handler without a change; `make interop` still passes.
 
 ### Decision 40: Payer approval, the vaulted path, cleanup and recovery
+
+**Status: confirmed by the owner.**
 
 Resolves: item 3 (cleanup), item 6 (honest payer approval) and the outcome-unknown rules.
 
@@ -1782,6 +1796,263 @@ Resolves: item 3 (cleanup), item 6 (honest payer approval) and the outcome-unkno
   request bodies, which the recorder keeps verbatim, and `payment_source` is dropped from responses, so
   the vaulted path is tested against the simulator in `tests/paypal_sim.py`, which models the
   behaviour of section 4. This is a limit of the evidence, not of the code.
+
+### Decision 41: The capture gate claims an attempt before it acts
+
+**Status: confirmed by the owner.**
+
+Resolves: exactly-once capture and void (INV-4, INV-11), and the states the attempt moves through.
+
+- `payment_attempts` gains the states `gating`, `capturing` and `captured` and the columns `capture_id`,
+  `receipt`, `gate_code` and `gate_reason` (migration 0004). The path is `authorized`, then `gating`
+  (the claim), `capturing` (just before the capture request), `captured`; or `gating`, then `voided`;
+  or `unresolved` from either. `captured` and `voided` are final (a trigger enforces it, and that a
+  captured attempt names its capture and receipt).
+- **The claim** is one conditional `UPDATE ... SET state = 'gating' WHERE state = 'authorized'`.
+  Postgres takes the row lock for that statement, so of two gates racing on one checkout exactly one
+  sees `rowcount == 1` and runs. The other returns `GatePending` and makes no PayPal call. A claim that
+  is older than `claim_stale_us` (default 60 s) is taken over with the same kind of statement, which
+  also matches the `updated_us` the taker saw, so two takers cannot both win.
+- **A takeover starts again from G-FETCH.** It finds either an authorization that is still `CREATED`
+  (and captures with the same deterministic Request-Id, Decision 19) or one PayPal shows captured. In
+  the second case G-STATUS fails and the fail path (Decision 43) settles it as captured by reading
+  PayPal: it finalizes the books and never captures again. A capture is therefore issued at most once
+  per authorization even across a crash; the Request-Id covers the case in which the first request
+  landed but its answer was lost.
+- **`recover(older_than_us)`** settles attempts a crash or an unreadable PayPal left behind
+  (`authorized`, `gating`, `capturing`, and `unresolved` ones the gate marked). It never captures. A
+  captured authorization is finalized, an uncaptured one is voided (the safe end), a voided one is
+  released, and an unreadable PayPal leaves the attempt `unresolved` with everything reserved.
+- A repeated call for a finished attempt returns the stored result (`captured` or a gate-voided
+  attempt) without calling PayPal.
+
+### Decision 42: What each gate step reads, and where the signed terms come from
+
+**Status: confirmed by the owner.**
+
+Resolves: the sources of G-MANDATE, G-BUDGET and G-TERMS, which the architecture left open.
+
+- **Stored mandates.** The Credential Provider stores the Payment Mandate token and the Checkout
+  Mandate it verified in `attempt_mandates`, in the reservation transaction (insert only). The gate
+  runs `verify_payment` on those stored tokens again at capture time, with its own clock and the
+  current session checkout. It does not trust a caller for the mandates, and it needs no cache of
+  anything. A mandate that expired between authorization and capture fails here.
+- **G-MANDATE** (in this order): the stored tokens exist; both chains verify now (expiry, signatures,
+  `transaction_id`, payee, amount, currency); neither open mandate (Payment or Checkout) is in
+  `mandate_revocations`; the Merchant and the Credential Provider reservations of this checkout are
+  both still `reserved`; and the Credential Provider reservation holds the nonce of the closed Payment
+  Mandate. `mandate_revocations` is insert only; the Trusted Surface will write it in P3 and the
+  gate only reads it.
+- **G-BUDGET** locks the open mandate's row, reads the spend view WITHOUT this checkout's own
+  in-flight entry (the evaluator adds this purchase itself, so counting it would count it twice), and
+  runs the payment constraint evaluator again. Money captured under the same open mandate since the
+  authorization counts.
+- **G-TERMS** compares the live order's re-derived terms (Decision 20) with `expected_terms` of the
+  session checkout. The session is frozen while it is `complete_in_progress` (an update is refused,
+  Decision 38), and the Merchant compared it with the signed checkout when `complete` began (M5), so
+  it is the signed checkout. `invoice_id` and `custom_id` are compared on the order and on the
+  authorization, each with its own reason.
+- **G-STATUS** also fails if the order lists any authorization other than the attempt's, or any
+  capture. **G-AMOUNT** compares the authorization and the order amount with the checkout total.
+- The first failing step ends the run (INV-10). A raised order therefore stops at G-TERMS, which comes
+  before G-AMOUNT, and G-AMOUNT is covered by a test in which only the authorized amount differs.
+
+### Decision 43: The fail path lets PayPal decide what is true
+
+**Status: confirmed by the owner.**
+
+Resolves: what a step failure, an exception or a log failure does (INV-10, INV-12).
+
+- Whatever failed, the next thing the gate does is read PayPal: the order and every authorization it
+  lists. Then, per authorization: `CAPTURED` or `PARTIALLY_CAPTURED` (the attempt's own) is settled as
+  captured by reading the capture (Decision 44), never voided (PayPal refuses it:
+  `PREVIOUSLY_CAPTURED`); `CREATED` or `PENDING` is voided and the void is confirmed by a GET that
+  must show `VOIDED` (a void answer can be incomplete); `VOIDED`, `EXPIRED` and `DENIED` need nothing;
+  any other status is unresolved. Every authorization on the order is handled, not only the attempt's.
+- Only when every authorization is confirmed ended does one transaction void the spend entry, release
+  both reservations (the open mandate can be used again with a NEW checkout; this checkout's id, hash
+  and nonce stay consumed, Decisions 1 and 2) and mark the attempt `voided` with the failing code and
+  reason, and a signed rejection Payment Receipt is returned.
+- If PayPal cannot be read, a void cannot be confirmed, or that transaction fails, the attempt becomes
+  `unresolved`, the spend entry stays in flight and the reservations stay reserved. No receipt is
+  issued: neither "captured" nor "rejected" is known. A later `run` or `recover` settles it by reading.
+- A PayPal call whose "started" entry cannot be written to the log is not made (as in Decision 40), so
+  with the log down a void is not attempted and the attempt ends `unresolved`; the authorization then
+  expires by itself.
+- UCP codes: G-MANDATE is `mandate_expired` when the reason says expired, else
+  `mandate_scope_mismatch`; G-BUDGET is `mandate_scope_mismatch`; G-LOCK is `mandate_required`; every
+  other step is `payment_failed`. The receipt's `error_description` is the fixed reason.
+
+### Decision 44: Capture, its confirmation, and the receipt
+
+**Status: confirmed by the owner.**
+
+Resolves: what counts as a captured payment.
+
+- The gate captures with the sealed `CaptureApproval` (Decision 19): the whole authorization,
+  `final_capture` true, one request. It then GETs the capture and the authorization. Success needs the
+  capture `COMPLETED`, `final_capture` true, an amount equal to the checkout total, the approved
+  `custom_id` when the capture reports one, and the authorization `CAPTURED`. Anything else is not
+  success: the fail path reads PayPal and, since the authorization is captured, ends `unresolved`
+  (`G-CAPTURE`), keeping the money reserved. It is never voided.
+- A capture request that fails with a definite refusal (for example the authorization was voided) and
+  leaves the authorization uncaptured takes the normal fail path and voids. A capture whose answer was
+  lost is confirmed by reading PayPal.
+- Books are finalized in one transaction: spend entry to `captured`, both reservations `consumed`,
+  attempt `captured` with the capture id and receipt, and a `gate.captured` log entry. If that
+  transaction fails the attempt is `unresolved` (`bookkeeping_failed`) and a retry finishes it without
+  capturing again.
+- **Success Payment Receipt** (`ap2/schemas/ap2/payment_receipt.json`, type `payment-receipt+jwt`):
+  `status` `Success`, `iss`, `iat`, `reference` (the digest of the closed Payment Mandate),
+  `payment_id` (the checkout id), `psp_confirmation_id` (the PayPal capture id) and
+  `network_confirmation_id`. PayPal is a closed-loop PSP here and reports no separate network
+  transaction reference to this client, so `network_confirmation_id` repeats the capture id. **To
+  confirm.**
+- `ABL_NO_GATE` skips every step and captures the amount the authorization states, through the same
+  sealed approval, confirmation and bookkeeping. It is the naive baseline, refused when
+  `APP_ENV=demo` (`countersign.ablations`). With it, an order raised after approval is captured at the
+  raised amount (tested), and the spend entry keeps the reserved amount, which is one of the ways the
+  baseline's budget is wrong.
+
+### Decision 45: UCP complete with the gate
+
+**Status: confirmed by the owner.**
+
+Resolves: what the final response says.
+
+- `CompleteCoordinator` runs the Merchant, the Credential Provider and then the gate. A gate pass
+  moves the checkout to `completed`. A gate rejection releases the reservations itself and the
+  service cancels the checkout (`checkout_canceled_after_rejection`), as for any rejection after the
+  single-use keys were spent. An unresolved payment leaves the checkout `complete_in_progress` with
+  one `payment_failed` error ("could not be confirmed yet"); a later `complete` calls the gate again,
+  which settles by reading PayPal. A concurrent complete is told `complete_in_progress`.
+- A completed checkout carries `order` (UCP `order_confirmation`): `id` is the checkout id and
+  `permalink_url` is the checkout resource URL. The service keeps no separate order record, so the
+  order is derived and appears on every later read. The PayPal order and capture ids are in the
+  receipt and the log.
+- The response carries the signed Payment Receipt in `ap2.payment_receipt` on the complete that
+  captured. It is outside `merchant_authorization` (which excludes `ap2`) and is a JWS of its own. The
+  UCP extension defines no slot for receipts, so these members are a Countersign extension (the
+  vendored `ap2` object schema allows other members). The same response carries `ap2.checkout_receipt`,
+  a Success Checkout Receipt issued by the Merchant role when the order completes
+  (`CheckoutMandateVerifier.completion_receipt`): `reference` is the digest of the closed Checkout
+  Mandate (as at acceptance) and `order_id` the checkout id. The receipt returned at acceptance goes
+  only to the first `complete`, which cannot carry it when a payer approval comes first, so this one
+  is issued again from the stored mandate. It is a new receipt with a later `iat`, not the same JWS.
+- Without a configured gate the payment stays authorized and in flight (nothing is captured).
+
+### Decision 46: The principal lock as the gate sees it
+
+**Status: confirmed by the owner.**
+
+Resolves: G-LOCK before the lock exists.
+
+- `LockPolicy` is a Protocol in `gate/policy.py`: `check(LockQuery) -> LockDecision`. The default
+  policy denies everything. A policy that raises, or returns anything but a `LockDecision`, is a denial.
+  The gate imports neither `lock/` nor any protocol adapter (import guard test).
+- The provisional adapter that first answered G-LOCK (a `# SHORTCUT:` that only checked that a mandate
+  chain was stored) is removed. `GateLockAdapter` (in `countersign.completion`, the composition root)
+  now answers it from the principal lock ([Decision 49](#decision-49-entry-points-and-the-ucp-signals)).
+
+### Decision 47: Where the customer id comes from
+
+Resolves: gap 12 (principal identity) and the principal of Decision 40 (the agent key thumbprint
+stood in for it).
+
+- **Source.** The customer id is the `sub` claim (RFC 7519) of the issuer-signed JWT of link 0 of a
+  mandate: the JWT the trusted platform provider signs ([Decision 5](#decision-5-trusted-platform-provider-with-a-device-consent-signature)).
+  `verify_chain` has already verified that signature, and a top-level claim is not selectively
+  disclosable, so a verifier sees it without help from the agent and the agent cannot alter or withhold
+  it. The principal is `(customer id, thumbprint of the key in the open mandate's cnf)`. Code:
+  `mandates.customer_id_of`, `lock.principal_from_chain`.
+- **Validity.** A `sub` counts only if it is a printable, trimmed string of 1 to 128 characters.
+  Anything else is "no customer id". When the Payment Mandate and the Checkout Mandate both name one
+  they must agree (`VerifiedPayment.customer_id`); if they differ the customer is unknown.
+- **Unknown is never unlocked.** A principal without a customer id is matched on its known parts. When
+  the merchant policy requires AP2 for the total, or the lock that matched names a customer, an
+  unknown customer is denied (`denied:customer_unknown`). With the policy off and no lock that names a
+  customer, it is treated like any principal whose lock requirement is only the mandate.
+- **Alternatives considered.**
+  1. *A member inside the selectively disclosable open mandate content.* It is inside AP2's content
+     model, but the agent decides what to disclose, the strict content rules would need an extension,
+     and it is a Countersign member in a standard credential. Rejected.
+  2. *The customer id of the Trusted Surface consent record* ([Decision 5](#decision-5-trusted-platform-provider-with-a-device-consent-signature)).
+     It is the right root but it is not carried in the mandate, so a verifier would need a lookup by
+     device key at every request. Rejected for the hot path; the consent record stays evidence.
+  3. *The agent key thumbprint only* (the status quo). It cannot tell two customers of one agent apart,
+     and a Human Present mandate has no agent key. Kept as the fallback half of the principal.
+- **Consequence for the build.** The platform provider (the Trusted Surface backend, P3) must write
+  `sub` when it signs a mandate. Until it does, mandates carry none, and the lock treats the customer
+  as unknown ([LIMITATIONS.md](LIMITATIONS.md) L19). The vault principal of Decision 40 is still the
+  agent key and moves to the pair in P3. **For the owner to confirm.**
+
+### Decision 48: The shared lock function and the merchant policy
+
+Resolves: what "locked" means and what the policy can say.
+
+- **One function.** `PrincipalLock.decide(LockRequest) -> LockVerdict` holds all the logic. A request
+  has an operation (`create`, `update`, `complete`, `capture`), the checkout id, a `Principal` or none,
+  `negotiated_ap2`, `mandate_valid` and the total. It has no protocol and no session field, so the lock
+  cannot key on either (INV-5); the two "key uses protocol" and "key uses session" mutations are
+  therefore only expressible as a changed key, which the tests catch.
+- **Order.** Read the policy (unreadable or hash mismatch denies); if AP2 is in use and the principal is
+  known, record the lock; a mandate is required when this session negotiated AP2, the principal is
+  locked, or the policy requires AP2 for the total; create and update need the capability, complete and
+  capture need a valid mandate; the decision is logged before it is returned and a log failure denies.
+- **Matching.** A lock matches a principal when the known customer and the known agent parts agree
+  (an unknown part matches anything) and at least one known part is equal. So an agent key alone and a
+  customer alone (Human Present) both find the lock, and two customers sharing an agent do not share
+  a lock. A lock is in force when the newest event for its exact key is `lock`.
+- **Storage** (migration 0005): `lock_policies` (versioned, hashed, insert only) and `lock_events`
+  (insert only). The runtime role has SELECT and INSERT only. Recording takes a transaction-level
+  advisory lock on the key and inserts only if the newest event is not already a lock, so parallel
+  negotiations leave one event; the record and its log entry are one transaction.
+- **Policy** is pure data: `off`, `all`, or `over_threshold` with a threshold in integer minor units
+  and a currency (INV-9). Over means strictly above. A total that cannot be compared (another
+  currency, or none) counts as over. The unmandated cap and velocity limits are not built.
+- **Unlock** is the merchant action `PrincipalLock.unlock`: a new policy version, an `unlock` event and
+  a log entry in one transaction. No protocol adapter or HTTP route reaches it.
+- **Privacy of the log.** Lock entries record whether a customer and an agent were known, never the
+  customer id or the thumbprint.
+
+### Decision 49: Entry points and the UCP signals
+
+Resolves: how the UCP adapter, which does not fetch platform profiles (L11), takes part.
+
+- **Enforcement points**, all calling `decide`: UCP create and update in `UcpService`; UCP complete in
+  `CompleteCoordinator` (once before the Merchant when no mandate was presented, once after the
+  Merchant accepted, with the principal named by the verified chain, releasing the Merchant
+  reservation on a denial); the capture gate through `GateLockAdapter`, built at the composition root
+  because the gate may not import the lock. The Credential Provider never authorizes without a
+  verified mandate, which is the same requirement. The adapter reads `verdict.allowed` and nothing
+  else (a test checks the adapter source for lock internals).
+- **Two request headers**, a Countersign extension: `Countersign-Delegation` carries an open Checkout
+  Mandate that names the principal (verified against the one trusted platform key, unexpired; anything
+  that does not verify names nobody), and `Countersign-Capabilities` lists the capabilities the agent
+  negotiated. `dev.ucp.common.payment.ap2_mandate` there counts as negotiating AP2. UCP does this by
+  profile; this server fetches none, so the header stands in for it. Identity and negotiation are
+  separate on purpose: an agent that identifies itself but does not negotiate AP2 is the new-session
+  escape, and is denied when its principal is locked.
+- **Lock on negotiation.** A create (or update, or complete with a mandate) that shows AP2 in use for a
+  known principal records the lock before the decision is returned, so a later checkout by that
+  principal on any protocol or session is processed under it.
+- **What it cannot do.** An agent that sends no delegation is unidentified. The lock cannot apply to
+  it; only the merchant policy can (`all`, or over the threshold). That is the stated limit of the
+  design ([LIMITATIONS.md](LIMITATIONS.md) L20). The real ACP adapter (P2.7) will resolve a principal
+  from its own identity header and call the same function; until then a test-only second entry point
+  stands in.
+- **Denial** is the UCP code `mandate_required` for every lock reason (the reason is in the log and, for
+  the gate, in the receipt). A denied create returns an error response with no resource.
+
+### Decision 50: Ablation and failure
+
+- `ABL_NO_PRINCIPAL_LOCK` (refused when `APP_ENV=demo`) records nothing and ignores stored locks: only
+  the session that negotiated AP2 is protected. With it on, a second session or a second protocol path
+  without a mandate gets through to the point where the Credential Provider or the gate would run; with
+  it off it is denied with `mandate_required`. Tested both ways.
+- A store that cannot be read, a policy whose hash does not match its row, an exception, or a log
+  that cannot be written all deny (INV-10, INV-12). A lock recorded in a transaction whose log entry
+  fails is not recorded.
 
 ---
 

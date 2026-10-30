@@ -4,8 +4,11 @@ It models what the recorded runs showed (docs/PROTOCOL.md section 4): create ans
 Request-Id (a repeated id replays the first result), an order is `APPROVED` only after the payer
 approves it, authorize needs `APPROVED` and authorizes the amount the order has AT THAT MOMENT
 (so a PATCH while `APPROVED` flows into the authorization), a vaulted merchant-initiated order is
-created and authorized in one call, void is idempotent per Request-Id. Failures can be injected per
-operation. Nothing here is a real credential.
+created and authorized in one call, void is idempotent per Request-Id. Capture follows section 4.5:
+a final capture moves the authorization to `CAPTURED`, a void after a capture is
+`PREVIOUSLY_CAPTURED`, a capture of a voided authorization is `AUTHORIZATION_VOIDED`, one above the
+authorized amount is `MAX_CAPTURE_AMOUNT_EXCEEDED`. Failures can be injected per operation.
+Nothing here is a real credential.
 """
 
 from __future__ import annotations
@@ -40,6 +43,11 @@ class PayPalSim:
         self.extra_auth = False
         self.auth_amount_override: str | None = None
         self.vault_mutation: dict[str, str] | None = None
+        self.captures: dict[str, dict[str, Any]] = {}
+        self.fail_when: dict[str, Callable[[PayPalSim], bool]] = {}
+        self.capture_status = "COMPLETED"
+        self.capture_amount_override: str | None = None
+        self.auth_status_after_capture = "CAPTURED"
 
     # ---- controls for tests
 
@@ -56,6 +64,7 @@ class PayPalSim:
         amount: str | None = None,
         custom_id: str | None = None,
         item_name: str | None = None,
+        invoice_id: str | None = None,
     ) -> None:
         order = self.orders[order_id]
         unit = order["unit"]
@@ -74,6 +83,8 @@ class PayPalSim:
             unit["items"][0]["quantity"] = "1"
         if custom_id is not None:
             unit["custom_id"] = custom_id
+        if invoice_id is not None:
+            unit["invoice_id"] = invoice_id
         if item_name is not None:
             unit["items"][0]["name"] = item_name
 
@@ -114,8 +125,13 @@ class PayPalSim:
         unit = copy.deepcopy(order["unit"])
         unit["payee"] = {"merchant_id": MERCHANT}
         auths = [a for a in self.authorizations.values() if a["order"] == order_id]
-        if auths:
-            unit["payments"] = {"authorizations": [self._auth_json(a) for a in auths]}
+        caps = [c for c in self.captures.values() if c["order"] == order_id]
+        if auths or caps:
+            unit["payments"] = {}
+            if auths:
+                unit["payments"]["authorizations"] = [self._auth_json(a) for a in auths]
+            if caps:
+                unit["payments"]["captures"] = [self._auth_json(c) for c in caps]
         body: dict[str, Any] = {
             "id": order_id,
             "status": order["status"],
@@ -174,6 +190,9 @@ class PayPalSim:
                       "expires_in": 32400},
             )  # fmt: skip
         op = self._op(method, path)
+        failing = self.fail_when.get(op)
+        if failing is not None and failing(self):
+            return server_error(request)
         for hook in self.hooks.get(op, [])[:1]:
             self.hooks[op].pop(0)
             injected = hook(request)
@@ -194,6 +213,12 @@ class PayPalSim:
             return "authorize"
         if method == "POST" and path.endswith("/void"):
             return "void"
+        if method == "PATCH" and path.startswith("/v2/checkout/orders/"):
+            return "patch"
+        if method == "POST" and path.endswith("/capture"):
+            return "capture"
+        if method == "GET" and path.startswith("/v2/payments/captures/"):
+            return "get_capture"
         if method == "GET" and path.startswith("/v2/checkout/orders/"):
             return "get_order"
         if method == "GET" and path.startswith("/v2/payments/authorizations/"):
@@ -230,6 +255,19 @@ class PayPalSim:
                       "links": [{"href": f"https://www.sandbox.paypal.com/checkoutnow?token={order_id}",
                                  "rel": "payer-action"}]},
             )  # fmt: skip
+        if method == "PATCH" and path.startswith("/v2/checkout/orders/"):
+            order = self.orders.get(path.rsplit("/", 1)[1])
+            if order is None:
+                return httpx.Response(404, headers=debug, json={"name": "RESOURCE_NOT_FOUND"})
+            if order["status"] != "APPROVED":  # recorded: refused once authorized (4.3)
+                return httpx.Response(
+                    422, headers=debug,
+                    json={"name": "UNPROCESSABLE_ENTITY", "details": [{"issue": "INVALID_OPERATION"}]},
+                )  # fmt: skip
+            for op in json.loads(request.content):
+                key = op["path"].rsplit("/", 1)[1]
+                order["unit"][key] = op["value"]
+            return httpx.Response(204, headers=debug)
         if method == "GET" and path.startswith("/v2/checkout/orders/"):
             order_id = path.rsplit("/", 1)[1]
             if order_id not in self.orders:
@@ -266,8 +304,56 @@ class PayPalSim:
                     422, headers=debug,
                     json={"name": "UNPROCESSABLE_ENTITY", "details": [{"issue": "PREVIOUSLY_VOIDED"}]},
                 )  # fmt: skip
+            if auth["status"] in ("CAPTURED", "PARTIALLY_CAPTURED"):
+                return httpx.Response(
+                    422, headers=debug,
+                    json={"name": "UNPROCESSABLE_ENTITY", "details": [{"issue": "PREVIOUSLY_CAPTURED"}]},
+                )  # fmt: skip
             auth["status"] = "VOIDED"
             return httpx.Response(204, headers=debug)
+        if method == "POST" and path.endswith("/capture"):
+            auth = self.authorizations.get(path.split("/")[-2])
+            if auth is None:
+                return httpx.Response(404, headers=debug, json={"name": "RESOURCE_NOT_FOUND"})
+            issue = {
+                "VOIDED": "AUTHORIZATION_VOIDED",
+                "CAPTURED": "AUTHORIZATION_ALREADY_CAPTURED",
+            }.get(auth["status"])
+            body = json.loads(request.content)
+            from decimal import Decimal
+
+            if issue is None and Decimal(body["amount"]["value"]) > Decimal(
+                auth["amount"]["value"]
+            ):
+                issue = "MAX_CAPTURE_AMOUNT_EXCEEDED"
+            if issue is not None:
+                return httpx.Response(
+                    422, headers=debug,
+                    json={"name": "UNPROCESSABLE_ENTITY", "details": [{"issue": issue}]},
+                )  # fmt: skip
+            capture = {
+                "id": self._id("CAP"),
+                "order": auth["order"],
+                "status": self.capture_status,
+                "amount": (
+                    {**body["amount"], "value": self.capture_amount_override}
+                    if self.capture_amount_override
+                    else body["amount"]
+                ),
+                "final_capture": bool(body.get("final_capture")),
+                "invoice_id": auth["invoice_id"],
+                "custom_id": auth["custom_id"],
+            }
+            self.captures[capture["id"]] = capture
+            auth["status"] = self.auth_status_after_capture
+            return httpx.Response(
+                201, headers=debug, json={"id": capture["id"], "status": capture["status"]}
+            )
+        if method == "GET" and path.startswith("/v2/payments/captures/"):
+            capture = self.captures.get(path.rsplit("/", 1)[1])
+            if capture is None:
+                return httpx.Response(404, headers=debug, json={"name": "RESOURCE_NOT_FOUND"})
+            return httpx.Response(200, headers=debug, json=self._auth_json(capture))
         return httpx.Response(404, headers=debug, json={"name": "RESOURCE_NOT_FOUND"})
 
 

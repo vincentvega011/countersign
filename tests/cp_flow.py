@@ -19,6 +19,7 @@ from typing import Any
 from joserfc.jwk import ECKey
 from sqlalchemy import Engine
 
+from countersign.ablations import Ablations
 from countersign.canonical import sd_hash
 from countersign.canonical.models import Checkout
 from countersign.catalog.catalog import Catalog, load_catalog
@@ -53,6 +54,7 @@ class FlowFixture:
     payment_token: str
     platform_jwk: dict[str, Any]  # public
     now: int
+    merchant_jwk: dict[str, Any] | None = None  # public key that signed the checkout JWT
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), indent=1, sort_keys=True) + "\n"
@@ -97,14 +99,15 @@ def build_fixture(checkout_id: str, catalog: Catalog | None = None) -> FlowFixtu
                nonce="rec-payment", edit_open_content=open_payment,
                edit_kb_content=closed_payment)  # fmt: skip
     return FlowFixture(
-        checkout_id, cm.token, pm.token, dict(keys.issuer.as_dict(private=False)), NOW
-    )
+        checkout_id, cm.token, pm.token, dict(keys.issuer.as_dict(private=False)), NOW,
+        dict(merchant_key.public_jwk),
+    )  # fmt: skip
 
 
-def make_provider(
-    engine: Engine, client: PayPalClient, fixture: FlowFixture, *, payee_merchant_id: str
-) -> CredentialProvider:
-    config = CpConfig(
+def make_config(
+    fixture: FlowFixture, *, payee_merchant_id: str, ablations: Ablations | None = None
+) -> CpConfig:
+    return CpConfig(
         issuer="https://merchant.example",
         signing_key=validate_jwk(generate_jwk()),
         platform_key=ECKey.import_key(fixture.platform_jwk),
@@ -112,7 +115,19 @@ def make_provider(
         paypal_payee_merchant_id=payee_merchant_id,
         return_url=RETURN_URL,
         cancel_url=CANCEL_URL,
+        ablations=ablations or Ablations(),
     )
+
+
+def make_provider(
+    engine: Engine,
+    client: PayPalClient,
+    fixture: FlowFixture,
+    *,
+    payee_merchant_id: str,
+    config: CpConfig | None = None,
+) -> CredentialProvider:
+    config = config or make_config(fixture, payee_merchant_id=payee_merchant_id)
     return CredentialProvider(
         config, engine, client, clock=lambda: float(fixture.now),
         evaluator=PaymentConstraintEvaluator(),

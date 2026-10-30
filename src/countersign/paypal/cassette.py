@@ -13,11 +13,19 @@ scope, merchant (account) ids and e-mail addresses are replaced by key, whole `p
 them), and any known secret string (the client id and secret, and every access token seen) is replaced
 wherever it appears. As a last check `save` rejects the file if it still contains a known secret, a
 `Bearer` token, or an `@` anywhere (an e-mail address).
+
+The one exemption is structural, not a loosening: the `path` of a JSON Patch operation in a request
+body (`/purchase_units/@reference_id=='default'/items`) legitimately contains an `@`. Only a string
+that is the `path` member of an `{"op", "path", ...}` operation AND matches `_PATCH_PATH` is
+neutralized before the text check; an `@` anywhere else, or a patch path of another shape, still
+refuses the file. When the check fails, `find_violations` reports only where (entry index, operation,
+JSON path) and which rule matched, never a value.
 """
 
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
@@ -41,6 +49,11 @@ _KEYS = frozenset(
     }
 )
 _DROP = frozenset({"payer", "shipping", "payment_source"})
+_PATCH_PATH = re.compile(r"/[A-Za-z0-9_/]*(@[A-Za-z_]+=='[A-Za-z0-9_]+')?[A-Za-z0-9_/]*")
+_PATH_WORDS = frozenset(
+    {"v1", "v2", "checkout", "orders", "payments", "authorizations", "captures", "authorize",
+     "capture", "void", "refund", "oauth2", "token"}
+)  # fmt: skip
 _KEPT_RESPONSE_HEADERS = ("paypal-debug-id", "content-type")
 
 
@@ -90,6 +103,65 @@ def check_clean(text: str, secrets: Iterable[str]) -> None:
             raise CassetteError("the cassette still contains a known secret; nothing was written")
     if "Bearer " in text or "@" in text:
         raise CassetteError("the cassette contains a bearer token or an e-mail address")
+
+
+def _is_patch_op(node: Any) -> bool:
+    return (
+        isinstance(node, dict)
+        and isinstance(node.get("op"), str)
+        and isinstance(node.get("path"), str)
+        and _PATCH_PATH.fullmatch(node["path"]) is not None
+    )
+
+
+def _neutralized(node: Any) -> Any:
+    """A copy with the `path` of every well-formed JSON Patch operation replaced (for the text check)."""
+    if isinstance(node, dict):
+        patch = _is_patch_op(node)
+        return {
+            k: ("PATCH_PATH" if patch and k == "path" else _neutralized(v)) for k, v in node.items()
+        }
+    if isinstance(node, list):
+        return [_neutralized(x) for x in node]
+    return node
+
+
+def _operation(request: Mapping[str, Any]) -> str:
+    path = str(request.get("path", "")).split("?")[0]
+    kept = [seg if seg in _PATH_WORDS else "{id}" for seg in path.split("/") if seg]
+    return f"{request.get('method', '?')} /{'/'.join(kept)}"
+
+
+def find_violations(
+    interactions: list[dict[str, Any]], secrets: Iterable[str]
+) -> list[tuple[int, str, str, str]]:
+    """Where a document still holds something sensitive: (entry index, operation, JSON path, rule).
+
+    Rules are `secret`, `bearer` and `email` (any `@`). Values are never returned. A string that is
+    the `path` of a well-formed JSON Patch operation is exempt from the `email` rule only.
+    """
+    known = [s for s in secrets if isinstance(s, str) and len(s) >= 4]
+    found: list[tuple[int, str, str, str]] = []
+
+    def walk(node: Any, where: str, index: int, op: str, patch_path: bool = False) -> None:
+        if isinstance(node, dict):
+            for key, item in node.items():
+                walk(item, f"{where}.{key}", index, op, _is_patch_op(node) and key == "path")
+        elif isinstance(node, list):
+            for n, item in enumerate(node):
+                walk(item, f"{where}[{n}]", index, op)
+        elif isinstance(node, str):
+            if any(secret in node for secret in known):
+                found.append((index, op, where, "secret"))
+            if "Bearer " in node:
+                found.append((index, op, where, "bearer"))
+            if "@" in node and not patch_path:
+                found.append((index, op, where, "email"))
+
+    for index, interaction in enumerate(interactions):
+        op = _operation(interaction["request"])
+        walk(interaction, "$", index, op)
+    return found
 
 
 def _json_or_none(content: bytes, content_type: str) -> Any:
@@ -161,7 +233,13 @@ class RecordingTransport(httpx.BaseTransport):
             "interactions": interactions,
         }
         text = json.dumps(document, indent=2, sort_keys=True) + "\n"
-        check_clean(text, self._secrets)
+        problems = find_violations(interactions, self._secrets)
+        if problems:
+            where = "; ".join(f"entry {i} {op} at {path}: {rule}" for i, op, path, rule in problems)
+            raise CassetteError(
+                f"the cassette still holds sensitive data; nothing was written: {where}"
+            )
+        check_clean(json.dumps(_neutralized(document), indent=2, sort_keys=True), self._secrets)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
 

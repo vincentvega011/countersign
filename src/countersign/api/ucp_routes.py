@@ -28,6 +28,7 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
+from countersign.mandates import MAX_MANDATE_CHARS
 from countersign.merchant.authorization import sign_checkout
 from countersign.merchant.keys import MerchantKey
 from countersign.protocols.ucp import messages as m
@@ -39,7 +40,7 @@ from countersign.protocols.ucp.requests import (
     parse_json_object,
     read_body,
 )
-from countersign.protocols.ucp.service import Result, UcpService
+from countersign.protocols.ucp.service import RequestContext, Result, UcpService
 
 log = structlog.get_logger()
 
@@ -84,6 +85,20 @@ def _respond(
     return _json(result.http_status, body)
 
 
+DELEGATION_HEADER = "Countersign-Delegation"
+CAPABILITIES_HEADER = "Countersign-Capabilities"
+
+
+def ctx(request: Request) -> RequestContext:
+    """The delegation header, if any. It is only a claim: the lock verifies it before using it."""
+    value = request.headers.get(DELEGATION_HEADER)
+    raw = request.headers.get(CAPABILITIES_HEADER, "")
+    capabilities = tuple(t.strip() for t in raw[:2048].split(",") if t.strip())
+    return RequestContext(
+        value if value and len(value) <= MAX_MANDATE_CHARS else None, capabilities
+    )
+
+
 def install(app: FastAPI, service: UcpService, base_path: str, key: MerchantKey) -> None:
     """Mount the checkout routes and the error handlers on `app`."""
     router = APIRouter(prefix=base_path)
@@ -102,7 +117,7 @@ def install(app: FastAPI, service: UcpService, base_path: str, key: MerchantKey)
     async def create(request: Request) -> JSONResponse:
         data = await prepare(request, body="required")
         req = parse_checkout_request(data, update=False)
-        return _respond(await run_in_threadpool(service.create, req), key, data)
+        return _respond(await run_in_threadpool(service.create, req, ctx(request)), key, data)
 
     @router.get("/checkout-sessions/{checkout_id}")
     async def get(checkout_id: str, request: Request) -> JSONResponse:
@@ -113,14 +128,16 @@ def install(app: FastAPI, service: UcpService, base_path: str, key: MerchantKey)
     async def update(checkout_id: str, request: Request) -> JSONResponse:
         data = await prepare(request, body="required")
         req = parse_checkout_request(data, update=True)
-        result = await run_in_threadpool(service.update, checkout_id, req)
+        result = await run_in_threadpool(service.update, checkout_id, req, ctx(request))
         return _respond(result, key, data)
 
     @router.post("/checkout-sessions/{checkout_id}/complete")
     async def complete(checkout_id: str, request: Request) -> JSONResponse:
         data = await prepare(request, body="required")
         req = parse_complete_request(data)
-        return _respond(await run_in_threadpool(service.complete, checkout_id, req), key)
+        return _respond(
+            await run_in_threadpool(service.complete, checkout_id, req, ctx(request)), key
+        )
 
     @router.post("/checkout-sessions/{checkout_id}/cancel")
     async def cancel(checkout_id: str, request: Request) -> JSONResponse:

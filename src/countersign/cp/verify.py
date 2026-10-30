@@ -45,6 +45,7 @@ from countersign.mandates import (
     VCT_PAYMENT_OPEN,
     MandateError,
     VerifiedChain,
+    customer_id_of,
     split_chain,
     verify_chain,
 )
@@ -70,6 +71,9 @@ class VerifiedPayment:
     checkout_reference: str  # digest of the closed Checkout Mandate
     open_payment_digest: str  # key of the budget and of the mandate-in-flight reservation
     principal: str | None  # thumbprint of the agent key named in the open Payment Mandate
+    customer_id: str | None = (
+        None  # `sub` of the platform-signed issuer JWT, if both mandates agree
+    )
 
 
 def _map(error: MandateError, step: str, prefix: str) -> CpRejection:
@@ -103,6 +107,15 @@ def _verify(
     except MandateError as error:
         raise _map(error, "C2", prefix) from None
     return chain, mode
+
+
+def _customer(payment: VerifiedChain, checkout: VerifiedChain) -> str | None:
+    """The customer both mandates name; None if either names none or they disagree (Decision 47)."""
+    first, second = (
+        customer_id_of(payment.links[0].claims),
+        customer_id_of(checkout.links[0].claims),
+    )
+    return first if first is not None and first == second else None
 
 
 def verify_payment(
@@ -170,4 +183,5 @@ def verify_payment(
         checkout_reference=checkout.final.digest,
         open_payment_digest=payment.links[0].digest,
         principal=payment.links[0].cnf_thumbprint,
+        customer_id=_customer(payment, checkout),
     )

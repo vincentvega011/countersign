@@ -33,6 +33,7 @@ OUTSIDE_MINTERS = {
     "tests/unit/test_paypal_client.py",
 }
 OUTSIDE_CAPTURERS = {
+    "tests/integration/test_gate_flow.py",  # checks that the client refuses a capture without a gate approval
     "tests/ungated_capture_cycle.py",
     "tests/unit/test_paypal_client.py",
     "tests/unit/test_paypal_strict_json.py",

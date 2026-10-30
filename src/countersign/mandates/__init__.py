@@ -17,6 +17,7 @@ from countersign.mandates.chain import (
 from countersign.mandates.cnf import extract_cnf_key
 from countersign.mandates.errors import MandateError
 from countersign.mandates.structure import MAX_MANDATE_CHARS, RawLink, split_chain
+from countersign.mandates.subject import customer_id_of
 from countersign.mandates.timecheck import CLOCK_SKEW_SECONDS, Clock
 
 __all__ = [
@@ -32,6 +33,7 @@ __all__ = [
     "RawLink",
     "VerifiedChain",
     "VerifiedLink",
+    "customer_id_of",
     "extract_cnf_key",
     "split_chain",
     "verify_chain",

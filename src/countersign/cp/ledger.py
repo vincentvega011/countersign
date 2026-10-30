@@ -49,12 +49,24 @@ class SpendLedger:
         if row.currency != currency:
             raise BudgetError("the open mandate was first seen in another currency")
 
-    def view(self, conn: Connection, digest: str, currency: str) -> SpendView:
-        rows = conn.execute(
+    def view(
+        self,
+        conn: Connection,
+        digest: str,
+        currency: str,
+        *,
+        exclude_checkout_id: str | None = None,
+    ) -> SpendView:
+        """The spend view of an open mandate. The capture gate passes its own checkout id so its
+        own in-flight reservation is not counted twice (the evaluator adds this purchase itself)."""
+        query = (
             select(spend_entries.c.state, func.coalesce(func.sum(spend_entries.c.amount_minor), 0))
             .where(spend_entries.c.mandate_digest == digest, spend_entries.c.state != "voided")
             .group_by(spend_entries.c.state)
-        ).all()
+        )
+        if exclude_checkout_id is not None:
+            query = query.where(spend_entries.c.checkout_id != exclude_checkout_id)
+        rows = conn.execute(query).all()
         totals = {state: int(total) for state, total in rows}
         return SpendView(currency, totals.get("captured", 0), totals.get("in_flight", 0))
 

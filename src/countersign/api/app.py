@@ -15,7 +15,7 @@ from countersign.catalog.catalog import Catalog, load_catalog
 from countersign.merchant.keys import MerchantKey, load_merchant_key
 from countersign.merchant.policy import policy_hash
 from countersign.protocols.ucp.profile import REST_BASE_PATH, build_profile
-from countersign.protocols.ucp.service import CompletionPort, UcpService, now_us
+from countersign.protocols.ucp.service import CompletionPort, LockPort, UcpService, now_us
 
 DEFAULT_KEY_PATH = "secrets/merchant_es256.jwk.json"
 DEFAULT_BASE_URL = "http://localhost:8000"
@@ -30,6 +30,7 @@ def create_app(
     catalog: Catalog | None = None,
     clock_us: Callable[[], int] | None = None,
     completion: CompletionPort | None = None,
+    lock: LockPort | None = None,
 ) -> FastAPI:
     """Create the app. Without an explicit `key`, load `MERCHANT_KEY_PATH` or fail.
 
@@ -37,6 +38,8 @@ def create_app(
     surfacing on the first request. The engine is created from `DATABASE_URL` when not given; it
     does not connect until the first checkout request. `completion` is the Merchant and Credential
     Provider wiring (`countersign.completion`); without it `complete` never succeeds (fail closed).
+    `lock` is the shared principal lock; the composition root passes the same one to the completion
+    coordinator and to the capture gate.
     """
     if key is None:
         key = load_merchant_key(os.environ.get("MERCHANT_KEY_PATH", DEFAULT_KEY_PATH))
@@ -60,6 +63,8 @@ def create_app(
         policy_hash=policy_hash(),
         clock_us=clock_us or now_us,
         completion=completion,
+        lock=lock,
+        order_base_url=f"{base.rstrip('/')}{REST_BASE_PATH}/checkout-sessions",
     )
     install_ucp(app, service, REST_BASE_PATH, key)
     return app

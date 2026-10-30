@@ -26,14 +26,16 @@ import re
 import secrets
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
-from typing import Any, Protocol
+from dataclasses import dataclass, field, replace
+from functools import wraps
+from typing import Any, Literal, Protocol
 
 from sqlalchemy import Connection, Engine
 
 from countersign.canonical.models import Checkout
 from countersign.catalog.catalog import Catalog
 from countersign.ledger import store as ledger
+from countersign.lock import LockRequest, LockVerdict, Principal
 from countersign.protocols.ucp import messages as m
 from countersign.protocols.ucp import store
 from countersign.protocols.ucp.checkout_state import (
@@ -43,6 +45,7 @@ from countersign.protocols.ucp.checkout_state import (
     transition,
     updatable,
 )
+from countersign.protocols.ucp.profile import AP2_CAPABILITY
 from countersign.protocols.ucp.requests import CheckoutRequest, CompleteRequest, LineRequest
 from countersign.protocols.ucp.responses import checkout_response
 
@@ -58,23 +61,67 @@ Message = dict[str, Any]
 class CompletionOutcome:
     """What the completion port reports; the service turns it into status, messages and a link.
 
-    `kind` is `rejected`, `approval_required`, `pending`, `authorized` or `in_progress`.
-    `messages` are the UCP error messages of a rejection. `consumed` says whether the checkout's
-    single-use keys were reserved before the rejection (then the checkout is spent and canceled).
+    `kind` is `rejected`, `approval_required`, `pending`, `authorized`, `in_progress`, `captured`
+    or `unresolved`. `messages` are the UCP error messages of a rejection or of an unresolved
+    payment. `consumed` says whether the checkout's single-use keys were reserved before the
+    rejection (then the checkout is spent and canceled). `receipts` holds the signed receipts of
+    a `captured` outcome. An `unresolved` payment leaves the checkout `complete_in_progress`:
+    money may be held, so the checkout is neither completed nor canceled.
     """
 
     kind: str
     messages: tuple[Message, ...] = ()
     continue_url: str | None = None
     consumed: bool = False
+    receipts: dict[str, str] = field(default_factory=dict)
 
 
 class CompletionPort(Protocol):
-    """Merchant verification, then the Credential Provider (wired in `countersign.completion`)."""
+    """Merchant verification, the lock, then the Credential Provider (`countersign.completion`)."""
 
     def complete(
-        self, *, checkout: Checkout, mandate: str | None, payment_token: str | None, resume: bool
+        self,
+        *,
+        checkout: Checkout,
+        mandate: str | None,
+        payment_token: str | None,
+        resume: bool,
+        principal: Principal | None = None,
+        negotiated: bool = False,
     ) -> CompletionOutcome: ...
+
+
+class LockPort(Protocol):
+    """The shared lock function (`countersign.lock.PrincipalLock`); the adapter only calls it."""
+
+    def principal_from_delegation(self, token: str | None) -> Principal | None: ...
+
+    def decide(self, request: LockRequest) -> LockVerdict: ...
+
+
+@dataclass(frozen=True)
+class RequestContext:
+    """What the HTTP layer read besides the body.
+
+    `delegation` is an open mandate that names the principal (identity). `capabilities` are the
+    capabilities the agent says it negotiated; Countersign does not fetch the platform profile (L11),
+    so this header stands in for profile based negotiation (docs/PROTOCOL.md Decision 49).
+    """
+
+    delegation: str | None = None
+    capabilities: tuple[str, ...] = ()
+
+    @property
+    def negotiated_ap2(self) -> bool:
+        return AP2_CAPABILITY in self.capabilities
+
+
+_LOCK_DENIED = m.error_message(
+    m.MANDATE_REQUIRED,
+    "This agent must use AP2: negotiate the AP2 mandates capability and present a mandate.",
+    "recoverable",
+    "$.ap2",
+)
 
 
 def now_us() -> int:
@@ -94,17 +141,39 @@ class Result:
     record: store.CheckoutRecord | None
     messages: tuple[Message, ...] = ()
     continue_url: str | None = None
+    order: dict[str, str] | None = None
+    receipts: dict[str, str] = field(default_factory=dict)
 
     def body(self) -> dict[str, Any]:
         if self.record is None:
             return m.error_response(list(self.messages))
-        return checkout_response(
+        body = checkout_response(
             self.record.checkout,
             self.record.status,
             self.record.expires_us,
             list(self.messages),
             self.continue_url,
+            self.order,
         )
+        if self.receipts:
+            # Outside the merchant_authorization signature (which excludes `ap2`); each receipt is
+            # a signed JWS of its own (docs/PROTOCOL.md Decision 45).
+            body["ap2"] = dict(self.receipts)
+        return body
+
+
+def _with_order(method: Callable[..., Result]) -> Callable[..., Result]:
+    """A completed checkout always carries its order confirmation (UCP `order`)."""
+
+    @wraps(method)
+    def wrapper(self: UcpService, *args: Any, **kwargs: Any) -> Result:
+        result = method(self, *args, **kwargs)
+        record = result.record
+        if record is not None and record.status is Status.COMPLETED and result.order is None:
+            return replace(result, order=self._order_confirmation(record.checkout.id))
+        return result
+
+    return wrapper
 
 
 class UcpService:
@@ -117,10 +186,14 @@ class UcpService:
         clock_us: Callable[[], int] = now_us,
         new_id: Callable[[], str] = new_checkout_id,
         completion: CompletionPort | None = None,
+        lock: LockPort | None = None,
         ttl_us: int = TTL_US,
+        order_base_url: str = "http://localhost:8000/ucp/v1/checkout-sessions",
     ) -> None:
+        self._order_base_url = order_base_url.rstrip("/")
         self._engine = engine
         self._completion = completion
+        self._lock = lock
         self._catalog = catalog
         self._policy_hash = policy_hash
         self._clock = clock_us
@@ -128,6 +201,30 @@ class UcpService:
         self._ttl_us = ttl_us
 
     # ---- helpers ----
+
+    def _principal(self, ctx: RequestContext | None) -> Principal | None:
+        if self._lock is None or ctx is None:
+            return None
+        return self._lock.principal_from_delegation(ctx.delegation)
+
+    def _lock_denial(
+        self, op: Literal["create", "update"], checkout: Checkout, ctx: RequestContext | None
+    ) -> Message | None:
+        """Ask the shared lock about a create or update. The adapter makes no decision of its own."""
+        if self._lock is None:
+            return None
+        principal = self._principal(ctx)
+        total = next(t.amount for t in checkout.totals if t.type == "total")
+        verdict = self._lock.decide(
+            LockRequest(
+                op, checkout.id, principal, ctx is not None and ctx.negotiated_ap2, False, total
+            )
+        )
+        return None if verdict.allowed else _LOCK_DENIED
+
+    def _order_confirmation(self, checkout_id: str) -> dict[str, str]:
+        """The order of a completed checkout. Its id is the checkout id (docs/PROTOCOL.md Decision 45)."""
+        return {"id": checkout_id, "permalink_url": f"{self._order_base_url}/{checkout_id}"}
 
     def _log(self, conn: Connection, kind: str, record: store.CheckoutRecord, **extra: Any) -> None:
         payload: dict[str, Any] = {
@@ -254,14 +351,19 @@ class UcpService:
 
     # ---- operations ----
 
-    def create(self, req: CheckoutRequest) -> Result:
+    @_with_order
+    def create(self, req: CheckoutRequest, ctx: RequestContext | None = None) -> Result:
         lines, next_seq, errors = self._resolve(req, set(), 1, update=False)
         if errors:
             # No resource is created: an error response, unrecoverable for this request.
             return Result(200, None, tuple({**e, "severity": "unrecoverable"} for e in errors))
+        built = self._build(self._new_id(), lines)
+        denial = self._lock_denial("create", built, ctx)
+        if denial is not None:
+            return Result(200, None, ({**denial, "severity": "unrecoverable"},))
         now = self._clock()
         record = store.CheckoutRecord(
-            checkout=self._build(self._new_id(), lines),
+            checkout=built,
             status=Status.READY_FOR_COMPLETE,
             version=1,
             next_line_seq=next_seq,
@@ -275,12 +377,16 @@ class UcpService:
             self._log(conn, "checkout.created", record, lines=_lines_of(record))
         return Result(201, record)
 
+    @_with_order
     def get(self, checkout_id: str) -> Result:
         with self._engine.begin() as conn:
             record = self._open(conn, checkout_id, lock=False)
         return self._not_found() if record is None else Result(200, record)
 
-    def update(self, checkout_id: str, req: CheckoutRequest) -> Result:
+    @_with_order
+    def update(
+        self, checkout_id: str, req: CheckoutRequest, ctx: RequestContext | None = None
+    ) -> Result:
         with self._engine.begin() as conn:
             record = self._open(conn, checkout_id, lock=True)
             if record is None:
@@ -293,8 +399,12 @@ class UcpService:
             )
             if errors:
                 return self._reject(conn, "update", record, errors)
+            built = self._build(record.id, lines)
+            denial = self._lock_denial("update", built, ctx)
+            if denial is not None:
+                return self._reject(conn, "update", record, [denial])
             new = record.advanced(
-                checkout=self._build(record.id, lines),
+                checkout=built,
                 next_line_seq=next_seq,
                 catalog_hash=self._catalog.catalog_hash(),
                 now_us=self._clock(),
@@ -309,7 +419,13 @@ class UcpService:
             )
             return Result(200, new)
 
-    def complete(self, checkout_id: str, request: CompleteRequest | None = None) -> Result:
+    @_with_order
+    def complete(
+        self,
+        checkout_id: str,
+        request: CompleteRequest | None = None,
+        ctx: RequestContext | None = None,
+    ) -> Result:
         """Complete a checkout: Merchant verification, then the Credential Provider.
 
         Three steps so that no database lock is held while PayPal is called: (1) under the row
@@ -336,11 +452,14 @@ class UcpService:
                 store.save(conn, started)
                 self._log(conn, "checkout.complete_started", started)
                 record = started
+        principal = self._principal(ctx)
         outcome = self._completion.complete(
             checkout=record.checkout,
             mandate=request.checkout_mandate,
             payment_token=request.payment_token,
             resume=resume,
+            principal=principal,
+            negotiated=ctx is not None and ctx.negotiated_ap2,
         )
         return self._finish_complete(checkout_id, outcome)
 
@@ -385,6 +504,17 @@ class UcpService:
                 text = "The payer has not approved the payment on PayPal yet."
                 info = m.info_message(m.PAYER_APPROVAL_REQUIRED, text)
                 return Result(200, record, (info,), outcome.continue_url)
+            if outcome.kind == "unresolved":
+                # Money may be held: neither completed nor canceled, and told so.
+                self._log(conn, "checkout.payment_unresolved", record)
+                return Result(200, record, tuple(outcome.messages))
+            if outcome.kind == "captured":
+                done = record.advanced(
+                    status=transition(record.status, Status.COMPLETED), now_us=self._clock()
+                )
+                store.save(conn, done)
+                self._log(conn, "checkout.completed", done)
+                return Result(200, done, receipts=dict(outcome.receipts))
             text = "The payment is authorized and waits for the capture gate."
             info = m.info_message(m.PAYMENT_AUTHORIZED, text)
             self._log(conn, "checkout.payment_authorized", record)
@@ -406,6 +536,7 @@ class UcpService:
             )
             return self._reject(conn, "complete", record, [msg])
 
+    @_with_order
     def cancel(self, checkout_id: str) -> Result:
         with self._engine.begin() as conn:
             record = self._open(conn, checkout_id, lock=True)

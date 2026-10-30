@@ -82,7 +82,7 @@ from countersign.paypal.translate import (
     order_request_from_checkout,
     paypal_order_to_canonical_terms,
 )
-from countersign.tables import payer_vault, payment_attempts
+from countersign.tables import attempt_mandates, payer_vault, payment_attempts
 
 log = structlog.get_logger("countersign.cp")
 
@@ -265,7 +265,13 @@ class CredentialProvider:
     # ------------------------------------------------------------------ C5 and C6
 
     def _reserve(
-        self, verified: VerifiedPayment, current: Checkout, custom_id: str, mode: str, now: float
+        self,
+        verified: VerifiedPayment,
+        current: Checkout,
+        custom_id: str,
+        mode: str,
+        now: float,
+        presented: tuple[str, str],
     ) -> Attempt:
         """Constraints and reservation in one transaction. Raises `CpRejection` after logging it."""
         rejection: CpRejection | None = None
@@ -320,6 +326,15 @@ class CredentialProvider:
                         currency=currency,
                     )
                     now_us_ = self._clock_us()
+                    # Kept so the capture gate verifies the same mandates again at capture time.
+                    conn.execute(
+                        attempt_mandates.insert().values(
+                            checkout_id=current.id,
+                            payment_token=presented[0],
+                            checkout_mandate=presented[1],
+                            created_us=now_us_,
+                        )
+                    )
                     conn.execute(
                         payment_attempts.insert().values(
                             checkout_id=current.id,
@@ -391,7 +406,10 @@ class CredentialProvider:
                 )
                 vault_id = self._vault_id_for(verified)
                 mode = "vault" if vault_id else "redirect"
-                attempt = self._reserve(verified, current, custom_id, mode, now)
+                assert isinstance(payment_token, str) and isinstance(checkout_mandate, str)
+                attempt = self._reserve(
+                    verified, current, custom_id, mode, now, (payment_token, checkout_mandate)
+                )
             except CpRejection as rejection:
                 return self._reject(rejection, payment_token, current.id)
             return self._create_order(attempt, verified, current, vault_id)

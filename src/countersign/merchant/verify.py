@@ -311,6 +311,25 @@ class CheckoutMandateVerifier:
 
     # ---- entry point ----
 
+    def completion_receipt(self, checkout_mandate: str, order_id: str) -> str:
+        """A signed Success Checkout Receipt issued when the order completes.
+
+        The acceptance receipt is returned only to the first `complete` call, so a completion that
+        needs a payer approval first cannot carry it. This one is made from the same inputs: the
+        `reference` is the digest of the final link of the presented Checkout Mandate (the same
+        function as at acceptance) and `order_id` is the checkout id. Only call it for a checkout
+        whose payment the capture gate confirmed.
+        """
+        return receipts.sign_receipt(
+            receipts.success_claims(
+                issuer=self._config.issuer,
+                iat=int(self._clock()),
+                reference=receipts.reference_for(checkout_mandate),
+                order_id=order_id,
+            ),
+            self._config.signing_key,
+        )
+
     def verify(
         self, *, mandate: object, issued_checkout: Mapping[str, Any] | None, current: Checkout
     ) -> Accepted | Rejected:
