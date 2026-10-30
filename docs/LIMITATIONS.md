@@ -268,14 +268,16 @@ and quantities to 99, which are Countersign choices, not UCP limits.
 
 ### L12. What the client has and has not been shown to do
 
-The client is tested against mocked HTTP and a fake PayPal, not yet against a recording of the real
-sandbox: the cassette needs one live approval and has not been recorded. Until it is, the required
-response fields (an order's `intent`, an authorization's `expiration_time`, a capture's
-`final_capture`) are taken from the schema notes, and the client fails closed if PayPal omits one.
-Where PayPal puts the specific error code (`name` or `details[].issue`) is accepted both ways rather
-than confirmed ([PROTOCOL.md](PROTOCOL.md) Decision 19). Only redirect-style payer approval is built;
-the vaulted flow in [PROTOCOL.md](PROTOCOL.md) 4.7 is not. A capture whose outcome is unknown must be
-resolved by re-fetching, and the client will not repeat it.
+The client is tested against mocked HTTP, a PayPal simulator, and recordings of the real sandbox
+(authorize and capture, order terms, the Credential Provider flow and the capture gate flow, under
+`tests/cassettes/`). The required response fields (an order's `intent`, an authorization's
+`expiration_time`, a capture's `final_capture`) appear in those recordings, and the client still fails
+closed if PayPal omits one. Where PayPal puts the specific error code (`name` or `details[].issue`) is
+accepted both ways rather than confirmed ([PROTOCOL.md](PROTOCOL.md) Decision 19). Both payer approval
+modes are built: redirect approval, and the vaulted wallet for merchant initiated orders
+([PROTOCOL.md](PROTOCOL.md) 4.7, Decision 40). The vaulted path has been observed in the sandbox and
+is exercised in tests against the simulator; it has no recording of its own. A capture whose outcome is
+unknown must be resolved by re-fetching, and the client will not repeat it.
 
 ### L13. Line item ids are applied by position
 
@@ -286,3 +288,43 @@ two items (`tests/cassettes/paypal_authorize_capture.json` and `tests/cassettes/
 Orders with one item, or with more than two, have not been recorded, and PayPal documents no ordering
 guarantee. If PayPal ever reordered items, the terms would differ and the order would be refused,
 which fails safe but would block a legitimate purchase.
+
+### L27. Baseline mode and the ablations
+
+- **Baseline is our model of a conventional integration, not a competitor product.** It is built from
+  the same code with the protections of [PROTOCOL.md](PROTOCOL.md) Decision 59 left out, each omission
+  justified there. A different careful integration may leave out less. Results against baseline say
+  what these protections add to this design, not how any real product behaves.
+- **Baseline captures without the gate, by definition.** The capture surface tests allow
+  `countersign/degraded/` for that reason (Decision 61); it is unreachable in `full`, and a test
+  checks that `full` builds none of it.
+- **The budget switch reopens nothing.** Baseline and `ABL_NO_BUDGET_RECON` keep a persistent local
+  counter and lack only the PayPal reconciliation, so a split purchase is still refused even with the
+  single-use rules off (Decisions 60 and 63). Reconciliation buys accuracy against events outside
+  Countersign, not protection against an agent, and no scenario here measures that accuracy.
+- **Baseline's unmandated ACP path** keeps pending orders in process memory, ignores the ACP
+  `payment_data` token, and obtains payer approval only through the vaulted wallet or the PayPal
+  approval link, as the Credential Provider does. The vaulted path is sandbox only (L1).
+- **Baseline is not evaluated live against PayPal yet.** Every baseline and ablation result so far
+  comes from the PayPal simulator and the real Postgres. The immediate capture of a raised order has no
+  recorded sandbox cassette.
+- **Local pair.** `make dev-pair` uses fixed passwords for its two local database roles and the
+  compose administrator URL. It is a development convenience, not a deployment.
+
+### L28. Concurrent completes can void the legitimate authorization
+
+A burst of `complete` calls after payer approval is safe (no second order, authorization or capture) but
+not always live: in a small share of runs a losing request voids the winner's authorization and the
+purchase is not completed, with one 500 for the loser. Triggerable by anyone who knows the checkout id.
+Cause and decision pending in [PROTOCOL.md](PROTOCOL.md) Decision 66. Measured only against the simulator.
+
+### L29. What the attack suite is and is not
+
+- 25 hand written, deterministic cases against the PayPal simulator and the real Postgres. They show
+  that these attacks fail in `full`; they are not a proof, and the adversary LLM runs are later work.
+- Several cases are layered (baseline also blocks them), which the report states.
+- No case covers a merchant level category policy, the device consent signature (P3), a live webhook
+  delivery, or a PATCH after authorization (impossible in the sandbox).
+- Case level mutation checks use the ablations, so they show what each switch reopens, not every
+  possible code defect.
+

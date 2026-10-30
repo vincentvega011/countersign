@@ -61,6 +61,7 @@ def session_response(
     updated_us: int,
     expires_us: int,
     order_url: str | None = None,
+    continue_url: str | None = None,
 ) -> dict[str, Any]:
     lines = []
     for line in checkout.line_items:
@@ -93,6 +94,8 @@ def session_response(
         "updated_at": rfc3339(updated_us),
         "expires_at": rfc3339(expires_us),
     }
+    if continue_url is not None and status is Status.COMPLETE_IN_PROGRESS:
+        body["continue_url"] = continue_url
     if status is Status.COMPLETED and order_url is not None:
         body["order"] = {
             "type": "order",

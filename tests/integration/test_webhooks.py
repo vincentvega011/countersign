@@ -116,7 +116,10 @@ def test_without_a_webhook_id_every_event_is_unverified(
             "header_transmission_sig",
         ),
         (lambda h: {**h, "PAYPAL-CERT-URL": "https://evil.example/cert"}, "header_cert_url_host"),
-        (lambda h: {**h, "PAYPAL-CERT-URL": "http://api.sandbox.paypal.com/cert"}, "header_cert_url_host"),
+        (
+            lambda h: {**h, "PAYPAL-CERT-URL": "http://api.sandbox.paypal.com/cert"},
+            "header_cert_url_host",
+        ),
         (
             lambda h: {**h, "PAYPAL-CERT-URL": "https://paypal.com.evil.example/c"},
             "header_cert_url_host",

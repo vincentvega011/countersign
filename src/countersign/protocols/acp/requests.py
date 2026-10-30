@@ -18,13 +18,14 @@ quantities, because it sells whole items only. This is recorded in docs/PROTOCOL
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from typing import Any
 
 from countersign.canonical.jsonstrict import DEFAULT_MAX_BYTES, StrictJsonError, loads_strict
 from countersign.protocols.acp.errors import AcpError
 
+JsonLoader = Callable[[bytes], Any]
 MAX_TEXT = 127
 MAX_LINES = 20
 MAX_QUANTITY = 99
@@ -92,13 +93,15 @@ async def read_body(stream: AsyncIterator[bytes], *, max_bytes: int = DEFAULT_MA
     return b"".join(chunks)
 
 
-def parse_json_object(raw: bytes, *, allow_empty: bool = False) -> dict[str, Any]:
+def parse_json_object(
+    raw: bytes, *, allow_empty: bool = False, loader: JsonLoader = loads_strict
+) -> dict[str, Any]:
     if not raw.strip():
         if allow_empty:
             return {}
         raise AcpError(400, "invalid_json", "The request body is empty.")
     try:
-        value = loads_strict(raw)
+        value = loader(raw)
     except StrictJsonError as exc:
         # The loader's stable code (duplicate key, NaN, precision, size, syntax); no text from the body.
         raise AcpError(400, exc.code, "The request body is not acceptable JSON.") from None

@@ -119,6 +119,9 @@ def test_only_the_gate_may_reference_the_capture_or_the_mint() -> None:
     for path in SRC.rglob("*.py"):
         rel = path.relative_to(SRC).as_posix()
         text = path.read_text()
-        if rel.startswith(("gate/", "mpp/")) or rel in ("paypal/approval.py", "paypal/client.py"):
+        if rel.startswith(("gate/", "mpp/", "degraded/")) or rel in (
+            "paypal/approval.py",
+            "paypal/client.py",
+        ):
             continue
         assert mint not in text and capture not in text, rel

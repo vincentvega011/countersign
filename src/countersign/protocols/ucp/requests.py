@@ -21,7 +21,7 @@ rules (unknown item, quantity limit) are decided in the service and returned as 
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -32,6 +32,7 @@ from countersign.protocols.ucp.messages import (
 )
 from countersign.protocols.ucp.profile import PAYMENT_CREDENTIAL_TYPE, PAYMENT_HANDLER_ID
 
+JsonLoader = Callable[[bytes], Any]
 MAX_TEXT = 127
 MAX_SAFE_INT = 9_007_199_254_740_991  # the schema maximum for `quantity`
 
@@ -65,14 +66,20 @@ async def read_body(stream: AsyncIterator[bytes], *, max_bytes: int = DEFAULT_MA
     return b"".join(chunks)
 
 
-def parse_json_object(raw: bytes, *, allow_empty: bool = False) -> dict[str, Any]:
-    """Strictly parse a body that must be a JSON object. An empty body is `{}` only if allowed."""
+def parse_json_object(
+    raw: bytes, *, allow_empty: bool = False, loader: JsonLoader = loads_strict
+) -> dict[str, Any]:
+    """Strictly parse a body that must be a JSON object. An empty body is `{}` only if allowed.
+
+    `loader` is the strict loader unless the composition root injects the `ABL_NO_STRICT_JSON`
+    evaluation loader (`countersign.degraded.lenient_json`); no request path chooses it.
+    """
     if not raw.strip():
         if allow_empty:
             return {}
         raise ProtocolError(400, "json_syntax", "the request body is empty")
     try:
-        value = loads_strict(raw)
+        value = loader(raw)
     except StrictJsonError as exc:
         raise ProtocolError(400, exc.code, str(exc)) from None
     if not isinstance(value, dict):

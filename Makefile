@@ -1,4 +1,4 @@
-.PHONY: interop-mandates interop-ucp setup node-deps keys dev demo db test test-safety sandbox-smoke eval interop tamper-demo lint deploy
+.PHONY: dev-pair interop-mandates interop-ucp setup node-deps keys dev demo db test test-safety sandbox-smoke eval interop tamper-demo lint deploy
 
 setup: node-deps
 	uv sync
@@ -13,6 +13,10 @@ keys:
 
 dev:
 	@echo "not implemented yet"
+
+# A full and a baseline instance side by side, each on its own database (docs/architecture.md).
+dev-pair: db keys
+	uv run python scripts/dev_pair.py
 
 demo:
 	@echo "not implemented yet"

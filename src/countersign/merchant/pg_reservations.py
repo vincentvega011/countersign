@@ -41,12 +41,21 @@ def now_us() -> int:
 
 
 class PostgresReservationStore:
-    def __init__(self, engine: Engine, role: str, clock_us: Callable[[], int] = now_us) -> None:
+    def __init__(
+        self,
+        engine: Engine,
+        role: str,
+        clock_us: Callable[[], int] = now_us,
+        *,
+        session_scoped: bool = False,
+    ) -> None:
         if role not in ROLES:
             raise ValueError("role must be 'merchant' or 'cp'")
         self._engine = engine
         self._role = role
         self._clock = clock_us
+        # Evaluation only (`ABL_NO_GLOBAL_NONCE`, baseline mode): see `_scoped`.
+        self._session_scoped = session_scoped
 
     # ---- the ReservationStore interface (own transaction) ----
 
@@ -68,9 +77,16 @@ class PostgresReservationStore:
 
     # ---- inside a caller's transaction ----
 
+    def _scoped(self, value: str, request: ReservationRequest) -> str:
+        """Single use memory per session: the key is made unique to the checkout, so the same
+        nonce, hash or open mandate in another session does not collide. Unset in `full`."""
+        return f"{value}#{request.checkout_id}" if self._session_scoped else value
+
     def reserve_in(self, conn: Connection, request: ReservationRequest) -> Reservation:
         handle = secrets.token_urlsafe(16)
         thumbprint, audience, nonce = request.nonce_scope or (None, None, None)
+        if audience is not None:
+            audience = self._scoped(audience, request)
         now = self._clock()
         try:
             with conn.begin_nested():  # a savepoint: a refused insert must not poison the caller
@@ -79,8 +95,8 @@ class PostgresReservationStore:
                         handle=handle,
                         role=self._role,
                         checkout_id=request.checkout_id,
-                        checkout_hash=request.checkout_hash,
-                        mandate_digest=request.mandate_digest,
+                        checkout_hash=self._scoped(request.checkout_hash, request),
+                        mandate_digest=self._scoped(request.mandate_digest, request),
                         nonce_thumbprint=thumbprint,
                         nonce_audience=audience,
                         nonce_value=nonce,

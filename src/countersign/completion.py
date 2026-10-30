@@ -30,6 +30,8 @@ itself.
 
 from __future__ import annotations
 
+from typing import Protocol
+
 from countersign.canonical.models import Checkout
 from countersign.cp import (
     CpApprovalRequired,
@@ -39,8 +41,8 @@ from countersign.cp import (
     CredentialProvider,
 )
 from countersign.gate import (
-    CaptureGate,
     GateNotApplicable,
+    GateOutcome,
     GatePassed,
     GatePending,
     GateRejected,
@@ -69,6 +71,15 @@ _ATTEMPT_ENDED = m.error_message(
     "The payment for this checkout has ended; create a new checkout.",
     "unrecoverable",
 )
+
+
+class CaptureStage(Protocol):
+    """What the coordinator needs from the stage after authorization: `CaptureGate` in every mode
+    except `baseline`, whose immediate capture (`countersign.degraded`) has the same shape."""
+
+    def run(self, *, checkout_id: str, current: Checkout) -> GateOutcome: ...
+
+    def presented_checkout_mandate(self, checkout_id: str) -> str | None: ...
 
 
 _LOCK_DENIED = m.error_message(
@@ -105,7 +116,7 @@ class CompleteCoordinator:
         merchant: CheckoutMandateVerifier,
         merchant_store: PostgresReservationStore,
         credential_provider: CredentialProvider,
-        gate: CaptureGate | None = None,
+        gate: CaptureStage | None = None,
         lock: PrincipalLock | None = None,
     ) -> None:
         self._lock = lock

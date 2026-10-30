@@ -69,12 +69,14 @@ class Session:
     record: store.CheckoutRecord
     http_status: int
     order_url: str | None = None
+    continue_url: str | None = None
 
     def body(self) -> dict[str, Any]:
         r = self.record
         return session_response(
             r.checkout, r.status, created_us=r.created_us, updated_us=r.updated_us,
             expires_us=r.expires_us, order_url=self.order_url,
+            continue_url=self.continue_url,
         )  # fmt: skip
 
 
@@ -84,20 +86,44 @@ class UnmandatedDenied:
     message: str
 
 
+@dataclass(frozen=True)
+class UnmandatedApproval:
+    """The payer must approve at `url` first; nothing is authorized or captured yet."""
+
+    url: str
+
+
+@dataclass(frozen=True)
+class UnmandatedPaid:
+    """The seam authorized and captured the payment. Only the baseline mode returns this."""
+
+    order_id: str
+    capture_id: str
+
+
+UnmandatedOutcome = UnmandatedDenied | UnmandatedApproval | UnmandatedPaid
+
+
 class UnmandatedCompletion(Protocol):
     """The seam for completing a checkout with no mandate, for a principal no lock applies to.
 
     The default (`DenyUnmandated`) denies. The permissive naive path of the baseline mode (accept the
-    complete, authorize and capture at once) is a different implementation of this Protocol, added when
-    the baseline is built. Anything this returns other than `UnmandatedDenied` is refused as an
-    internal error (fail closed), so adding a permissive outcome means changing the adapter on purpose.
+    complete, authorize and capture at once, `countersign.degraded.unmandated`) is a different
+    implementation of this Protocol, chosen at the composition root. Anything this returns other
+    than the three outcomes is refused as an internal error (fail closed). `resumable` says whether
+    a checkout already `complete_in_progress` may come back to the seam (the baseline after the
+    payer approved); the default is False, so in `full` that status is still a 409.
     """
 
-    def complete(self, checkout: Checkout, principal: Principal | None) -> UnmandatedDenied: ...
+    resumable: bool
+
+    def complete(self, checkout: Checkout, principal: Principal | None) -> UnmandatedOutcome: ...
 
 
 class DenyUnmandated:
-    def complete(self, checkout: Checkout, principal: Principal | None) -> UnmandatedDenied:
+    resumable = False
+
+    def complete(self, checkout: Checkout, principal: Principal | None) -> UnmandatedOutcome:
         return UnmandatedDenied(
             e.UNMANDATED_NOT_ALLOWED,
             "This merchant completes no checkout without an AP2 mandate.",
@@ -271,7 +297,8 @@ class AcpService:
             raise self._not_found()
         if record.status is Status.COMPLETED:
             return self._session(record)
-        if record.status is not Status.READY_FOR_COMPLETE:
+        resumed = record.status is Status.COMPLETE_IN_PROGRESS and self._unmandated.resumable
+        if record.status is not Status.READY_FOR_COMPLETE and not resumed:
             raise e.AcpError(409, "not_ready", "This checkout session is not ready for payment.")
         principal = self._principal(ctx)
         verdict = self._lock.decide(self._lock_request("complete", record.checkout, ctx, principal))
@@ -284,10 +311,45 @@ class AcpService:
                 "This agent must use AP2: negotiate the AP2 mandates capability and present a mandate.",
             )
         outcome = self._unmandated.complete(record.checkout, principal)
+        if isinstance(outcome, UnmandatedPaid):
+            return self._finish_unmandated(record, outcome)
+        if isinstance(outcome, UnmandatedApproval):
+            return self._await_approval(record, outcome)
         if not isinstance(outcome, UnmandatedDenied):
-            raise TypeError("the unmandated seam returned something that is not a denial")
+            raise TypeError("the unmandated seam returned something that is not an outcome")
         self._log(None, "acp.complete_denied", record.id, reason=outcome.code, locked=False)
         raise e.denied(outcome.code, outcome.message)
+
+    def _await_approval(self, record: store.CheckoutRecord, outcome: UnmandatedApproval) -> Session:
+        """Baseline only: the session waits for the payer, and the answer carries the approval link."""
+        with self._engine.begin() as conn:
+            current = self._open(conn, record.id, lock=True)
+            if current is None:
+                raise self._not_found()
+            if current.status is Status.READY_FOR_COMPLETE:
+                current = current.advanced(
+                    status=transition(current.status, Status.COMPLETE_IN_PROGRESS),
+                    now_us=self._clock(),
+                )
+                store.save(conn, current)
+            self._log(conn, "acp.complete_approval_required", record.id, mandate=False)
+        return Session(current, 200, continue_url=outcome.url)
+
+    def _finish_unmandated(self, record: store.CheckoutRecord, outcome: UnmandatedPaid) -> Session:
+        """Baseline only: the seam captured the payment; the session becomes `completed`."""
+        with self._engine.begin() as conn:
+            current = self._open(conn, record.id, lock=True)
+            if current is None:
+                raise self._not_found()
+            for target in (Status.COMPLETE_IN_PROGRESS, Status.COMPLETED):
+                if current.status is not target and current.status is not Status.COMPLETED:
+                    current = current.advanced(
+                        status=transition(current.status, target), now_us=self._clock()
+                    )
+                    store.save(conn, current)
+            self._log(conn, "acp.completed_unmandated", record.id,
+                      order_id=outcome.order_id, capture_id=outcome.capture_id)  # fmt: skip
+        return self._session(current)
 
     def reject_delegated_payment(self, ctx: AcpContext) -> e.AcpError:
         """ACP delegated payment is not implemented. A locked principal gets `mandate_required`."""

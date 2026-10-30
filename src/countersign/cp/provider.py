@@ -172,6 +172,8 @@ class CredentialProvider:
         evaluator: PaymentConstraintEvaluator | None = None,
         vault_lookup: Callable[[str], str | None] | None = None,
         new_id: Callable[[], str] = lambda: "sp_" + secrets.token_urlsafe(16),
+        store: PostgresReservationStore | None = None,
+        ledger: SpendLedger | None = None,
     ) -> None:
         self._config = config
         self._engine = engine
@@ -179,8 +181,10 @@ class CredentialProvider:
         self._clock = clock
         self._clock_us = clock_us
         self._evaluator = evaluator or PaymentConstraintEvaluator()
-        self._store = PostgresReservationStore(engine, "cp", clock_us)
-        self._ledger = SpendLedger(clock_us)
+        self._store = (
+            store if store is not None else PostgresReservationStore(engine, "cp", clock_us)
+        )
+        self._ledger = ledger if ledger is not None else SpendLedger(clock_us)
         self._vault_lookup = vault_lookup or self._vault_from_table
         self._new_id = new_id
         self._policy_hash = policy_hash()

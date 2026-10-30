@@ -46,13 +46,22 @@ class ReservationRow:
 
 
 class GateStore:
-    def __init__(self, engine: Engine, clock_us: Callable[[], int]) -> None:
+    def __init__(
+        self,
+        engine: Engine,
+        clock_us: Callable[[], int],
+        *,
+        ledger: SpendLedger | None = None,
+        session_scoped: bool = False,
+    ) -> None:
         self.engine = engine
         self._clock = clock_us
-        self.ledger = SpendLedger(clock_us)
+        self.ledger = ledger or SpendLedger(clock_us)
         self._stores = {
-            "merchant": PostgresReservationStore(engine, "merchant", clock_us),
-            "cp": PostgresReservationStore(engine, "cp", clock_us),
+            "merchant": PostgresReservationStore(
+                engine, "merchant", clock_us, session_scoped=session_scoped
+            ),
+            "cp": PostgresReservationStore(engine, "cp", clock_us, session_scoped=session_scoped),
         }
 
     # ------------------------------------------------------------------ reads

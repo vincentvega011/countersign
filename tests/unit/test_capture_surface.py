@@ -24,8 +24,10 @@ SRC = ROOT / "src" / "countersign"
 MINT = "mint_capture_approval"
 CAPTURE = "capture_authorization"
 
-LIBRARY_MINTERS = ("gate/",)
-LIBRARY_CAPTURERS = ("gate/", "mpp/")
+# `degraded/` is the evaluation-only baseline: it captures without the gate by definition, and is
+# kept out of `full` by tests/unit/test_degraded_import_guard.py.
+LIBRARY_MINTERS = ("gate/", "degraded/")
+LIBRARY_CAPTURERS = ("gate/", "mpp/", "degraded/")
 # Outside the package: the recording harness and tests that stand in for the gate.
 OUTSIDE_MINTERS = {
     "tests/unit/test_webhooks_import_guard.py",  # lists the names the webhook code must never use
@@ -203,7 +205,7 @@ def _library_modules() -> list[types.ModuleType]:
 
 
 def _allowed_module(name: str) -> bool:
-    allowed = ("countersign.gate", "countersign.mpp")
+    allowed = ("countersign.gate", "countersign.mpp", "countersign.degraded")
     return name == "countersign.paypal.approval" or name.startswith(allowed)
 
 

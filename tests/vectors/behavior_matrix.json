@@ -1,0 +1,224 @@
+{
+ "differences": {
+  "ABL_NO_GLOBAL_NONCE": {
+   "budget_split_across_sessions": {
+    "authorized": 1,
+    "captured": 1,
+    "captured_value": [
+     "11.00"
+    ],
+    "code": "mandate_scope_mismatch",
+    "result": "200:canceled",
+    "voided": 0
+   },
+   "nonce_replay_in_a_new_session": {
+    "authorized": 2,
+    "captured": 2,
+    "captured_value": [
+     "11.00",
+     "11.00"
+    ],
+    "code": null,
+    "result": "200:completed",
+    "voided": 0
+   }
+  },
+  "ABL_NO_PREAUTH_CHECK": {
+   "order_items_changed_while_approved": {
+    "authorized": 1,
+    "captured": 0,
+    "captured_value": [],
+    "code": "payment_failed",
+    "result": "200:canceled",
+    "voided": 1
+   },
+   "order_raised_while_approved": {
+    "authorized": 1,
+    "captured": 0,
+    "captured_value": [],
+    "code": "payment_failed",
+    "result": "200:canceled",
+    "voided": 1
+   }
+  },
+  "ABL_NO_PRINCIPAL_LOCK": {
+   "acp_complete_without_mandate_by_a_locked_principal": {
+    "authorized": 0,
+    "captured": 0,
+    "captured_value": [],
+    "code": "unmandated_checkout_not_allowed",
+    "result": "403:error",
+    "voided": 0
+   }
+  },
+  "ABL_NO_STRICT_JSON": {
+   "duplicate_json_keys": {
+    "authorized": 0,
+    "captured": 0,
+    "captured_value": [],
+    "code": "quantity_2",
+    "result": "201:ready_for_complete",
+    "voided": 0
+   }
+  },
+  "baseline": {
+   "acp_complete_without_mandate_by_a_locked_principal": {
+    "authorized": 1,
+    "captured": 1,
+    "captured_value": [
+     "11.00"
+    ],
+    "code": null,
+    "result": "200:completed",
+    "voided": 0
+   },
+   "budget_split_across_sessions": {
+    "authorized": 1,
+    "captured": 1,
+    "captured_value": [
+     "11.00"
+    ],
+    "code": "mandate_scope_mismatch",
+    "result": "200:canceled",
+    "voided": 0
+   },
+   "duplicate_json_keys": {
+    "authorized": 0,
+    "captured": 0,
+    "captured_value": [],
+    "code": "quantity_2",
+    "result": "201:ready_for_complete",
+    "voided": 0
+   },
+   "nonce_replay_in_a_new_session": {
+    "authorized": 2,
+    "captured": 2,
+    "captured_value": [
+     "11.00",
+     "11.00"
+    ],
+    "code": null,
+    "result": "200:completed",
+    "voided": 0
+   },
+   "order_items_changed_while_approved": {
+    "authorized": 1,
+    "captured": 1,
+    "captured_value": [
+     "11.00"
+    ],
+    "code": null,
+    "result": "200:completed",
+    "voided": 0
+   },
+   "order_raised_while_approved": {
+    "authorized": 1,
+    "captured": 1,
+    "captured_value": [
+     "33.00"
+    ],
+    "code": null,
+    "result": "200:completed",
+    "voided": 0
+   }
+  }
+ },
+ "full": {
+  "acp_complete_without_mandate_by_a_locked_principal": {
+   "authorized": 0,
+   "captured": 0,
+   "captured_value": [],
+   "code": "mandate_required",
+   "result": "403:error",
+   "voided": 0
+  },
+  "amount_mismatch": {
+   "authorized": 0,
+   "captured": 0,
+   "captured_value": [],
+   "code": "mandate_scope_mismatch",
+   "result": "200:canceled",
+   "voided": 0
+  },
+  "budget_split_across_sessions": {
+   "authorized": 1,
+   "captured": 1,
+   "captured_value": [
+    "11.00"
+   ],
+   "code": "mandate_scope_mismatch",
+   "result": "200:ready_for_complete",
+   "voided": 0
+  },
+  "checkout_hash_reuse": {
+   "authorized": 1,
+   "captured": 1,
+   "captured_value": [
+    "11.00"
+   ],
+   "code": "mandate_scope_mismatch",
+   "result": "200:ready_for_complete",
+   "voided": 0
+  },
+  "duplicate_json_keys": {
+   "authorized": 0,
+   "captured": 0,
+   "captured_value": [],
+   "code": "json_duplicate_key",
+   "result": "400:error",
+   "voided": 0
+  },
+  "happy_path": {
+   "authorized": 1,
+   "captured": 1,
+   "captured_value": [
+    "11.00"
+   ],
+   "code": null,
+   "result": "200:completed",
+   "voided": 0
+  },
+  "mandate_expired": {
+   "authorized": 0,
+   "captured": 0,
+   "captured_value": [],
+   "code": "mandate_expired",
+   "result": "200:ready_for_complete",
+   "voided": 0
+  },
+  "mandate_forged": {
+   "authorized": 0,
+   "captured": 0,
+   "captured_value": [],
+   "code": "mandate_invalid_signature",
+   "result": "200:ready_for_complete",
+   "voided": 0
+  },
+  "nonce_replay_in_a_new_session": {
+   "authorized": 1,
+   "captured": 1,
+   "captured_value": [
+    "11.00"
+   ],
+   "code": "mandate_scope_mismatch",
+   "result": "200:ready_for_complete",
+   "voided": 0
+  },
+  "order_items_changed_while_approved": {
+   "authorized": 0,
+   "captured": 0,
+   "captured_value": [],
+   "code": "mandate_scope_mismatch",
+   "result": "200:canceled",
+   "voided": 0
+  },
+  "order_raised_while_approved": {
+   "authorized": 0,
+   "captured": 0,
+   "captured_value": [],
+   "code": "mandate_scope_mismatch",
+   "result": "200:canceled",
+   "voided": 0
+  }
+ }
+}

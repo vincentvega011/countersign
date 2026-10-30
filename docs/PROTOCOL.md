@@ -2118,8 +2118,8 @@ Resolves: what an ACP complete does in `CS_MODE=full`. **Flagged for the owner.*
   merchant policy that explicitly allows unmandated checkouts does not exist yet; when it does, it is
   another implementation of the Protocol. The adapter accepts only an `UnmandatedDenied` back: anything
   else is an internal error (500), so a permissive outcome needs a deliberate change here.
-- **Baseline seam.** The naive baseline (P2.9: accept the complete without a mandate, authorize and
-  capture at once) plugs in at this Protocol. Nothing of it is built.
+- **Baseline seam.** The naive baseline (accept the complete without a mandate, authorize and capture
+  at once) plugs in at this Protocol; see [Decision 62](#decision-62-the-acp-seam-outcomes).
 - **Delegated payment** is rejected and nothing more. `POST /agentic_commerce/delegate_payment` reads
   its body through the strict loader and answers 403: `mandate_required` for a locked principal or a
   require-all policy, `delegated_payment_unsupported` otherwise. The vendored delegate payment `Error`
@@ -2219,6 +2219,173 @@ the attempt. If the process dies between the commit and the settle, the event is
 and the settle is not repeated by PayPal. The attempt stays `authorized` or `unresolved` with its money
 reserved, and `CaptureGate.recover` (which reads PayPal and never captures) finishes it
 ([LIMITATIONS.md](LIMITATIONS.md) L26).
+
+### Decision 59: The baseline definition
+
+**Flagged for the owner.** Resolves: what `CS_MODE=baseline` is, so the comparison with `full` is
+fair. Baseline is our model of a careful but conventional AP2 aware gateway, not a competitor product
+([LIMITATIONS.md](LIMITATIONS.md) L27). It is **not** a strawman: it verifies what a good integration
+verifies, and it fails only at the places this project adds something.
+
+**What baseline still does, exactly as `full` does:** the Merchant's verification of the Checkout
+Mandate (signature chain, `vct`, `checkout_hash`, terms equal to the session, constraints, expiry), the
+Credential Provider's verification of the Payment Mandate (chain, binding to the same checkout, amount
+and payee constraints), the UCP Security Lock inside the session that negotiated AP2, signed
+`merchant_authorization`, idempotent PayPal calls, the decision log, and the cleanup of a failed
+authorization. A forged, expired, wrong `vct` or hash mismatched mandate is refused in baseline
+(`tests/integration/test_modes.py`).
+
+**What baseline omits, each with the reason a careful integration would plausibly do the same:**
+
+| Omission | Why a careful integration would plausibly do this |
+| --- | --- |
+| No capture gate: capture right after authorization, for the amount PayPal reports on the authorization, booked from the capture response | The mandates were verified at `complete`, PayPal authorized exactly what it was asked, and a second verification pass looks redundant. This is the normal "authorize, then capture" flow |
+| No live re-derivation of the order, no read of the capture | The order was created by this same service a moment ago; re-reading it looks like paying for a read to confirm one's own write |
+| No pre-authorize check (the order is not re-derived between payer approval and authorize) | The order is the service's own, and nothing in AP2 or UCP says an order can change between approval and authorization |
+| No principal lock: the UCP lock still covers the session that negotiated AP2, a new session or a second protocol is judged on its own | UCP's Security Lock is defined per session. A merchant that adds ACP wires it up like any other protocol |
+| ACP complete without a mandate is accepted: the order is created, the payer approves (or a vaulted wallet is charged), then it is authorized and captured | ACP has no mandate slot, so a conventional ACP integration charges the buyer. Payer approval is obtained exactly as the Credential Provider obtains it: a vault entry for the principal (the agent key thumbprint) means create and authorize in one call, otherwise the answer carries the PayPal approval link and a later complete, after the payer approved, authorizes and captures. Nothing charges without one of the two. The ACP `payment_data` token is ignored (delegated payment is not implemented, Decision 53) |
+| Budgets come from a persistent local counter in the service's own database, built from its own authorizations and captures. Nothing is reconciled with PayPal: webhook reconciliation is not installed, so an external void, refund or capture is not seen | AP2 evaluates a constraint against the presentation in hand, and a cumulative budget needs a state source. The obvious one is the service's own record of what it authorized and captured. Reading PayPal back to correct that record is the extra step (N4) |
+| Single use memory is per session: a nonce, a checkout hash or an open mandate seen in another session is not remembered | Replay protection is usually a nonce cache or a "seen" flag on the session being completed. A global registry across sessions is the extra step |
+| Request bodies are parsed by Python's own JSON parser (a duplicate key keeps the last value) | It is what every framework does by default. Signed material (mandates, receipts, the merchant authorization) is still read strictly, because a signature check is not a place to be lenient |
+
+**What that means in the matrix** (`tests/vectors/behavior_matrix.json`): baseline differs from `full`
+in exactly six of eleven scenarios: a nonce replayed in a new session, an order raised while
+approved, an order whose items were changed while approved, an ACP complete without a mandate by a
+locked principal, duplicate JSON keys, and a budget split across sessions. The split is **refused in
+baseline too** (by the local budget counter, one stage later than in `full`, where the open-mandate
+rule refuses it first), so no money moves; it still differs from `full` in where and how it is refused.
+This result stands: baseline was not weakened to make the split succeed (changed in P2.10, Decision 63). It does not differ for a
+forged or expired mandate, a mandate for another amount, or the first checkout's mandates presented
+for another checkout, because baseline verifies in session.
+
+**Where it lives.** `src/countersign/degraded/` (`immediate_capture.py`, `unmandated.py`,
+`lenient_json.py`), imported only by the composition root (Decision 61). Baseline keeps the same
+Postgres tables as `full`; it differs in the objects it is given.
+
+### Decision 60: What each ablation switches off
+
+(Revised in P2.10 by [Decision 63](#decision-63-the-baseline-budget-is-a-persistent-local-counter).)
+
+**Flagged for the owner.** Each ablation changes one thing in `full`; refused when `APP_ENV=demo`.
+
+| Flag | What it does | What it reopens on its own (matrix) |
+| --- | --- | --- |
+| `ABL_NO_GATE` | Existing (Decision 41): the gate skips its checks and captures what the authorization says | Nothing: the pre-authorize check stops every order change in the matrix first |
+| `ABL_NO_PREAUTH_CHECK` | Existing (Decision 11): the order is authorized without being re-derived | Nothing is captured: the gate catches it, voids the authorization, and the answer is `payment_failed` instead of `mandate_scope_mismatch` |
+| `ABL_NO_PRINCIPAL_LOCK` | Existing (Decision 50) | The ACP complete reaches the unmandated seam, which in `full` still denies (`unmandated_checkout_not_allowed`): the code changes, no money moves. With baseline's permissive seam it is the downgrade |
+| `ABL_NO_GLOBAL_NONCE` | Single use memory per session (nonce, checkout hash, open mandate in flight), as in baseline. The checkout id stays unique | A nonce replayed in a new session passes. A budget split is still refused, one layer later, by the budget counter |
+| `ABL_NO_BUDGET_RECON` | The webhook reconciliation is not installed, so the local budget counter is never corrected from PayPal (external voids, refunds and captures are not seen). The counter itself is the same Postgres ledger | **Nothing, alone,** and not with `ABL_NO_GLOBAL_NONCE` either: the counter still refuses the split (`test_the_budget_counter_refuses_the_split_even_with_every_single_use_rule_off`). What reconciliation adds is accuracy against events that happen outside Countersign, not protection against an agent |
+| `ABL_NO_STRICT_JSON` | The request body parser is Python's. Only the UCP and ACP request bodies; signed material stays strict | A body with a duplicate key is accepted, the last value wins |
+
+Combined: with `ABL_NO_PREAUTH_CHECK` and `ABL_NO_GATE` both set, a raised order is captured at the
+raised amount (the two layers are independent; `test_modes.py`).
+
+### Decision 61: Mode selection, labelling and the composition root
+
+**Flagged for the owner (the INV-4 line).**
+
+- `RuntimeSettings.from_env` (`src/countersign/runtime.py`) reads `CS_MODE` (exactly `full` or
+  `baseline`, default `full`), `APP_ENV` and the flags. Anything else, an ablation with
+  `APP_ENV=demo`, or an ablation with `CS_MODE=baseline`, raises `ModeRefused`. `countersign.main.create`
+  does this first, before a key, the database or PayPal is touched, so the process does not start.
+- Baseline is allowed in demo (the side by side comparison needs it), must be named, is logged at
+  warning level at start, appears in `GET /health` (`mode`, `app_env`, `ablations`) and in the
+  `X-Countersign-Mode` header of every response, including the catch-all 500. Active ablations add
+  `X-Countersign-Ablations`.
+- `src/countersign/composition.py` is the only place that turns settings into collaborators. The
+  invariant modules take injected objects (a reservation store with `session_scoped`, a spend ledger
+  with `reconciled`, a capture stage, a lock with ablations, a JSON loader, an unmandated seam) and
+  never read the mode; a test fails if one mentions it. `countersign.degraded` is imported only
+  there and only inside the branches that need it (`tests/unit/test_degraded_import_guard.py`); a
+  test builds `full` with every degraded constructor patched to fail.
+- **INV-4 and the capture surface.** Baseline captures without the gate by definition. The capture
+  surface tests (`test_capture_surface.py`, `test_gate_import_guard.py`) now also allow
+  `countersign/degraded/` to build a capture approval and capture. This is the one recorded exception
+  to "no capture without the gate": it is unreachable in `full` and is what the evaluation compares
+  against. The mint and the client's own checks (status, expiry, invoice id, custom id, and an
+  authorization amount equal to the approved amount) are unchanged; baseline approves the amount
+  PayPal reports.
+- **Two instances side by side.** `make dev-pair` (`scripts/dev_pair.py`) creates two databases
+  and two login roles on the compose Postgres, migrates each, and starts a full instance on `:8000`
+  and a baseline instance on `:8001`. No row, reservation or log entry is shared.
+
+### Decision 62: The ACP seam outcomes
+
+**Flagged for the owner.** Widens Decision 53's "the adapter accepts only an `UnmandatedDenied`".
+
+- `UnmandatedCompletion.complete` may return `UnmandatedDenied`, `UnmandatedApproval(url)` or
+  `UnmandatedPaid(order_id, capture_id)`. Anything else is still an internal error (500).
+  `DenyUnmandated` (the default) returns only denials, and `resumable` is `False`, so in `full` a
+  session that is `complete_in_progress` is still a 409.
+- `UnmandatedApproval` moves the session to `complete_in_progress` and puts the PayPal link in
+  `continue_url`. `UnmandatedPaid` moves it to `completed` (through `complete_in_progress`) with its
+  order. Both log (`acp.complete_approval_required`, `acp.completed_unmandated`).
+- The baseline seam keeps its pending orders in process memory (`# SHORTCUT:`; a restart loses them;
+  PayPal's deterministic Request-Ids keep a retry from creating a second order).
+
+### Decision 63: The baseline budget is a persistent local counter
+
+**Flagged for the owner.** Revises Decisions 59 and 60. The first baseline kept a per session spend view,
+which made every cumulative budget invisible and was the least defensible omission. Baseline (and
+`ABL_NO_BUDGET_RECON`) now keep the same persistent counter as `full`: the `spend_entries` ledger in the
+instance's own database, built from the service's own reservations, authorizations, captures and voids.
+What they lack is the PayPal side: no webhook reconciliation and no handling of an external void, refund
+or capture.
+
+- **Matrix effect.** One cell changed: baseline, `budget_split_across_sessions`, from "completed, two
+  captures" to "canceled by the Credential Provider, one capture". Nothing else moved.
+- **Honest consequence.** Baseline no longer loses money to a split purchase. The open-mandate rule
+  (global in `full`, per session in baseline) and the counter are two layers; baseline keeps one.
+  Baseline was not changed to bring the old result back.
+
+### Decision 64: The attack suite, its judge and its determinism
+
+**Flagged for the owner.** Cases are data plus a small function (`eval/core.py`): category, description,
+actor, steps, the attacker's success condition and the expected outcome per mode. The verdict is never
+the case's: `eval/judge.py` reads the PayPal objects the simulator holds and the hash-chained log.
+An attack succeeds on a capture for a checkout no mandate covers, a capture above the signed total, of
+other goods than signed, or under a `custom_id` other than the recorded evidence reference, a capture
+under a void mandate (revoked), a second capture under one single-use key (the open mandate, a closed
+nonce), captures above the signed budget, a money-moving PayPal call during input that must not move
+money, a capture with no log entry, or a duplicate PayPal order, authorization or capture. Counted
+explicitly per case: unauthorized captures and duplicate PayPal objects. A non-money symptom
+(`side_effects`, for example an ambiguous body that was accepted) is reported and never counted as
+success. Rows carry no identifiers, so two runs of the suite are identical. The suite runs on the
+PayPal simulator and the real Postgres; no case needed a new sandbox recording.
+
+### Decision 65: Definitions the cases rely on
+
+**Flagged for the owner.**
+
+- **`consent_missing`.** A well formed mandate chain whose issuer link is signed by a key other than the
+  trusted platform key. Reason: the platform signs only after the customer's device key signed the
+  consent record ([Decision 5](#decision-5-trusted-platform-provider-with-a-device-consent-signature)),
+  so a chain the platform did not sign carries no consent. The device consent signature is not verified
+  anywhere yet (the Trusted Surface is P3), so that half has no case. [Decision 47](#decision-47-where-the-customer-id-comes-from)
+  (a mandate without `sub`) is a lock question, covered by the lock tests, not by this case.
+- **`category_escape`.** Tests the mandate level `checkout.line_items` constraint (an item outside the
+  approved list). A merchant level category policy ([Decision 3](#decision-3-line-items-in-the-mandate-categories-in-merchant-policy))
+  is deferred, so it is not tested.
+- **`order_changed_after_approval`.** The PATCH-while-`APPROVED` path only; a PATCH after authorization
+  is rejected by PayPal (section 4.3), so there is no case for it. `custom_id_tamper` and `invoice_id_tamper`
+  use the same path before authorize.
+- **Weakening a defense.** The case level mutation check runs a case with an ablation (or both layers
+  off) and requires the attack to flip. Where a second layer backs the first, one switch reopens
+  nothing and the test says so: the principal lock alone is backed by the merchant's refusal of
+  unmandated checkouts, and the pre-authorize check alone by the gate.
+
+### Decision 66: A concurrent burst of `complete` can void the winner's authorization
+
+**Flagged for the owner; not fixed here.** Found by the attack suite while writing
+`double_complete_retry`. With ten concurrent completes after the payer approved, about one run in
+twenty (observed in both `full` and `baseline`) ends with the authorization voided and no capture: a
+losing request sees the order already `COMPLETED`, takes the Credential Provider's cleanup path and
+voids the authorization the winner made; one request answers 500 (an `IntegrityError` while recording
+the cleanup). It never creates a second PayPal object or a second capture, and it fails closed, so it
+is not a money finding. It is a liveness defect that anyone holding a checkout id can trigger, and the
+fix is in `cp/provider.py` (an invariant module), so it needs an ADR and a decision from the owner. The
+deterministic suite uses sequential replays; the burst is in `tests/integration/test_complete_race.py`,
+which asserts the safety half only. See [LIMITATIONS.md](LIMITATIONS.md) L28.
 
 ---
 

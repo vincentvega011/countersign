@@ -28,11 +28,13 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
+from countersign.canonical.jsonstrict import loads_strict
 from countersign.mandates import MAX_MANDATE_CHARS
 from countersign.merchant.authorization import sign_checkout
 from countersign.merchant.keys import MerchantKey
 from countersign.protocols.ucp import messages as m
 from countersign.protocols.ucp.requests import (
+    JsonLoader,
     check_content_type,
     ignored_members,
     parse_checkout_request,
@@ -99,7 +101,13 @@ def ctx(request: Request) -> RequestContext:
     )
 
 
-def install(app: FastAPI, service: UcpService, base_path: str, key: MerchantKey) -> None:
+def install(
+    app: FastAPI,
+    service: UcpService,
+    base_path: str,
+    key: MerchantKey,
+    json_loader: JsonLoader = loads_strict,
+) -> None:
     """Mount the checkout routes and the error handlers on `app`."""
     router = APIRouter(prefix=base_path)
 
@@ -111,7 +119,7 @@ def install(app: FastAPI, service: UcpService, base_path: str, key: MerchantKey)
         raw = await read_body(request.stream())
         if raw.strip():
             check_content_type(request.headers.get("Content-Type"))
-        return parse_json_object(raw, allow_empty=body == "optional")
+        return parse_json_object(raw, allow_empty=body == "optional", loader=json_loader)
 
     @router.post("/checkout-sessions")
     async def create(request: Request) -> JSONResponse:

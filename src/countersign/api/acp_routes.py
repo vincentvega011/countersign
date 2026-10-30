@@ -24,10 +24,12 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
+from countersign.canonical.jsonstrict import loads_strict
 from countersign.mandates import MAX_MANDATE_CHARS
 from countersign.protocols.acp import errors as e
 from countersign.protocols.acp.requests import (
     SUPPORTED_VERSION,
+    JsonLoader,
     parse_cancel,
     parse_complete,
     parse_create,
@@ -72,16 +74,21 @@ def _checks(request: Request, *, post: bool) -> None:
         raise e.AcpError(400, "idempotency_key_required", "Idempotency-Key header is required")
 
 
-async def _body(request: Request, *, allow_empty: bool = False) -> dict[str, Any]:
+async def _body(
+    request: Request, *, allow_empty: bool = False, loader: JsonLoader = loads_strict
+) -> dict[str, Any]:
     media = request.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
     raw = await read_body(request.stream())
     if raw.strip() and media != "application/json":
         raise e.AcpError(400, "invalid_content_type", "Content-Type must be application/json")
-    return parse_json_object(raw, allow_empty=allow_empty)
+    return parse_json_object(raw, allow_empty=allow_empty, loader=loader)
 
 
-def install(app: FastAPI, service: AcpService) -> None:
+def install(app: FastAPI, service: AcpService, json_loader: JsonLoader = loads_strict) -> None:
     router = APIRouter()
+
+    async def read(request: Request, *, allow_empty: bool = False) -> dict[str, Any]:
+        return await _body(request, allow_empty=allow_empty, loader=json_loader)
 
     async def guarded(
         request: Request, work: Callable[[], Awaitable[Session | e.AcpError]]
@@ -103,7 +110,7 @@ def install(app: FastAPI, service: AcpService) -> None:
     async def create(request: Request) -> JSONResponse:
         async def work() -> Session:
             _checks(request, post=True)
-            req = parse_create(await _body(request))
+            req = parse_create(await read(request))
             return await run_in_threadpool(service.create, req, context(request))
 
         return await guarded(request, work)
@@ -120,7 +127,7 @@ def install(app: FastAPI, service: AcpService) -> None:
     async def update(session_id: str, request: Request) -> JSONResponse:
         async def work() -> Session:
             _checks(request, post=True)
-            req = parse_update(await _body(request))
+            req = parse_update(await read(request))
             return await run_in_threadpool(service.update, session_id, req, context(request))
 
         return await guarded(request, work)
@@ -129,7 +136,7 @@ def install(app: FastAPI, service: AcpService) -> None:
     async def complete(session_id: str, request: Request) -> JSONResponse:
         async def work() -> Session:
             _checks(request, post=True)
-            parse_complete(await _body(request))
+            parse_complete(await read(request))
             return await run_in_threadpool(service.complete, session_id, context(request))
 
         return await guarded(request, work)
@@ -138,7 +145,7 @@ def install(app: FastAPI, service: AcpService) -> None:
     async def cancel(session_id: str, request: Request) -> JSONResponse:
         async def work() -> Session:
             _checks(request, post=True)
-            parse_cancel(await _body(request, allow_empty=True))
+            parse_cancel(await read(request, allow_empty=True))
             return await run_in_threadpool(service.cancel, session_id)
 
         return await guarded(request, work)
@@ -147,7 +154,7 @@ def install(app: FastAPI, service: AcpService) -> None:
     async def delegate_payment(request: Request) -> JSONResponse:
         async def work() -> e.AcpError:
             _checks(request, post=True)
-            await _body(request)  # read through the strict loader, then rejected whatever it says
+            await read(request)  # read through the strict loader, then rejected whatever it says
             return await run_in_threadpool(service.reject_delegated_payment, context(request))
 
         return await guarded(request, work)

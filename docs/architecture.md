@@ -276,7 +276,8 @@ entry in this document. Stack: Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, 
   `PrincipalLock.decide` at create, update and complete; it holds no lock logic. Complete never pays:
   a locked principal, or any principal under a policy that requires AP2, gets `mandate_required`
   (403 `Error`); everyone else gets `unmandated_checkout_not_allowed` from a named seam
-  (`UnmandatedCompletion`, default deny) where the baseline mode's permissive path will plug in. Strict
+  (`UnmandatedCompletion`, default deny) where the baseline mode's permissive path plugs in
+  ([PROTOCOL.md](PROTOCOL.md) Decision 62). Strict
   JSON on every body, fixed error text, every decision logged. Decisions 51 to 54 in
   [PROTOCOL.md](PROTOCOL.md).
 - Acceptance: schema conformance against the vendored schemas; `merchant_authorization` verifies
@@ -564,15 +565,38 @@ log proofs. Tampering with any byte makes verification fail at the correct step 
 
 ## 6. Runtime modes
 
-- `CS_MODE=full`: everything described above.
-- `CS_MODE=baseline`: a careful but conventional AP2-aware gateway. It verifies UCP mandates
-  correctly at `complete`, but has no capture gate (it captures immediately after authorization),
-  no principal lock (the ACP path is accepted without mandates), no budget reconciliation, and only
-  per-session nonce memory. It exists so comparisons are fair and the value of the gate and lock is
-  visible.
-- Ablations in `full`: `ABL_NO_GATE`, `ABL_NO_PRINCIPAL_LOCK`, `ABL_NO_BUDGET_RECON`,
-  `ABL_NO_GLOBAL_NONCE`, `ABL_NO_STRICT_JSON`, `ABL_NO_PREAUTH_CHECK`. They are refused when
-  `APP_ENV=demo`.
+- `CS_MODE=full` (the default): everything described above.
+- `CS_MODE=baseline`: a careful but conventional AP2-aware gateway, defined line by line, with the
+  reason for each omission, in [PROTOCOL.md](PROTOCOL.md) Decision 59. It verifies UCP mandates
+  correctly at `complete`, but has no capture gate (it captures immediately after authorization, with
+  no read of the order or the capture), no pre-authorize check, no principal lock (an ACP complete
+  without a mandate is accepted, authorized and captured), budgets from a persistent local
+  counter that is never reconciled from PayPal (no webhook reconciliation), single-use memory per session only, and
+  request bodies read by Python's JSON parser. It exists so comparisons are fair and the value of the
+  gate and lock is visible. It is our model of a conventional integration, not a competitor.
+- Ablations in `full`: `ABL_NO_GATE`, `ABL_NO_PREAUTH_CHECK`, `ABL_NO_PRINCIPAL_LOCK`,
+  `ABL_NO_BUDGET_RECON`, `ABL_NO_GLOBAL_NONCE`, `ABL_NO_STRICT_JSON`; each switches off one thing
+  ([PROTOCOL.md](PROTOCOL.md) Decision 60). They are refused when `APP_ENV=demo` and together with
+  baseline.
+
+### 6.1 Where the mode lives
+
+`countersign.runtime` reads and validates `CS_MODE`, `APP_ENV` and the flags (`countersign.main.create`
+does so before it touches a key, the database or PayPal). `countersign.composition.build_app` is the
+only place that turns the settings into collaborators; the invariant modules receive them and never
+read the mode. `countersign.degraded` holds the weakened pieces (immediate capture, the permissive ACP
+seam, the lenient JSON loader) and is imported only by the composition root, only in the branches that
+need it. The mode is on `GET /health` and in the `X-Countersign-Mode` header of every response.
+
+### 6.2 A full and a baseline instance side by side
+
+`make dev-pair` runs `scripts/dev_pair.py` against the compose Postgres. It creates two databases
+(`countersign_full`, `countersign_baseline`) with a login role each, migrates both, and starts
+`uvicorn countersign.main:create --factory` twice: full on `http://localhost:8000` and baseline on
+`http://localhost:8001` (`FULL_PORT`, `BASELINE_PORT`). The two share nothing: not a reservation, a
+spend entry, a lock or a log. The same sandbox credentials and keys (see `.env.example`) are used by
+both; a platform key is needed for any mandate to verify (`PLATFORM_KEY_PATH`). The dashboard side of
+the comparison is built in P4.
 
 ## 7. Product surfaces
 
@@ -638,6 +662,12 @@ Otherwise it returns a grid state object the dashboard applies. It has no write 
   toward a goal. It has no PayPal credentials and no database access. Every attempt is logged.
 
 ## 8. Evaluation
+
+**Implemented so far (P2.10).** `eval/run.py --suite attacks --mode {full,baseline,both}` runs the 25
+attack cases of `eval/attacks/` against the application built by the composition root over the PayPal
+simulator, judges each from the simulator's PayPal objects and the decision log (`eval/judge.py`), and
+writes `eval/reports/<timestamp>/report.{json,md}` and `eval/reports/latest.json`. See `eval/README.md`
+and [PROTOCOL.md](PROTOCOL.md) Decisions 64 to 66. The other suites are later work.
 
 Ground truth is PayPal sandbox state (fetched), the decision log and evidence verification. Never a
 model judge.

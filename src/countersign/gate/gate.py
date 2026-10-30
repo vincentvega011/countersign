@@ -160,6 +160,7 @@ class CaptureGate:
         evaluator: PaymentConstraintEvaluator | None = None,
         expiry_skew_s: int = 60,
         claim_stale_us: int = 60_000_000,
+        store: GateStore | None = None,
     ) -> None:
         self._config = config
         self._engine = engine
@@ -171,7 +172,7 @@ class CaptureGate:
         self._evaluator = evaluator or PaymentConstraintEvaluator()
         self._skew = expiry_skew_s
         self._stale_us = claim_stale_us
-        self._store = GateStore(engine, clock_us)
+        self._store = store if store is not None else GateStore(engine, clock_us)
         self._policy_hash = policy_hash()
 
     # ------------------------------------------------------------------ logging

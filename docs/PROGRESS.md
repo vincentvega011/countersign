@@ -127,7 +127,7 @@ recorded request ids again, so:
   adapter, `ABL_NO_GATE`; migration 0004; UCP complete runs the gate and returns the order and the
   signed Payment Receipt. Decisions 41 to 46 in [PROTOCOL.md](PROTOCOL.md). Simulator, concurrency,
   crash and property tests pass; the real-sandbox gate cassette (`scripts/record_gate_cassette.py`, two
-  approvals) is written and not yet recorded.
+  approvals) is recorded (`tests/cassettes/gate_flow.json`) and its replay tests run in CI.
 
 - P2.6: principal lock (`src/countersign/lock/`): `(customer id, agent key thumbprint)` recorded as
   locked on AP2 negotiation (insert-only Postgres tables, migration 0005, idempotent and race safe),
@@ -155,6 +155,19 @@ recorded request ids again, so:
   webhook id is configured (steps in [ENV.md](ENV.md) section 11, pending for P5.1). The failure-path
   recording script exists and has not been run. Decisions 55 to 58 in [PROTOCOL.md](PROTOCOL.md).
 
+- P2.9: baseline mode and ablations (`src/countersign/runtime.py`, `composition.py`, `main.py`,
+  `degraded/`): `CS_MODE=baseline` as the line-by-line conventional gateway of Decision 59, the six
+  ablations as injected policy (Decision 60), refusal at start in demo, the mode on `GET /health` and in
+  a response header, `make dev-pair` for a full and a baseline instance on separate databases. A
+  behavior matrix of eleven scenarios against eight configurations is checked in as data
+  (`tests/vectors/behavior_matrix.json`). Decisions 59 to 62 in [PROTOCOL.md](PROTOCOL.md). Simulator
+  and Postgres only: no new sandbox recording.
+
+- P2.10: first 25 attack cases (`eval/attacks/`), the judge, runner and report (`eval/`), a case level
+  mutation check, and the baseline budget made a persistent local counter (Decision 63). Run on the
+  simulator only. Decisions 64 to 66 in [PROTOCOL.md](PROTOCOL.md); a liveness defect found in
+  concurrent completes is open ([LIMITATIONS.md](LIMITATIONS.md) L28).
+
 ## P2 carry-over tasks
 
 Findings from the P1 review that belong to P2 and are not optional there:
@@ -178,6 +191,10 @@ Findings from the P1 review that belong to P2 and are not optional there:
   model code (`tests/unit/test_gate_import_guard.py`).
 
 ## Carried forward
+
+- **P5.1:** run `CaptureGate.recover` and the CP recovery on a schedule (L26).
+- **P5.1:** rate limit unverified webhook requests (L26).
+- **P5.1:** record a real refund once and confirm the `payments.refunds` reading (Decision 55 note).
 
 - **P3.3:** make the `sub` claim mandatory in mandates once the Trusted Surface backend writes it; remove the
   sub-less leniency of Decision 47 and L19.
