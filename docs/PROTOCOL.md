@@ -2463,6 +2463,116 @@ ACP path, a repeated complete answers with the first result (`completed`).
 - The `double_complete_retry` attack case is a real concurrent burst again. It records no winner, only
   what PayPal ended up holding.
 
+### Decision 70: Cancel is refused once a payment attempt exists
+
+**Flagged for the owner.** Sources: UCP `shopping/checkout/index.md` ("Status Values": `canceled` is
+"invalid or expired"; the `complete_in_progress` operation table says the Platform must follow the
+cancellation race rules, which end with "Cancellation can race completion; the Platform MUST NOT treat
+the Checkout as canceled unless the Business reports `status: canceled`"), and the vendored ACP
+`openapi.agentic_checkout.yaml` (cancel: 200, or 405 "Not cancelable"). The specs let the Business refuse;
+they name no code for it. Decisions 17 and 51 allowed cancel in every non-final status, which left the
+hole recorded as L30.
+
+- **Rule.** `countersign.checkout.cancel.cancel_refusal`, called by both adapters under the checkout row
+  lock, refuses a cancel when the checkout is `complete_in_progress` OR a payment attempt exists in any
+  non-final state (`reserved`, `order_created`, `authorizing`, `authorized`, `gating`, `capturing`,
+  `unresolved`), whatever the checkout's status says. The attempt test is the second half on purpose: an
+  attempt that outlives its checkout's status is still money held. Before any attempt exists and
+  while the checkout is not completing, cancel works as before.
+- **What a refusal does.** Nothing but log. It does not void, release, abandon or touch the attempt, the
+  reservations or the ledger. The refusal is logged in the same transaction as the decision, before the
+  answer (INV-12): `checkout.cancel_rejected` (UCP) and `acp.cancel_rejected` (ACP). ACP logs and
+  commits first and raises after, because raising inside the transaction would roll the log back.
+- **Answer, UCP.** HTTP 200 with the unchanged checkout (status `complete_in_progress`) and the message
+  `complete_in_progress`, severity `recoverable`: the same code the update refusal uses, and "try
+  again later" is what it means. A final checkout keeps `checkout_not_cancelable` (unrecoverable) and the
+  body is that checkout, so a cancel after completion reports the completed checkout and a cancel after a
+  void or rejection reports the canceled one.
+  UCP answers a refused cancel with HTTP 200 and the unchanged checkout, so clients must read the status
+  and the message, not the HTTP code.
+- **Answer, ACP.** 405 (the spec's only "not cancelable" answer) with code `complete_in_progress`, or
+  `not_cancelable` for a final session. The ACP error body carries no session, so the final state is
+  read with GET; this is the schema, not a choice.
+- **Order against a complete.** `complete` moves `ready_for_complete` to `complete_in_progress` under the
+  same row lock. A cancel before it wins and the complete is refused as not ready with nothing created
+  (a canceled checkout never has a PayPal order); a cancel after it is refused. The database orders them.
+- **Same in `full` and `baseline`.** The guard is protocol and mode neutral (INV-5 spirit): it lives in
+  the checkout layer, not in the gate, so the baseline has it too. The `cancel_during_completion` attack
+  case is therefore blocked in both modes and does not separate them.
+- **Baseline ACP.** See [Decision 72](#decision-72-the-baseline-acp-seam-claims-the-session-first).
+
+### Decision 71: G-CHECKOUT, the gate re-reads the checkout under the row lock
+
+**Flagged for the owner.** The second defense, for any path that slips past Decision 70: a cancel
+written straight to the store, an expiry (`_open` cancels a non-final checkout past `expires_at`, also
+while it is completing), a bug.
+
+- **Step.** A ninth check, `G-CHECKOUT`, after `G-LOCK` (the code is in `STEP_CODES`). It is not a
+  separate read followed by a transition: `GateStore.begin_capture` does both in one transaction. It
+  reads the checkout row `FOR SHARE`, requires status `complete_in_progress` and `now < expires_at`, and
+  in the same transaction moves the attempt `gating` to `capturing`. Only then does the gate mint the
+  `CaptureApproval`. The cancel takes the row `FOR UPDATE`, so a cancel that committed first is seen
+  here, and one that comes later waits for this transaction and then finds a live attempt and is refused.
+  Read outside the lock, there would be a window between the check and the capture.
+- **Failure.** Reasons are fixed strings in the log and the receipt: `checkout_missing`,
+  `checkout_<status>` (canceled, completed, ready_for_complete, incomplete, ...), `checkout_expired`.
+  Any of them is a `GateFailure` and takes the existing fail path (GET, void and confirm by GET,
+  release the reservations, signed rejection receipt, attempt `voided`). A missing row fails closed.
+  UCP code on the receipt and in the answer: `payment_failed`, unchanged mapping for an unlisted code.
+  A lost transition (another gate already holds the attempt) is `GatePending`, as before.
+- **The service.** When the gate rejects because the checkout was canceled under it, the checkout stays
+  `canceled` and the response carries the gate's messages (`payment_failed`), not "being completed".
+- **Not in `baseline`.** The baseline's immediate capture and `ABL_NO_GATE` skip the check: it is a gate
+  step. They rely on Decision 70 alone. No new ablation was added.
+- **No schema change, no request id change.** The cassettes are valid as recorded. The `checkout_id` of
+  the attempt is the checkout id, so the join needs nothing new.
+- **Residual: expiry.** An expiry that cancels a completing checkout is caught by the gate if the gate
+  runs. If nobody completes again, the authorization is voided by `recover` (L26), which is not scheduled
+  until P5.1.
+
+### Decision 72: The baseline ACP seam claims the session first
+
+**Flagged for the owner.** The baseline ACP complete used to read the session without the lock, call the
+seam (which creates, authorizes and captures at PayPal) and only then take the lock to move the session
+to `complete_in_progress` and `completed`. A cancel committed in between left a capture on a canceled
+session, and `_finish_unmandated` raised `InvalidTransition` (a 500). The ACP adapter now claims
+`complete_in_progress` under the row lock BEFORE a seam that can pay is called (`resumable` seams, which
+is only the baseline's), so Decision 70 refuses the cancel from then on.
+
+- **The claim is never given back.** A seam that raised or denied may already have moved money (an unknown
+  capture outcome), and a session that could be canceled again would contradict the books. A denied
+  baseline complete therefore leaves the session `complete_in_progress`, which the seam can resume. In
+  `full` the seam never pays and nothing is claimed.
+- **Repeats.** A repeated complete finds `complete_in_progress` or `completed` and goes to the seam, which
+  reports the first result (Decision 63).
+- **SHORTCUT, baseline only:** an expiry that cancels the session before `_finish_unmandated` leaves the
+  capture standing on a canceled session. The baseline has no gate to catch it ([L30](LIMITATIONS.md)).
+
+### Decision 73: The shared UI has no build step
+
+**Flagged for the owner.** `web/ui/` is plain CSS custom properties, one ES module (`ui.js`) and static
+HTML, so any surface (dashboard, Trusted Surface, demo store) can load it with a link and a script tag.
+No framework and no bundler. The only addition is a development dependency, `playwright` in
+`web/ui/package.json` (and its Chromium download), used only by `web/ui/test/screenshots.mjs` to write
+review images to the gitignored `web/ui/.artifacts/`. `pnpm-lock.yaml` changed for it.
+
+### Decision 74: Fonts
+
+**Flagged for the owner.** Newsreader (display headings and large amounts), Instrument Sans (interface)
+and JetBrains Mono (hashes, fingerprints, tabular figures), all SIL Open Font License 1.1, the Latin
+variable subset only (about 128 KB in total), self-hosted as woff2 in `web/ui/fonts/` with each licence
+text beside the files. No remote font service. A test fails if any page names another origin.
+
+### Decision 75: Gallery availability and contrast rules
+
+**Flagged for the owner.** The component gallery is served at `/_ui/gallery.html` only when `APP_ENV` is
+exactly `dev` or `eval` (an allowlist: `demo`, an unknown value or an empty one serve nothing). The
+contrast test checks the manifest in `tests/ui_contrast.py`: 4.5 for every text pair and badge, 3.0 for
+control outlines (`--color-border-strong`) and the focus ring, in light and dark. The decorative
+`--color-border` hairline is not a control boundary and is not held to 3.0. The state pills carry a glyph
+as well as a tone, so no state depends on colour alone. The tokens that the AG Grid theme will use in P4
+are listed in the comment at the top of `tokens.css`.
+
 ---
 
 ## 4. Confirmed PayPal facts

@@ -331,14 +331,23 @@ and then dies leaves the attempt `authorizing` until `recover` runs, and `recove
 - Case level mutation checks use the ablations, so they show what each switch reopens, not every
   possible code defect.
 
-### L30. A checkout can be canceled while it is completing
+### L30. A checkout can be canceled while it is completing (RESOLVED in P2.12)
 
-Cancel is allowed in every status that is not final, including `complete_in_progress`, and the capture gate
-does not re-read the checkout. Anyone holding the checkout id can therefore cancel a checkout between
-authorize and capture: the gate still captures, and the checkout then reads `canceled` without receipts,
-so the trail contradicts itself. A cancel during payer approval leaves the attempt, the budget and the
-mandate reserved until `recover` runs (L26). No money moves outside what was signed. Planned: refuse the
-cancel in that status and have the gate check the status under lock (P2.12).
+Cancel used to be allowed in every status that is not final, and the capture gate did not re-read the
+checkout, so anyone holding the checkout id could cancel between authorize and capture and leave a
+`canceled` checkout with a capture and no receipts. Resolved by two defenses ([PROTOCOL.md](PROTOCOL.md)
+Decisions 70 to 72): cancel is refused once a payment attempt exists or the checkout is completing
+(UCP, ACP, `full` and `baseline`), and the gate re-reads the checkout under the row lock in the same
+transaction that moves the attempt to `capturing` (G-CHECKOUT, `full` only).
+
+What remains, stated plainly:
+
+- A checkout that expires while completing becomes `canceled`; the gate voids it if it runs, otherwise
+  only `recover` does, and `recover` is not scheduled until P5.1 (L26).
+- The baseline has no G-CHECKOUT. An expiry during a baseline ACP completion leaves the capture on a
+  canceled session (a `# SHORTCUT:` in `_finish_unmandated`). Nothing outside what was signed is captured.
+- A refused cancel is a business outcome (HTTP 200 on UCP, 405 on ACP); a platform that wants to abandon
+  a checkout must wait for the completion to end. The specs allow this ("cancellation can race completion").
 
 ### L31. The open mandate digest depends on how the agent presents it
 

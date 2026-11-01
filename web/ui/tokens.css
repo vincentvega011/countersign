@@ -1,0 +1,147 @@
+/* Design tokens. The one source of truth for colour, space, type and motion.
+
+   Themes: light is the default; dark follows prefers-color-scheme unless the page sets
+   data-theme="light"; data-theme="dark" forces dark. Any element may carry data-theme to scope a
+   theme to a subtree (the component gallery shows both side by side).
+
+   Colour values are plain #rrggbb so tests/unit/test_ui_contrast.py can read and check them. The
+   dark block appears twice (media query and data-theme override) and a test requires the two copies
+   to be identical.
+
+   AG Grid mapping (P4) will use: --color-surface (background), --color-text (foreground),
+   --color-muted (secondary text), --color-border (borders), --color-sunken (header background),
+   --color-accent and --color-accent-surface (selection and focus), --color-success/-warning/-danger
+   and their -surface tints (status cell renderers), --font-ui, --font-mono, --text-sm, --space-*
+   (cell padding) and --radius-sm. */
+
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --color-page: #f6f5f1;
+  --color-surface: #ffffff;
+  --color-sunken: #ecebe4;
+  --color-text: #19202b;
+  --color-muted: #4f5b6b;
+  --color-border: #d9d6cc; /* decorative hairlines; controls use --color-border-strong */
+  --color-border-strong: #7a8492; /* control outlines, 3:1 against page and surface */
+  --color-accent: #0e5f63;
+  --color-accent-hover: #0a4a4e;
+  --color-accent-surface: #ddf0ee;
+  --color-on-accent: #ffffff;
+  --color-focus: #0e5f63;
+  --color-success: #1b6b3a;
+  --color-success-surface: #ddf1e3;
+  --color-warning: #85500a;
+  --color-warning-surface: #fbebcb;
+  --color-danger: #a32828;
+  --color-danger-hover: #861f1f;
+  --color-danger-surface: #fbe1de;
+  --color-on-danger: #ffffff;
+  --color-info: #1f4f9b;
+  --color-info-surface: #e0eafa;
+  --shadow-1: 0 1px 2px rgb(25 32 43 / 8%), 0 1px 1px rgb(25 32 43 / 6%);
+  --shadow-2: 0 6px 20px rgb(25 32 43 / 12%), 0 2px 6px rgb(25 32 43 / 8%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-page: #0f141b;
+    --color-surface: #171e27;
+    --color-sunken: #0b0f14;
+    --color-text: #e8ecf1;
+    --color-muted: #9ca8b7;
+    --color-border: #2a3441;
+    --color-border-strong: #7a8798;
+    --color-accent: #5cc9c1;
+    --color-accent-hover: #7adad3;
+    --color-accent-surface: #12302f;
+    --color-on-accent: #06201f;
+    --color-focus: #5cc9c1;
+    --color-success: #6fd18f;
+    --color-success-surface: #12301c;
+    --color-warning: #f0b955;
+    --color-warning-surface: #36270b;
+    --color-danger: #ff8a80;
+    --color-danger-hover: #ffa49c;
+    --color-danger-surface: #3a1613;
+    --color-on-danger: #2a0907;
+    --color-info: #8db4f5;
+    --color-info-surface: #14263f;
+    --shadow-1: 0 1px 2px rgb(0 0 0 / 40%);
+    --shadow-2: 0 8px 24px rgb(0 0 0 / 50%);
+  }
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-page: #0f141b;
+  --color-surface: #171e27;
+  --color-sunken: #0b0f14;
+  --color-text: #e8ecf1;
+  --color-muted: #9ca8b7;
+  --color-border: #2a3441;
+  --color-border-strong: #7a8798;
+  --color-accent: #5cc9c1;
+  --color-accent-hover: #7adad3;
+  --color-accent-surface: #12302f;
+  --color-on-accent: #06201f;
+  --color-focus: #5cc9c1;
+  --color-success: #6fd18f;
+  --color-success-surface: #12301c;
+  --color-warning: #f0b955;
+  --color-warning-surface: #36270b;
+  --color-danger: #ff8a80;
+  --color-danger-hover: #ffa49c;
+  --color-danger-surface: #3a1613;
+  --color-on-danger: #2a0907;
+  --color-info: #8db4f5;
+  --color-info-surface: #14263f;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow-2: 0 8px 24px rgb(0 0 0 / 50%);
+}
+
+:root {
+  /* Type */
+  --font-display: "Newsreader", "Iowan Old Style", Georgia, serif;
+  --font-ui:
+    "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:
+    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+  --leading-tight: 1.2;
+  --leading-normal: 1.5;
+  --tracking-caps: 0.06em;
+
+  /* Space (4 px base) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+
+  /* Shape */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --border-width: 1px;
+  --focus-ring-width: 3px;
+  --focus-ring-offset: 2px;
+  --target-min: 44px; /* minimum touch target */
+
+  /* Motion */
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 320ms;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+}

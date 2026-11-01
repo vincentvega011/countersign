@@ -92,7 +92,7 @@ def test_a_clean_flow_passes_every_step_and_captures_once(world: GateWorld) -> N
     # Every step is logged, in order, before the capture; the log chain verifies.
     assert steps_logged(world) == [
         ("G-FETCH", "pass"), ("G-STATUS", "pass"), ("G-REVERSE", "pass"), ("G-TERMS", "pass"),
-        ("G-AMOUNT", "pass"), ("G-MANDATE", "pass"), ("G-BUDGET", "pass"), ("G-LOCK", "pass"),
+        ("G-AMOUNT", "pass"), ("G-MANDATE", "pass"), ("G-BUDGET", "pass"), ("G-LOCK", "pass"), ("G-CHECKOUT", "pass"),
     ]  # fmt: skip
     log = kinds(world)
     assert log.index("gate.step") < log.index("gate.paypal.capture.started")
@@ -497,7 +497,7 @@ def test_a_void_frees_the_open_mandate_and_the_budget_for_a_new_checkout(
     assert isinstance(rejected, GateRejected)
 
     # The first checkout's id, hash and nonce stay consumed; the open mandates are free again.
-    second_checkout = make_checkout(checkout_id="chk_second_checkout_00000")
+    second_checkout = make_checkout(checkout_id="chk_second_checkout_000000")
     again = world.base.mandates(
         checkout=second_checkout, nonce="nonce-0002",
         reuse_open_payment=first.payment.open_token, reuse_checkout_open=first.checkout.open_token,

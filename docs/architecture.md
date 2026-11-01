@@ -488,6 +488,12 @@ order object.
 | `G-MANDATE` | the mandates are still unexpired and not revoked, the single-use keys are reserved by this checkout, and the consent record verifies |
 | `G-BUDGET`  | the budget still holds under a freshly reconciled spend view                                                                         |
 | `G-LOCK`    | the principal lock requirements are still satisfied                                                                                  |
+| `G-CHECKOUT` | the checkout is still `complete_in_progress` and unexpired, read `FOR SHARE` in the transaction that moves the attempt to `capturing` |
+
+`G-CHECKOUT` is the ninth check and runs last, inside the move to `capturing` (PROTOCOL.md Decision 71).
+It pairs with the cancel entry guard in `countersign.checkout.cancel` (Decision 70): both take the
+checkout row lock, so a cancel and a capture on one checkout are ordered by the database and end in one
+consistent outcome (canceled with nothing authorized, or completed with receipts).
 
 On pass: capture, consume the keys and the open mandate, add the amount to the spend view and sign
 the Payment Receipt. On fail: void, release the reservations (the open mandate returns to `unused`

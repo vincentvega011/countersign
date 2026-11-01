@@ -25,6 +25,7 @@ from countersign.canonical import sd_hash
 from countersign.cp import CpApprovalRequired, CpAuthorized, CpRejected
 from countersign.gate import revoke_mandate
 from countersign.merchant.verify import Accepted
+from tests.checkout_seed import seed_checkout
 from tests.gate_support import GateWorld, make_gate_world
 from tests.merchant_support import make_checkout
 
@@ -98,6 +99,7 @@ def test_captured_money_never_exceeds_the_budget_or_the_signed_total(
             world.sim.approve(started.order_id)
             if kind == "raised":
                 world.sim.patch(started.order_id, amount="140.00")
+            seed_checkout(world.engine, checkout)
             done = world.base.provider.finish(checkout_id=checkout.id, current=checkout)
             assert isinstance(done, CpAuthorized)
             if kind == "revoked":

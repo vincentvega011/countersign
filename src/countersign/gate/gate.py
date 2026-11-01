@@ -15,6 +15,9 @@ G-MANDATE  the Payment and Checkout Mandates verify AGAIN from the stored tokens
            by this checkout.
 G-BUDGET   the budget still holds under the ledger view, excluding this checkout's own reservation.
 G-LOCK     the principal lock policy (a `LockPolicy`; the default denies) still allows the payment.
+G-CHECKOUT the checkout is still `complete_in_progress` and unexpired, read under a shared row lock
+           in the same transaction that moves the attempt to `capturing` (Decision 71), so a
+           checkout canceled or expired after authorization is never captured.
 
 Pass: mint the sealed `CaptureApproval`, capture the whole authorization with `final_capture` true,
 then GET the capture and the authorization and require `COMPLETED` and `CAPTURED`. Capture and void
@@ -70,6 +73,7 @@ from countersign.gate.outcomes import (
     G_AMOUNT,
     G_BUDGET,
     G_CAPTURE,
+    G_CHECKOUT,
     G_FETCH,
     G_LOCK,
     G_MANDATE,
@@ -458,11 +462,12 @@ class CaptureGate:
     # ------------------------------------------------------------------ capture
 
     def _capture(self, run: _Run, total: Money) -> GateOutcome:
-        run.step = G_CAPTURE
         row = run.row
-        if not self._store.set_state(run.checkout_id, "capturing", expect=("gating",)):
+        held = self._step(run, G_CHECKOUT, lambda: self._begin_capture(run))
+        if not held:
             latest = self._store.row(run.checkout_id)
             return GatePending(run.checkout_id, "none" if latest is None else str(latest.state))
+        run.step = G_CAPTURE
         approval = mint_capture_approval(
             checkout_id=run.checkout_id, authorization_id=row.authorization_id,
             expected_total=total, invoice_id=run.checkout_id, custom_id=row.custom_id,
@@ -472,6 +477,21 @@ class CaptureGate:
         except PayPalError as error:
             raise GateFailure(G_CAPTURE, f"capture_failed:{type(error).__name__}") from None
         return self._confirm_and_finalize(run, made.resource_id, total)
+
+    def _begin_capture(self, run: _Run) -> bool:
+        """G-CHECKOUT: the checkout still owns the attempt, atomically with moving to `capturing`.
+
+        False if another gate took the attempt (nothing was done); raises `GateFailure` if the
+        checkout was canceled, expired or is gone, which takes the fail path (void and confirm,
+        release, rejection receipt). Runs before `mint_capture_approval`, so no approval exists for
+        a checkout that does not own the attempt.
+        """
+        reason = self._store.begin_capture(run.checkout_id)
+        if reason is None:
+            return True
+        if reason == "lost_claim":
+            return False
+        raise GateFailure(G_CHECKOUT, reason)
 
     def _confirm_and_finalize(self, run: _Run, capture_id: str, expected: Money) -> GateOutcome:
         """GET the capture and the authorization; only a confirmed capture is success."""

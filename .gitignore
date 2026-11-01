@@ -18,6 +18,7 @@ dist/
 # Node
 node_modules/
 web/*/dist/
+web/*/.artifacts/
 .vite/
 
 # Cassettes: only scrubbed ones are committed. Raw recordings may contain tokens.

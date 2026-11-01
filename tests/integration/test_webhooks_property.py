@@ -82,7 +82,7 @@ def test_final_books_do_not_depend_on_order_or_duplication(
     @given(kind=scenarios, refunds=refund_values, data=st.data())
     def run(kind: str, refunds: list[str], data: st.DataObject) -> None:
         serial = next(COUNTER)
-        checkout = make_checkout(checkout_id=f"chk_whprop_{serial:010d}")
+        checkout = make_checkout(checkout_id=f"chk_whprop_{serial:015d}")
         world = make_webhook_world(app_engine, checkout=checkout)
         world.sim._n = (
             serial * 100

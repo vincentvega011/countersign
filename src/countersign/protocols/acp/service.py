@@ -34,7 +34,8 @@ from sqlalchemy import Connection, Engine
 from countersign.canonical.models import Checkout
 from countersign.catalog.catalog import Catalog
 from countersign.checkout import store
-from countersign.checkout.state import FINAL, Status, cancelable, transition, updatable
+from countersign.checkout.cancel import cancel_refusal
+from countersign.checkout.state import FINAL, Status, transition, updatable
 from countersign.ledger import store as ledger
 from countersign.lock import AP2_CAPABILITY, LockPort, LockRequest, Principal
 from countersign.protocols.acp import errors as e
@@ -310,6 +311,11 @@ class AcpService:
                 e.MANDATE_REQUIRED,
                 "This agent must use AP2: negotiate the AP2 mandates capability and present a mandate.",
             )
+        if getattr(self._unmandated, "resumable", False):
+            # The claim is never given back: a seam that raised or denied may already have moved
+            # money at PayPal (an unknown capture outcome), and a session that could be canceled
+            # again would contradict the books. The baseline can resume it (`resumable`).
+            self._claim_completion(record)
         outcome = self._unmandated.complete(record.checkout, principal)
         if isinstance(outcome, UnmandatedPaid):
             return self._finish_unmandated(record, outcome)
@@ -319,6 +325,34 @@ class AcpService:
             raise TypeError("the unmandated seam returned something that is not an outcome")
         self._log(None, "acp.complete_denied", record.id, reason=outcome.code, locked=False)
         raise e.denied(outcome.code, outcome.message)
+
+    def _claim_completion(self, record: store.CheckoutRecord) -> bool:
+        """Move the session to `complete_in_progress` BEFORE a seam that can pay is called.
+
+        Only a seam that can pay (the baseline's) needs this. Money must never move while the
+        session can still be canceled: the cancel guard refuses a `complete_in_progress` session
+        (Decision 70), and both this claim and the cancel run under the row lock, so a cancel lands
+        first (then this complete is refused as not ready) or finds the session completing. True if
+        this call made the transition.
+        """
+        with self._engine.begin() as conn:
+            current = self._open(conn, record.id, lock=True)
+            if current is None:
+                raise self._not_found()
+            if current.status is not Status.READY_FOR_COMPLETE:
+                if current.status in (Status.COMPLETE_IN_PROGRESS, Status.COMPLETED):
+                    return False  # a repeat: the seam reports the first result
+                self._log(conn, "acp.complete_not_ready", current.id, status=current.status.value)
+                raise e.AcpError(
+                    409, "not_ready", "This checkout session is not ready for payment."
+                )
+            started = current.advanced(
+                status=transition(current.status, Status.COMPLETE_IN_PROGRESS),
+                now_us=self._clock(),
+            )
+            store.save(conn, started)
+            self._log(conn, "acp.complete_started", started.id)
+            return True
 
     def _await_approval(self, record: store.CheckoutRecord, outcome: UnmandatedApproval) -> Session:
         """Baseline only: the session waits for the payer, and the answer carries the approval link."""
@@ -341,6 +375,13 @@ class AcpService:
             current = self._open(conn, record.id, lock=True)
             if current is None:
                 raise self._not_found()
+            if current.status is Status.CANCELED:
+                # SHORTCUT: only an expiry can reach here (cancel is refused while completing); the
+                # baseline has no gate to catch it, so the capture stands and the session stays
+                # canceled. docs/LIMITATIONS.md L30.
+                self._log(conn, "acp.completed_unmandated_after_cancel", record.id,
+                          order_id=outcome.order_id, capture_id=outcome.capture_id)  # fmt: skip
+                return self._session(current)
             for target in (Status.COMPLETE_IN_PROGRESS, Status.COMPLETED):
                 if current.status is not target and current.status is not Status.COMPLETED:
                     current = current.advanced(
@@ -370,15 +411,30 @@ class AcpService:
         return e.denied(e.DELEGATED_PAYMENT_UNSUPPORTED, "Delegated payment is not supported.", "$")
 
     def cancel(self, session_id: str) -> Session:
+        """Cancel a session, unless it is final or its payment is in flight (Decision 70).
+
+        ACP's only "not cancelable" answer is 405, so a final session and a completing one both
+        get it, with different codes (`not_cancelable`, `complete_in_progress`). The refusal is
+        logged in a transaction that commits before the error is raised (INV-12): raising inside
+        the transaction would roll the log back. Nothing else changes.
+        """
         with self._engine.begin() as conn:
             record = self._open(conn, session_id, lock=True)
             if record is None:
                 raise self._not_found()
-            if not cancelable(record.status):
-                raise e.AcpError(405, "not_cancelable", "This checkout session cannot be canceled.")
-            new = record.advanced(
-                status=transition(record.status, Status.CANCELED), now_us=self._clock()
-            )
-            store.save(conn, new)
-            self._log(conn, "acp.session_canceled", new.id, previous=record.status.value)
-        return self._session(new)
+            refusal = cancel_refusal(conn, record)
+            if refusal is None:
+                new = record.advanced(
+                    status=transition(record.status, Status.CANCELED), now_us=self._clock()
+                )
+                store.save(conn, new)
+                self._log(conn, "acp.session_canceled", new.id, previous=record.status.value)
+                return self._session(new)
+            self._log(conn, "acp.cancel_rejected", record.id, reason=refusal,
+                      status=record.status.value)  # fmt: skip
+        if refusal == "completing":
+            raise e.AcpError(
+                405, "complete_in_progress",
+                "This checkout session is being completed and cannot be canceled now.",
+            )  # fmt: skip
+        raise e.AcpError(405, "not_cancelable", "This checkout session cannot be canceled.")

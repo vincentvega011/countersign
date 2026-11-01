@@ -9,7 +9,7 @@ A phase starts only when the previous gate has passed.
 | P0    | Foundations: repository, CI, vendored specs, spec notes, library selection, PayPal sandbox confirmations                               | `make sandbox-smoke` passes and every Day 0 confirmation in [architecture.md](architecture.md) has an answer or a written fallback                 | Passed      |
 | P1    | Canonical core, UCP checkout and profile, `merchant_authorization`, PayPal client, decision log                                        | A UCP checkout is signed and verified by the independent Node verifier, and canonical terms round-trip through a real sandbox order                | Passed |
 | P2    | Mandates, Merchant and Credential Provider roles, constraints, capture gate, principal lock, ACP adapter, baseline mode, first attacks | Downgrade, order-changed-after-approval (nothing is authorized in full; authorized, then voided by the gate with `ABL_NO_PREAUTH_CHECK`) and replay attacks succeed in baseline and fail in full with nothing captured; concurrency tests pass | Passed      |
-| P3    | Trusted Surface with device keys and consent, shopping agent, evidence bundles and verifiers                                           | An autonomous purchase runs from phone approval to a captured sandbox order to a verified evidence bundle, with no server-held customer key        | Not started |
+| P3    | Trusted Surface with device keys and consent, shopping agent, evidence bundles and verifiers                                           | An autonomous purchase runs from phone approval to a captured sandbox order to a verified evidence bundle, with no server-held customer key        | In progress |
 | P4    | Dashboard, assistant, hostile agent, full evaluation                                                                                   | The whole demo runs from the dashboard locally and the evaluation numbers are frozen                                                               | Not started |
 | P5    | Deployment, design polish, documentation, fresh-clone test                                                                             | A stranger can use the hosted demo end to end and can run it locally from the README alone                                                         | Not started |
 | P6    | Video, submission text, final checks                                                                                                   | Everything is submitted with time to spare                                                                                                         | Not started |
@@ -175,6 +175,21 @@ recorded request ids again, so:
   the 200-iteration stress tests are in Decisions 66 to 69 ([PROTOCOL.md](PROTOCOL.md)); L28 is resolved.
   `double_complete_retry` is a real concurrent burst again. Simulator and Postgres only.
 
+- P2.12: cancel while completing (review note N1, L30). Entry guard `checkout/cancel.py`: cancel is refused
+  once a payment attempt exists or the checkout is `complete_in_progress`, on UCP and ACP, in `full` and
+  `baseline`, logged before the answer. Gate step `G-CHECKOUT`: the checkout is re-read `FOR SHARE` in the
+  transaction that moves the attempt to `capturing`, so a canceled or expired checkout is voided and
+  rejected, never captured. The baseline ACP seam now claims the session before it can pay. Decisions 70 to
+  72 in [PROTOCOL.md](PROTOCOL.md); L30 is resolved. Simulator and Postgres only; no new recording.
+
+## P3 log
+
+- P3.1: shared visual system (`web/ui/`): design tokens (light, dark, `data-theme` override), self-hosted
+  fonts, base components (button, card, badge, status pill, key fingerprint, amount, code block), a
+  component gallery served in dev and eval only, a WCAG AA contrast test over the tokens, a no
+  third-party origin test, amount and fingerprint tests, and review screenshots at 375 and 1280 px.
+  Decisions 73 to 75 in [PROTOCOL.md](PROTOCOL.md). No product pages yet.
+
 ## P2 gate (run 2026-10-30): passed
 
 Gate evidence:
@@ -199,9 +214,7 @@ Gate evidence:
 
 Follow-ups from the review, none blocking the gate:
 
-- **P2.12 (before P3):** refuse cancel of a `complete_in_progress` checkout (or route it through the gate's
-  fail path) and have the gate re-check the checkout status under lock before it mints a capture approval
-  (L30).
+- **P2.12 (before P3):** done, see the P2 log (L30 resolved).
 - **P3 prerequisite:** key single use, budget and revocation on a presentation-independent open mandate
   identity, and forbid selective disclosure of whole constraint elements in the platform issuer (L31);
   key the payer vault on (customer id, agent thumbprint) before vault mode is enabled (L32).
@@ -234,11 +247,16 @@ Findings from the P1 review that belong to P2 and are not optional there:
 ## Carried forward
 
 - **P5.1:** rate limit completes and `complete_in_progress` log growth per checkout and per principal (Decision 68).
-- **P3:** add the device-consent half of `consent_missing` once the Trusted Surface signs consent.
+- **P3.4:** add the device-consent half of `consent_missing` once the Trusted Surface signs consent.
+- **P3.4:** key single use, budget and revocation on a presentation-independent open mandate identity, and forbid selective disclosure of whole constraint elements in the platform issuer (L31).
+- **Before vault mode is enabled:** key the payer vault on (customer id, agent thumbprint), not the agent key alone (L32).
 - **P4.5:** wire `check_category_policy` into the Merchant verifier and the Policy view (`category_escape` currently covers the `line_items` constraint only).
 - **P5.1:** run `CaptureGate.recover` and the CP recovery on a schedule (L26).
 - **P5.1:** rate limit unverified webhook requests (L26).
 - **P5.1:** record a real refund once and confirm the `payments.refunds` reading (Decision 55 note).
+- **P5.1:** make ablation refusal fail closed when `APP_ENV` is not explicitly `dev` or `eval`, and pin `APP_ENV=demo` in `render.yaml` (L33).
+- **P5.1:** log the "pending" answer, and let a resumed checkout with no attempt return to `ready_for_complete` after a fence (L34).
+- **P5.1:** create the PayPal webhook, record its id, and confirm live delivery and `verify-webhook-signature` against a real notification (ENV section 11).
 
 - **P3.3:** make the `sub` claim mandatory in mandates once the Trusted Surface backend writes it; remove the
   sub-less leniency of Decision 47 and L19.

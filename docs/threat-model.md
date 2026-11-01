@@ -53,6 +53,7 @@ defense itself.
 | `decimal_ambiguity` | decimal_ambiguity | malicious agent | INV-8, INV-9 | `test_canonical_jsonstrict.py` |
 | `webhook_spoof` | webhook_spoof | network attacker | INV-4, INV-7, INV-10 | `test_webhooks.py` |
 | `double_complete_retry` | double_complete_retry | malicious agent | INV-6, INV-11 | `test_complete_ownership.py`, `test_complete_stress.py` |
+| `cancel_during_completion` | cancel_during_completion | malicious agent | INV-4, INV-10, INV-12 | `test_cancel_during_completion.py` |
 
 Notes on what the cases do and do not cover:
 
@@ -68,12 +69,29 @@ Notes on what the cases do and do not cover:
   fixed by the ownership rule ([PROTOCOL.md](PROTOCOL.md) Decision 67, [LIMITATIONS.md](LIMITATIONS.md)
   L28) and `double_complete_retry` is a real concurrent burst again.
 
+## Cancel while completing
+
+- **Fact.** Before P2.12 a cancel was accepted in every non-final status and the gate never re-read the
+  checkout ([LIMITATIONS.md](LIMITATIONS.md) L30).
+- **Who can do it.** Anyone who knows a checkout id: the agent, a platform retrying, a third party that
+  saw the id. It moves no money by itself; the harm is a trail that contradicts itself (canceled with a
+  capture, no receipts), which is the evidence a dispute depends on.
+- **Defense.** Entry guard: cancel is refused once a payment attempt exists or the checkout is completing
+  ([PROTOCOL.md](PROTOCOL.md) Decision 70, one function for UCP and ACP, `full` and `baseline`). Gate:
+  G-CHECKOUT re-reads the checkout `FOR SHARE` in the transaction that moves the attempt to `capturing`
+  (Decision 71). Baseline ACP claims the session before it can pay (Decision 72).
+- **Attack case.** `cancel_during_completion` (blocked in both modes, because both share the entry guard).
+  The gate re-check is covered by a test that cancels straight in the store, a lock-wait test, and
+  forced interleavings; `tests/integration/test_cancel_during_completion.py`.
+- **Not defended.** An expiry that cancels a completing checkout is caught by the gate only if it runs;
+  otherwise `recover` voids the authorization (P5.1 schedules it).
+
 ## Review of the phase 2 implementation
 
 The whole phase 2 change set was reviewed against the invariants. Result: no finding that moves money
 outside what was signed, bypasses a mandate or the lock, alters the log, or enables a degraded mode
 remotely. Five accepted notes, recorded in [LIMITATIONS.md](LIMITATIONS.md) L30 to L34: cancel during
-completion (INV-10, INV-12), the open mandate identity (INV-6), the payer vault key (INV-5), the default
+completion (INV-10, INV-12; resolved in P2.12), the open mandate identity (INV-6), the payer vault key (INV-5), the default
 of the ablation refusal, and two liveness and logging gaps (INV-12). Areas examined and sound: the
 algorithm allowlist, `typ` and `vct` matching, chain splitting and the `~~` rule, disclosure handling,
 key binding and `cnf`, the customer id source, the identity headers, single use under races, the sealed

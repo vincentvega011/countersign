@@ -1,0 +1,69 @@
+/* Layout of the review page only. Components live in components.css. */
+body {
+  margin: 0;
+}
+.gallery-head {
+  padding: var(--space-5) var(--space-4) 0;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.gallery-head h1 {
+  font-size: var(--text-2xl);
+}
+.gallery {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-4);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+@media (min-width: 900px) {
+  .gallery[data-panels="2"] {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+.panel {
+  padding: var(--space-5) var(--space-4);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  min-width: 0;
+}
+.panel > h2 {
+  font-size: var(--text-xl);
+  margin-bottom: var(--space-4);
+}
+.group {
+  margin-top: var(--space-6);
+}
+.group > h3 {
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--color-muted);
+  margin-bottom: var(--space-3);
+}
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: var(--space-2);
+}
+.swatch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+.swatch i {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: none;
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--color-border-strong);
+}
+.specimen-display {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+}

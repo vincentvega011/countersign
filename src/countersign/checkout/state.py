@@ -14,8 +14,9 @@ Edges:
 - `ready_for_complete` to `complete_in_progress` (Complete accepted), to `incomplete` (an update
   removed required information) and to `canceled`.
 - `complete_in_progress` to `completed`, and back to `ready_for_complete` or `incomplete` when the
-  business rejects the completion; to `canceled` (expiry; cancellation while in progress is
-  otherwise governed by the spec's race rules, which Countersign does not implement).
+  business rejects the completion; to `canceled` (expiry, or a gate or Credential Provider rejection
+  that consumed the checkout). A cancel REQUEST in this status is refused (`checkout.cancel`,
+  docs/PROTOCOL.md Decision 70), so the edge is used by the owner of the completion, never by a caller.
 - `completed` and `canceled` are final: nothing leaves them.
 
 Staying in the same status (an update that changes nothing about readiness) is not an edge and is

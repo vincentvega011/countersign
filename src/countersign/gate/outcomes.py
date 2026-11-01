@@ -28,10 +28,15 @@ G_AMOUNT = "G-AMOUNT"
 G_MANDATE = "G-MANDATE"
 G_BUDGET = "G-BUDGET"
 G_LOCK = "G-LOCK"
-# Not one of the eight checks: the capture itself and its confirmation, which can also fail.
+# The ninth check: the checkout still owns the attempt (docs/PROTOCOL.md Decision 71). It runs inside
+# the transition to `capturing`, so it is atomic with it.
+G_CHECKOUT = "G-CHECKOUT"
+# Not one of the nine checks: the capture itself and its confirmation, which can also fail.
 G_CAPTURE = "G-CAPTURE"
 
-STEP_CODES = (G_FETCH, G_STATUS, G_REVERSE, G_TERMS, G_AMOUNT, G_MANDATE, G_BUDGET, G_LOCK)
+STEP_CODES = (
+    G_FETCH, G_STATUS, G_REVERSE, G_TERMS, G_AMOUNT, G_MANDATE, G_BUDGET, G_LOCK, G_CHECKOUT
+)  # fmt: skip
 ALL_CODES = (*STEP_CODES, G_CAPTURE)
 
 

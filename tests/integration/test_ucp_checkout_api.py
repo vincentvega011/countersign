@@ -509,7 +509,7 @@ EXPECT = {
     "incomplete": ("ok", "checkout_not_ready", "ok"),
     "requires_escalation": ("ok", "checkout_not_ready", "ok"),
     "ready_for_complete": ("ok", "mandate_required", "ok"),
-    "complete_in_progress": ("complete_in_progress", "checkout_not_ready", "ok"),
+    "complete_in_progress": ("complete_in_progress", "checkout_not_ready", "complete_in_progress"),
     "completed": ("checkout_not_modifiable", "checkout_not_ready", "checkout_not_cancelable"),
     "canceled": ("checkout_not_modifiable", "checkout_not_ready", "checkout_not_cancelable"),
 }
@@ -560,7 +560,8 @@ def test_each_operation_in_each_status(
         assert r["status"] == "canceled" and "messages" not in r
     else:
         assert codes(r) == [canc] and r["status"] == status
-        assert r["messages"][0]["severity"] == "unrecoverable"
+        severity = "recoverable" if status == "complete_in_progress" else "unrecoverable"
+        assert r["messages"][0]["severity"] == severity
 
 
 def test_update_during_completion_is_recoverable(client: TestClient, admin_engine: Engine) -> None:

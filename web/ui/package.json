@@ -1,0 +1,14 @@
+{
+  "name": "@countersign/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "prettier --check --ignore-path .prettierignore .",
+    "test": "node --test test/",
+    "screenshots": "node test/screenshots.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.50.0"
+  }
+}

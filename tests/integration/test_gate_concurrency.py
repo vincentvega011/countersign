@@ -23,6 +23,7 @@ from countersign.gate import (
 )
 from countersign.gate.store import GateStore
 from countersign.merchant.pg_reservations import PostgresReservationStore
+from tests.checkout_seed import seed_checkout
 from tests.gate_support import GateWorld, make_gate_world
 from tests.merchant_support import make_checkout
 
@@ -87,7 +88,7 @@ def test_a_purchase_racing_the_first_under_one_open_mandate_authorizes_and_captu
 
     # A budget with room for both: only the single-use open mandate can stop the second.
     first = world.base.mandates(maximum=30_000)
-    other_checkout = make_checkout(checkout_id="chk_racing_second_0000")
+    other_checkout = make_checkout(checkout_id="chk_racing_second_00000000")
     second = world.base.mandates(
         checkout=other_checkout, nonce="nonce-0002",
         reuse_open_payment=first.payment.open_token, reuse_checkout_open=first.checkout.open_token,
@@ -119,6 +120,7 @@ def test_a_purchase_racing_the_first_under_one_open_mandate_authorizes_and_captu
     PostgresReservationStore(world.engine, "merchant").reserve(
         _merchant_request(winner_checkout.id, world, results[0] is won[0] and first or second)
     )
+    seed_checkout(world.engine, winner_checkout)
     outcome = world.gate.run(checkout_id=winner_checkout.id, current=winner_checkout)
     assert isinstance(outcome, GatePassed), outcome
     assert world.sim.count("/authorize") == 1 and world.sim.count("/capture") == 1

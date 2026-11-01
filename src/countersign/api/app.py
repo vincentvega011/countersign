@@ -5,10 +5,12 @@ from __future__ import annotations
 import inspect
 import os
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import Engine, create_engine
 
 from countersign.api.acp_routes import install as install_acp
@@ -26,6 +28,8 @@ from countersign.protocols.ucp.service import CompletionPort, UcpService, now_us
 from countersign.runtime import ABLATIONS_HEADER, MODE_HEADER, RuntimeSettings
 from countersign.webhooks import WebhookService
 
+UI_DIR = Path(__file__).resolve().parents[3] / "web" / "ui"
+UI_ENVS = frozenset({"dev", "eval"})  # an allowlist: anything else, including demo, serves nothing
 DEFAULT_KEY_PATH = "secrets/merchant_es256.jwk.json"
 DEFAULT_BASE_URL = "http://localhost:8000"
 DEFAULT_DATABASE_URL = "postgresql+psycopg://countersign:countersign@localhost:5432/countersign"
@@ -88,6 +92,10 @@ def create_app(
             "ablations": list(runtime.active_ablations),
         }
         return JSONResponse(body, headers={"Cache-Control": "no-store"})
+
+    if runtime.app_env in UI_ENVS and UI_DIR.is_dir():
+        # The shared visual system and its component gallery are review tools: dev and eval only.
+        app.mount("/_ui", StaticFiles(directory=UI_DIR), name="ui")
 
     @app.get("/.well-known/ucp")
     def well_known_ucp() -> JSONResponse:

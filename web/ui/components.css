@@ -1,0 +1,281 @@
+/* Base components. Everything reads tokens.css; nothing here hard-codes a colour. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+.cs-scope {
+  background: var(--color-page);
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  -webkit-text-size-adjust: 100%;
+}
+
+.cs-scope h1,
+.cs-scope h2,
+.cs-scope h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  line-height: var(--leading-tight);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.cs-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Focus: one visible ring for every interactive element. */
+.cs-scope :is(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* ---------------------------------------------------------------- button */
+.cs-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--target-min);
+  min-width: var(--target-min);
+  padding: 0 var(--space-5);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background-color var(--motion-fast) var(--ease-out),
+    border-color var(--motion-fast) var(--ease-out),
+    transform var(--motion-fast) var(--ease-out);
+}
+.cs-btn:active:not([disabled], [aria-disabled="true"]) {
+  transform: translateY(1px);
+}
+.cs-btn--primary {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+.cs-btn--primary:hover:not([disabled], [aria-disabled="true"]) {
+  background: var(--color-accent-hover);
+}
+.cs-btn--secondary {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
+}
+.cs-btn--secondary:hover:not([disabled], [aria-disabled="true"]) {
+  background: var(--color-sunken);
+}
+.cs-btn--danger {
+  background: var(--color-danger);
+  color: var(--color-on-danger);
+}
+.cs-btn--danger:hover:not([disabled], [aria-disabled="true"]) {
+  background: var(--color-danger-hover);
+}
+.cs-btn[disabled],
+.cs-btn[aria-disabled="true"] {
+  background: var(--color-sunken);
+  color: var(--color-muted);
+  border-color: var(--color-border);
+  cursor: not-allowed;
+}
+/* Loading: keeps its size, announces busy, shows a spinner (a static ring if motion is reduced). */
+.cs-btn.is-loading {
+  cursor: progress;
+}
+.cs-btn.is-loading::before {
+  content: "";
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentcolor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: cs-spin 0.8s linear infinite;
+}
+@keyframes cs-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------------------------------------------------------------- card */
+.cs-card {
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+  padding: var(--space-5);
+}
+.cs-card--raised {
+  box-shadow: var(--shadow-2);
+}
+.cs-card__title {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  margin: 0 0 var(--space-2);
+}
+.cs-muted {
+  color: var(--color-muted);
+}
+
+/* ---------------------------------------------------------------- badge and status pill */
+.cs-badge,
+.cs-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  background: var(--color-sunken);
+  color: var(--color-text);
+}
+.cs-badge--accent {
+  background: var(--color-accent-surface);
+  color: var(--color-accent);
+}
+.cs-badge--success,
+.cs-pill[data-tone="success"] {
+  background: var(--color-success-surface);
+  color: var(--color-success);
+}
+.cs-badge--warning,
+.cs-pill[data-tone="warning"] {
+  background: var(--color-warning-surface);
+  color: var(--color-warning);
+}
+.cs-badge--danger,
+.cs-pill[data-tone="danger"] {
+  background: var(--color-danger-surface);
+  color: var(--color-danger);
+}
+.cs-badge--info,
+.cs-pill[data-tone="info"] {
+  background: var(--color-info-surface);
+  color: var(--color-info);
+}
+.cs-pill[data-tone="neutral"] {
+  background: var(--color-sunken);
+  color: var(--color-muted);
+}
+/* The glyph carries the state without colour. */
+.cs-pill__glyph {
+  font-family: var(--font-mono);
+  line-height: 1;
+}
+
+/* ---------------------------------------------------------------- key fingerprint */
+.cs-fingerprint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-sunken);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  max-width: 100%;
+}
+.cs-fingerprint__value {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  letter-spacing: 0.02em;
+}
+.cs-fingerprint__group {
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- amount */
+.cs-amount {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  white-space: nowrap;
+}
+.cs-amount--lg {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.cs-amount--negative {
+  color: var(--color-danger);
+}
+
+/* ---------------------------------------------------------------- code block */
+.cs-code {
+  position: relative;
+  background: var(--color-sunken);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.cs-code__bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border);
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+.cs-code pre {
+  margin: 0;
+  padding: var(--space-4);
+  overflow-x: auto;
+  white-space: pre; /* never wrap: scroll sideways */
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  tab-size: 2;
+}
+.cs-code pre:focus-visible {
+  outline-offset: -2px;
+}
+
+/* ---------------------------------------------------------------- utilities used by pages */
+.cs-stack > * + * {
+  margin-top: var(--space-4);
+}
+.cs-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.cs-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cs-scope *,
+  .cs-scope *::before,
+  .cs-scope *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .cs-btn:active:not([disabled], [aria-disabled="true"]) {
+    transform: none;
+  }
+}

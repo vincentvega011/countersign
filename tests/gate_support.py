@@ -28,6 +28,7 @@ from countersign.merchant.policy import policy_hash
 from countersign.merchant.verify import Accepted, CheckoutMandateVerifier, MerchantConfig
 from countersign.tables import payment_attempts, reservations, spend_entries
 from tests import paypal_sim
+from tests.checkout_seed import seed_checkout
 from tests.constraint_fixtures import MERCHANT
 from tests.cp_support import CpWorld, Mandates, make_world
 from tests.mandate_issuer import NOW
@@ -93,6 +94,7 @@ class GateWorld:
     ) -> tuple[Mandates, CpAuthorized]:
         """Merchant verify, CP start, payer approval, optional `between(order_id)`, CP finish."""
         current = checkout or self.base.checkout
+        seed_checkout(self.engine, current)
         m = mandates or self.base.mandates(checkout=current, **mandate_kwargs)
         verdict = self.merchant.verify(
             mandate=m.checkout_mandate, issued_checkout=None, current=current

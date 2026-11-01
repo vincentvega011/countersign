@@ -44,6 +44,7 @@ from countersign.merchant.verify import Accepted, CheckoutMandateVerifier, Merch
 from countersign.paypal.client import PayPalClient
 from countersign.paypal.config import PayPalConfig
 from countersign.paypal.errors import PayPalError
+from tests.checkout_seed import seed_checkout
 from tests.constraint_fixtures import (
     checkout_constraints,
     closed_payment_values,
@@ -156,6 +157,7 @@ class Stack:
     provider: CredentialProvider
     gate: CaptureGate
     merchant: CheckoutMandateVerifier
+    engine: Engine
 
 
 def make_stack(
@@ -181,7 +183,7 @@ def make_stack(
         gate_config, engine, client, GateLockAdapter(lock),
         clock=lambda: float(fixture.now), paypal_now=paypal_now,
     )  # fmt: skip
-    return Stack(provider, gate, make_merchant(engine, fixture, config))
+    return Stack(provider, gate, make_merchant(engine, fixture, config), engine)
 
 
 def patch_raise(
@@ -255,6 +257,7 @@ def authorize_flow(
 ) -> tuple[CpOutcome, CpOutcome]:
     """Merchant verify, CP start, payer approval, optional `between(order_id)`, CP finish."""
     checkout = flow_checkout(fixture.checkout_id, catalog)
+    seed_checkout(stack.engine, checkout)
     verdict = stack.merchant.verify(
         mandate=fixture.checkout_mandate, issued_checkout=None, current=checkout
     )

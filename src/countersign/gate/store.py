@@ -22,6 +22,8 @@ from typing import Any
 
 from sqlalchemy import Connection, Engine, select, update
 
+from countersign.checkout.state import Status
+from countersign.checkout.store import checkout_sessions
 from countersign.cp.ledger import SpendLedger
 from countersign.merchant.pg_reservations import PostgresReservationStore
 from countersign.merchant.reservations import Reservation
@@ -152,6 +154,42 @@ class GateStore:
                 .values(state=state, updated_us=self._clock(), **values)
             )
         return bool(result.rowcount == 1)
+
+    def begin_capture(self, checkout_id: str) -> str | None:
+        """G-CHECKOUT and the move to `capturing`, in ONE transaction. None if this call may capture.
+
+        Under a shared row lock on the checkout, require that it is still `complete_in_progress`
+        and not past `expires_at`; then, in the same transaction, move the attempt from `gating`
+        to `capturing`. `cancel` takes the exclusive lock on the same row and refuses once an
+        attempt is live (`checkout.cancel`), so a cancel that commits first is seen here (the gate
+        fails and voids) and a cancel that comes later waits for this transaction and is refused.
+        There is no window between the check and the transition.
+
+        Returns a fixed reason when the checkout does not own the attempt (`checkout_missing`,
+        `checkout_<status>`, `checkout_expired`) and `lost_claim` when the attempt was no longer
+        `gating`. Reads the table directly (never a cache) and fails closed on a missing row.
+        """
+        with self.engine.begin() as conn:
+            found = conn.execute(
+                select(checkout_sessions.c.status, checkout_sessions.c.expires_us)
+                .where(checkout_sessions.c.id == checkout_id)
+                .with_for_update(read=True)
+            ).first()
+            if found is None:
+                return "checkout_missing"
+            if found.status != Status.COMPLETE_IN_PROGRESS.value:
+                return f"checkout_{found.status}"[:80]
+            if self._clock() >= found.expires_us:
+                return "checkout_expired"
+            result = conn.execute(
+                update(payment_attempts)
+                .where(
+                    payment_attempts.c.checkout_id == checkout_id,
+                    payment_attempts.c.state == "gating",
+                )
+                .values(state="capturing", updated_us=self._clock())
+            )
+            return None if result.rowcount == 1 else "lost_claim"
 
     def _handles(self, conn: Connection, checkout_id: str) -> list[tuple[str, Reservation]]:
         found: list[tuple[str, Reservation]] = []

@@ -35,10 +35,10 @@ from sqlalchemy import Connection, Engine
 from countersign.canonical.models import Checkout
 from countersign.catalog.catalog import Catalog
 from countersign.checkout import store
+from countersign.checkout.cancel import cancel_refusal
 from countersign.checkout.state import (
     FINAL,
     Status,
-    cancelable,
     transition,
     updatable,
 )
@@ -473,6 +473,10 @@ class UcpService:
                 self._log(conn, "checkout.complete_after_end", record, outcome=outcome.kind)
                 if record.status is Status.COMPLETED and outcome.kind == "captured":
                     return Result(200, record, receipts=dict(outcome.receipts))
+                if record.status is Status.CANCELED and outcome.kind == "rejected":
+                    # The gate refused a checkout that was canceled or expired under it: the books
+                    # are consistent (voided, released), so say that and not "being completed".
+                    return Result(200, record, tuple(outcome.messages))
                 text = "The checkout is being completed."
                 msg = m.error_message(m.UPDATE_DURING_COMPLETION, text, "recoverable")
                 return Result(200, record, (msg,))
@@ -542,14 +546,26 @@ class UcpService:
 
     @_with_order
     def cancel(self, checkout_id: str) -> Result:
+        """Cancel a checkout, unless its payment is in flight (docs/PROTOCOL.md Decision 70).
+
+        Refused, with the checkout unchanged and logged before the answer (INV-12): a final
+        checkout reports its state (`checkout_not_cancelable`), a completing one is told
+        `complete_in_progress`. A refusal never voids, releases or touches the payment attempt.
+        """
         with self._engine.begin() as conn:
             record = self._open(conn, checkout_id, lock=True)
             if record is None:
                 return self._not_found()
-            if not cancelable(record.status):
+            refusal = cancel_refusal(conn, record)
+            if refusal == "final":
                 code = m.CHECKOUT_NOT_CANCELABLE
                 text = f"A {record.status.value} checkout cannot be canceled."
                 return self._refuse(conn, "cancel", record, code, text, "unrecoverable")
+            if refusal == "completing":
+                text = "The checkout is being completed and cannot be canceled now."
+                return self._refuse(
+                    conn, "cancel", record, m.UPDATE_DURING_COMPLETION, text, "recoverable"
+                )
             new = record.advanced(
                 status=transition(record.status, Status.CANCELED), now_us=self._clock()
             )
