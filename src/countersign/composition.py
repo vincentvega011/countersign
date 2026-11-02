@@ -47,6 +47,7 @@ from countersign.paypal.client import PayPalClient
 from countersign.protocols.acp.service import UnmandatedCompletion
 from countersign.protocols.ucp.requests import JsonLoader
 from countersign.runtime import Mode, RuntimeSettings
+from countersign.trusted_surface import Merchant, TrustedSurface
 from countersign.webhooks import WebhookService
 
 
@@ -160,7 +161,14 @@ def build_app(settings: RuntimeSettings, wiring: Wiring) -> FastAPI:
 
     return create_app(
         key=key, public_base_url=base, engine=engine, completion=coordinator, lock=lock,
-        webhooks=webhooks, runtime=settings, unmandated=unmandated, json_loader=json_loader,
+        webhooks=webhooks, runtime=settings,
+        trusted_surface=TrustedSurface(
+            engine, public_origin=base, clock_us=clock_us, platform_key=wiring.platform_key,
+            issuer=issuer,
+            merchant=Merchant(
+                wiring.merchant_constraint_id, str(wiring.payee.get("name", "")), base
+            ),
+        ), unmandated=unmandated, json_loader=json_loader,
         clock_us=clock_us,
     )  # fmt: skip
 

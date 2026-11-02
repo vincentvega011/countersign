@@ -688,7 +688,7 @@ delegation model ([1.3.1](#131-capability-and-negotiation), [1.2.9](#129-who-can
 - **Consent before signing.** The platform key signs only after the backend has verified a
   consent signature from the customer's non-extractable device key (WebCrypto ECDSA P-256) over the
   exact constraints (for open mandates) or the exact checkout (for closed mandates).
-- **Consent signature format (to be refined when the Trusted Surface is built).** A JWS with
+- **Consent signature format (refined by [Decision 81](#decision-81-the-consent-record-and-the-platform-issuer); the text below is the original sketch).** A JWS with
   `alg` `ES256` and `kid` equal to the device key's JWK thumbprint, over the JCS bytes of a consent
   record that contains: a version, the consent kind (open mandates or closed checkout), the
   customer id, the exact mandate contents to be signed (the claims, before signing), a nonce and
@@ -1981,10 +1981,10 @@ stood in for it).
      device key at every request. Rejected for the hot path; the consent record stays evidence.
   3. *The agent key thumbprint only* (the status quo). It cannot tell two customers of one agent apart,
      and a Human Present mandate has no agent key. Kept as the fallback half of the principal.
-- **Consequence for the build.** The platform provider (the Trusted Surface backend, P3) must write
-  `sub` when it signs a mandate. Until it does, mandates carry none, and the lock treats the customer
-  as unknown ([LIMITATIONS.md](LIMITATIONS.md) L19). The vault principal of Decision 40 is still the
-  agent key and moves to the pair in P3. **For the owner to confirm.**
+- **Consequence for the build (superseded by [Decision 82](#decision-82-the-sub-claim-is-mandatory)).** The
+  platform provider (the Trusted Surface backend) now writes `sub` on every mandate it issues, and a
+  mandate without a usable `sub` is refused by `verify_chain`; the sub-less leniency and L19 are gone. The
+  vault principal of Decision 40 is still the agent key and moves to the pair in P3.4 (L32).
 
 ### Decision 48: The shared lock function and the merchant policy
 
@@ -2572,6 +2572,261 @@ control outlines (`--color-border-strong`) and the focus ring, in light and dark
 `--color-border` hairline is not a control boundary and is not held to 3.0. The state pills carry a glyph
 as well as a tone, so no state depends on colour alone. The tokens that the AG Grid theme will use in P4
 are listed in the comment at the top of `tokens.css`.
+
+### Decision 76: The Trusted Surface page is served from an exact allowlist
+
+**Flagged for the owner (approved with the allowlist change).** The Trusted Surface setup page is a
+product page, so unlike the gallery (Decision 75, `/_ui`, dev and eval only) it is served in every
+mode, including demo. Nothing serves a directory. `api/static_routes.py` holds one table from URL path
+to one file and one media type, and registers one route per entry:
+
+- the page: `/approve/` (`index.html`), `/approve/approve.css`, `/approve/app.js`,
+  `/approve/device-key.js`, `/approve/messages.js`;
+- the shared UI files it needs, under `/ui/` (not `/_ui/`, which stays the gallery mount):
+  `tokens.css`, `components.css`, `fonts.css`, `ui.js` and the three `.woff2` fonts.
+
+Everything else, including `/ui/gallery.*`, `/ui/test/`, `/ui/node_modules/`, `/ui/.artifacts/`, the font
+licence texts, `/approve/package.json`, `/approve/test/` and any path with `..` (plain, percent-encoded,
+backslash, doubly encoded or with a NUL), is a 404 because no table entry matches. A test fails if a file
+appears in `web/approve` that is not in the table, or if a table entry has no file. The page is sent with
+`Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self';
+connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+`X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer`. `/approve` redirects to
+`/approve/`. Tests: `tests/unit/test_approve_static.py` (every mode, plus traversal through the ASGI
+interface so nothing normalizes the path first).
+
+### Decision 77: Device key enrolment: challenge, proof of possession, tables
+
+**Flagged for the owner.** Refines the "consent signature format" paragraph of Decision 5 for the
+registration step only; the consent record itself is still P3.3.
+
+- **Challenge.** `POST /trusted-surface/keys/challenge` with `{"purpose": "register_device_key"}` (the
+  only purpose accepted today) returns `challenge_id` (`kch_` plus `token_urlsafe(16)`), a 32 byte
+  random `nonce`, the purpose and `expires_us`. A challenge lives 5 minutes. **Expiry is computed from
+  the issue time** (`created_us` plus 300 s, expired at exactly that instant) and nothing is ever updated
+  to expire it. The runtime database role has SELECT and INSERT only, on every new table.
+- **Single use is an INSERT.** Consuming a challenge inserts a row into `key_challenge_uses` whose
+  primary key is the challenge id; a unique violation means it was already used (`challenge_used`).
+  Of N simultaneous registrations on one challenge, the others wait on the unique index until the
+  winner commits and then fail; exactly one wins (tested with 12 threads, with 12 keys and with one key).
+  A refused registration rolls back, so it does not spend the challenge.
+- **Record the new key signs.** The JCS (RFC 8785) bytes of
+  `{"v":1,"purpose":"countersign.device-key.register.v1","challenge_id":...,"challenge":<nonce>,
+  "thumbprint":...,"customer_id":<id or null>,"origin":...}`. The `customer_id` member is always present:
+  `null` for a new customer, the id when adding a key. The server rebuilds the record from its own
+  values and verifies the ES256 signature (raw `r || s`, 64 bytes, canonical base64url, ECDSA over
+  SHA-256) over it. A signature made for another challenge, purpose, origin, customer or key does not
+  verify (`proof_invalid`).
+- **JWK.** Exactly `kty` `EC`, `crv` `P-256`, `x`, `y`: each coordinate the canonical unpadded base64url
+  of 32 bytes, the point on the curve. A private member (`d`, `p`, `q`, `dp`, `dq`, `qi`, `oth`, `k`) is
+  `jwk_private_member`; any other extra member (`alg`, `kid`, `use`, `key_ops`, `ext`) is
+  `jwk_extra_members`; other shape errors `jwk_malformed`; another curve or key type
+  `jwk_unsupported_curve`; an off-curve point `jwk_not_on_curve`. The thumbprint is RFC 7638 and is
+  computed on the server only (the four members in lexicographic order, which is their JCS form).
+- **Origin.** Compared as `(scheme, host, port)` with scheme and host lower-cased and the default port
+  filled in, against the origin of `PUBLIC_BASE_URL`. The request `origin` member must match, and so
+  must the `Origin` header when the browser sent one (`origin_mismatch`). Anything that is not exactly
+  an origin (path, query, fragment, user information, whitespace or control characters) does not match.
+  A bad configured origin stops the start.
+- **Tables** (migration 0007; 0008 moves revocation out of `customer_keys`). `key_challenges`,
+  `key_challenge_uses`, `customer_keys` (customer id, thumbprint primary key, the JWK as JCS text,
+  `created_us`). The convention of the other
+  tables (`_us` microsecond columns) is kept instead of `created_at`.
+- **Revocation (settled in P3.3, [Decision 83](#decision-83-revocation-is-an-insert-only-table)).** An
+  earlier draft of this decision gave `customer_keys` a `revoked_us` column that an owner role could set once,
+  guarded by a trigger. **That column and that trigger are gone** (migration 0008): a key is revoked when a row
+  exists in the insert-only `key_revocations` table, and `customer_keys` has no updatable column and no
+  trigger. Its protection is the missing UPDATE and DELETE grant of the runtime role.
+- **Logging.** Every refusal is appended to the hash-chained log before the answer (`ts.key.refused`,
+  `ts.challenge.refused`), with the code, the thumbprint when it was computed and the challenge id; never
+  a request body. A success is logged in the transaction that inserts the key (`ts.key.registered`), so a
+  key never exists without its entry. If the log cannot be written the answer is `log_unavailable` (503)
+  and nothing was registered.
+
+### Decision 78: Customer identity and the add-only key rules
+
+**Flagged for the owner.**
+
+- A new customer gets `cus_` plus `token_urlsafe(16)` (the convention of `chk_` and `sp_`). This is the
+  value that becomes the `sub` claim of the platform issuer JWT (Decision 47, L19).
+- **Adding a key to an existing customer** names the customer id and carries the signature of an
+  already registered, non-revoked key of that customer over the same record
+  (`authorizer: {"thumbprint", "signature"}`): `authorizer_required`, `authorizer_unknown` (not a key of
+  that customer), `authorizer_revoked`, `authorizer_invalid`. An unknown customer is `customer_unknown`.
+  An `authorizer` without a customer id is `malformed_request`.
+- **Same thumbprint twice.** The same customer: an idempotent success that changes nothing (200,
+  `new_key: false`) and still spends its challenge. A different customer: `key_conflict` (409). A revoked
+  key: `key_revoked`. Keys are never overwritten or deleted.
+- **A deliberate extension.** A registration that names no customer for a thumbprint that is already
+  registered returns the existing customer (200) instead of a conflict. The signature proves possession
+  of that key, the customer id is not a secret, and the browser needs it when a response was lost after
+  the registration committed. **For the owner to confirm.**
+- Creating a new customer is unauthenticated in this demo (LIMITATIONS L35).
+
+### Decision 79: Where the browser keeps the key, and what it shows
+
+**Flagged for the owner.**
+
+- `crypto.subtle.generateKey` ECDSA P-256, `extractable: false`, usages `sign` and `verify`; the public
+  key is exported from the pair as a JWK with only `kty`, `crv`, `x`, `y`. The `CryptoKeyPair` is stored
+  with the structured clone algorithm in IndexedDB (`countersign-trusted-surface`, store `device`, key
+  `current`) together with the customer id once registered. The private key is never exported, logged or
+  sent. `navigator.storage.persist()` is requested and a refusal is told to the user.
+- The key is saved **before** the registration is attempted, so a registered key is never lost for want
+  of a write, and a registration that fails leaves a saved key that a reload offers to finish.
+- On a reload the stored pair is validated (private, non-extractable, ECDSA P-256) and the thumbprint is
+  recomputed from the public key; nothing is sent. A stored private key that is extractable or any other
+  damaged record is `key_unreadable`.
+- A small `localStorage` marker (thumbprint and customer id) lets a later visit tell "never enrolled"
+  from "enrolled, key gone" (`key_lost`). It is a hint and is not trusted for anything else.
+- **Recovery is a new customer.** A lost or unreadable key cannot sign, so it cannot vouch for a new
+  one. Re-enrolment creates a new key and a new customer id; the old key is not usable any more
+  (LIMITATIONS L36).
+- Every sentence on the page is in `messages.js` as a fixed template. The only service-supplied text is
+  the stable error code, shown only if it matches `^[a-z][a-z0-9_]{0,47}$` and otherwise as `unknown`. A
+  browser test checks every text node against the templates and that no request leaves the origin.
+
+### Decision 80: Browser tests, the new package and a shared component fix
+
+**Flagged for the owner.** `web/approve` gains the development dependency `playwright` (the version of
+`web/ui`; `pnpm-lock.yaml` changed). The browser tests are `web/approve/test/enrol.test.mjs`; they are run
+by `tests/integration/test_approve_browser.py`, which starts the real app on a real Postgres on a free
+port and runs `node --test`, so they are part of `make test` and `make test-safety`. A missing Chromium
+fails the test, it is not skipped. `countersign.trusted_surface` joins the strict typing list and the
+safety coverage list. The shared `button()` in `web/ui/ui.js` set `aria-busy=""` instead of `"true"`
+when loading; fixed, because the browser test asserts it.
+
+### Decision 81: The consent record and the platform issuer
+
+**Flagged for the owner.** Implements the consent step of Decision 5 (`POST /trusted-surface/consent`,
+`trusted_surface/consent.py`, `service.py`, `issuer.py`, migration 0009).
+
+- **The record the device key signs.** JCS bytes of `{v: 1, purpose: "countersign.consent.open-mandates.v1",
+  customer_id, device_thumbprint, challenge_id, challenge (the nonce), issued_at, expires_at, origin,
+  terms, mandate}`. `terms` is `{merchant {id, name, website}, items [{id, title, quantity}], ceiling_minor,
+  currency "USD", mandate_expires_at, agent_thumbprint}`. `mandate` is the contents of the two open
+  mandates (`checkout` and `payment`: `vct`, `exp`, `constraints`). Times are integer seconds. The page
+  renders the terms from this record with fixed templates and signs the JCS bytes of this same object; the
+  object it sends is the object it signed.
+- **Nonce.** The existing challenge mechanism with the purpose `consent_open_mandates`: server issued,
+  single use (an INSERT into `key_challenge_uses`), 5 minutes from issue. `issued_at` is the server's own
+  time at issue (returned with the challenge), so the device clock never matters; `expires_at` is
+  `issued_at` plus 300 s and a record may live at most 600 s.
+- **What the platform adds after verification** (so the customer does not sign these byte for byte): `iat`;
+  `cnf` (the agent's public key, supplied beside the record, whose thumbprint is in the terms and is
+  checked); the issuer JWT `sub` (the customer id the device key vouches for); and the `payment.reference`
+  constraint, the `sd_hash` of the open Checkout Mandate, which exists only once that mandate is signed.
+  Everything else is in the record.
+- **The mandates.** Native AP2 constraints only. Checkout: `checkout.line_items` (one requirement per item,
+  `acceptable_items` with the catalog id and title, the quantity) and `checkout.allowed_merchants`.
+  Payment: `payment.reference`, `payment.amount_range` (`min` 1, `max` the ceiling), `payment.allowed_payees`,
+  `payment.budget` (`max` the ceiling) and `payment.agent_recurrence` (`ON_DEMAND`, `max_occurrences` 1, so
+  one purchase per consent). Both are validated against the vendored `open_checkout_mandate.json` and
+  `open_payment_mandate.json`. Every constraint element is a plain object in the one disclosed content
+  element (Decision 84).
+- **Verification, each step with a stable code, logged before the answer** (`ts.consent.refused`, with a
+  fixed `detail` token and never a request body): the shape of the record (`consent_malformed`,
+  `consent_purpose_mismatch`); the origin (`origin_mismatch`); the platform can sign (`signing_unavailable`);
+  the challenge exists, has the consent purpose, carries this nonce, is unexpired and unused
+  (`challenge_unknown`, `challenge_purpose_mismatch`, `challenge_nonce_mismatch`, `challenge_expired`,
+  `challenge_used`); the device key is registered, belongs to the record's customer and is not revoked
+  (`device_key_unknown`, `device_key_customer_mismatch`, `device_key_revoked`); the signature verifies with
+  the STORED public key, never one from the request (`consent_signature_invalid`); the record's own times
+  (`consent_time_invalid`, `consent_expired`); the agent key matches the terms (`agent_key_mismatch`); the
+  terms mean something (`consent_terms_invalid`: this store's merchant record exactly, catalog items with
+  their catalog titles, no duplicates, 1 to 99 each, ceiling 1 to 1,000,000 minor units, a mandate expiry
+  60 s to 14 days away and not before the consent expires); and **the backend's own rebuild of the
+  mandate contents from the terms equals the claimed contents byte for byte** (`consent_claims_mismatch`,
+  with `detail` naming `checkout`, `payment` or `other`). Only then does the issuer sign.
+- **One transaction.** The work holds the per-customer advisory lock (so it serializes with revocation),
+  spends the nonce, signs, stores the consent record, its signature, the device public key and both open
+  mandates in `consent_records` (insert only, `challenge_id` unique) and appends `ts.consent.issued`
+  (digests, never the mandates). A log failure means no mandate and an unspent nonce.
+- **The proposal.** The page takes an agent's request from the address, `#intent=<base64url JSON>`
+  (never sent to a server). It carries only structured values: item ids and quantities, `ceiling_minor`,
+  `currency`, `mandate_expires_at` and the agent's public JWK. **No store name and no item title:** those
+  come from `GET /trusted-surface/store` (the store's own merchant record and catalog titles), so no text an
+  agent wrote can reach the page (INV-2). A proposal with any other member, an unknown item or a malformed
+  value is `intent_invalid` and is not echoed.
+- **Platform key.** `PLATFORM_KEY_PATH` now names the platform's ES256 key including its private half
+  (`make keys` writes `secrets/platform_es256.jwk.json`). Without a private key the backend refuses to
+  consent (`signing_unavailable`), and verification works as before.
+
+### Decision 82: The `sub` claim is mandatory
+
+**Flagged for the owner.** Removes the sub-less leniency of Decision 47 and closes L19.
+
+- `verify_chain` requires, on link 0 (the platform-signed issuer JWT), a usable `sub` read from the **signed
+  top-level payload**, never from a disclosure: a string of 1 to 128 printable characters with no leading or
+  trailing space (`customer_id_of`). Otherwise `SubjectMissingError`, code `subject_missing`, checked after the
+  `vct` (so the older errors keep their order). Key-binding links need none. The Merchant maps it to
+  `mandate_invalid_signature` like every other chain failure.
+- The shared vectors gained eight cases (a missing, empty, padded, over-long, control-character and non-string
+  `sub`; a `sub` that exists only as a selectively disclosable claim; a 128 character one that is valid) and
+  were regenerated (152 vectors); the Node cross-check implements the same rule and agrees on all of them.
+- The principal's customer id is now always known for a verified mandate. The lock's handling of an unknown
+  customer (`denied:customer_unknown`) stays as defence in depth and is exercised at the lock level; it can
+  no longer be reached through a verified chain.
+- **Tests that relied on the leniency, and what changed.** (1) `test_lock_ucp.py`: "a mandate naming no
+  customer is denied and released" became "a mandate with no customer id is refused before anything is
+  reserved or authorized" (`mandate_invalid_signature`, no order); the two gate tests that authorized a
+  "nameless mandate" and expected `G-LOCK` could not be built any more and became one test that the Merchant
+  refuses it with `subject_missing`; the "named mandate still captures" counterparts are unchanged.
+  (2) `tests/lock_support.delegation(sub=None)` and `tests/integration/test_ucp_complete.mandates(no_sub=True)`
+  now really omit the claim (before, "None" meant "do not add one", and the test issuer added none); the ACP
+  tests that pass a sub-less delegation now get a delegation that names nobody, which is what they asserted.
+  (3) The test issuer writes a `sub` by default. (4) The two real-sandbox cassettes recorded with sub-less
+  mandates (`cp_authorize`, `gate_flow`) cannot replay: `custom_id` derives from the mandate digests, so
+  they had to be re-recorded from the live sandbox, which was done. The recording scripts and their fixtures now build
+  mandates with a `sub` in the issuer's shape, and void or capture everything they create.
+
+### Decision 83: Revocation is an insert-only table
+
+**Flagged for the owner.** Replaces the owner-trigger design of Decision 77.
+
+- `key_revocations` (migration 0008): `thumbprint` primary key (and foreign key), `customer_id`,
+  `signer_thumbprint`, `challenge_id`, `record` (JCS text), `signature`, `revoked_us`. A key is revoked when
+  a row exists. SELECT and INSERT only. `customer_keys.revoked_us` and its trigger are dropped; existing
+  revocations are copied over first (marker proof `migrated`), and the downgrade restores both.
+- `POST /trusted-surface/keys/revoke` with `{challenge_id, customer_id, target, signer, origin, signature}`.
+  The signer is a registered, non-revoked key of the same customer and may be the target or another key of
+  that customer; it signs the JCS bytes of `{v, purpose "countersign.device-key.revoke.v1", challenge_id,
+  challenge, customer_id, target_thumbprint, signer_thumbprint, origin}` over a challenge of purpose
+  `revoke_device_key` (single use, 5 minutes). Codes: `customer_unknown`, `signer_unknown`, `signer_revoked`,
+  `proof_invalid`, `key_unknown` (also for another customer's key), `origin_mismatch`, the challenge codes.
+- **Idempotent.** Revoking a revoked key answers 200 (`new_revocation: false`) and still spends the
+  challenge. A revoked key cannot sign, so it cannot repeat its own revocation (`signer_revoked`).
+- **Final.** A revoked thumbprint never gets the idempotent re-registration 200 of Decision 78, whether or
+  not the request names the customer (`key_revoked`; tested). A revoked key cannot vouch, revoke, or consent.
+- **Serialized per customer.** Revocation, adding a key with a voucher, and consent each hold a per-customer
+  advisory lock, so two keys cannot revoke each other at once (exactly one wins; the other is
+  `signer_revoked`), and a consent cannot commit on a key that was revoked a moment before. Tests hold the
+  lock from another connection and require each operation to wait.
+
+### Decision 84: Whole constraint elements are never selectively disclosable (L31, issuer side)
+
+**Flagged for the owner.** `issuer.issue_open_mandate` refuses to sign content in which any element of
+`constraints` is not a plain object with a `type`, is a `{"...": digest}` placeholder, or carries `_sd` or
+`_sd_alg` (`constraint_element_disclosure`, `constraint_element_not_plain`, `constraints_missing`); it also
+refuses content members other than `vct`, `exp` and `constraints`, a `vct` that is not the open mandate's, a
+customer id that is empty or padded, and a signing key without its private half. Issued mandates have
+exactly one disclosure, the whole content, so a holder can neither withhold nor reorder anything: the digest
+of an issued open mandate has one possible serialization. **Re-keying single use, budget and revocation on a
+presentation-independent open-mandate identity stays in P3.4.** P3.3 is correct without it for issued
+mandates for that reason: there is nothing nested to vary, and an unreferenced extra disclosure is refused by
+`verify_chain`. It would matter for mandates not issued here (none are accepted: the platform key is the only
+trusted issuer).
+
+### Decision 85: Recording scripts, CI browser and the status of two cassettes
+
+**Flagged for the owner.** `scripts/record_cp_cassette.py` and `scripts/record_gate_cassette.py` build
+mandates with a `sub` of the shape the issuer writes (`cus_` plus 22 characters, fresh for each recording) and
+leave nothing open in the sandbox: the gate script captures A and the gate voids B; every authorization that
+is neither is voided with a client that is not recording, so the cassette holds exactly the calls the replay
+makes. No `PayPal-Request-Id` or `custom_id` derivation changed. Both cassettes were re-recorded from the live sandbox with these mandates (2 November 2026) and their
+replay tests pass; they are never skipped.
+CI installs Chromium with its system libraries (`playwright install --with-deps chromium`, cached) before
+pytest, because the browser tests fail, by design, when it is missing.
 
 ---
 

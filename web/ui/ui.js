@@ -110,7 +110,7 @@ export function button(
       type: "button",
       class: `cs-btn cs-btn--${variant}${loading ? " is-loading" : ""}`,
       disabled: disabled,
-      "aria-busy": loading,
+      "aria-busy": loading ? "true" : false,
     },
     label,
   );

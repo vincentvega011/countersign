@@ -26,6 +26,7 @@ Per link, in this order:
    cannot pair a key binding with another credential that reuses the same `cnf` key, nor drop a
    disclosure. `issuer_jwt_hash` alone is refused because it does not cover the disclosures.
 7. `cnf`: required on every link that is followed by another link, validated on the last if present.
+5b. Link 0 only: the signed top-level `sub` (the customer id) must be a usable string (Decision 47).
 8. `exp`, `nbf`, `iat` with the 60 second skew. `exp` is required on every link that is not a
    final key-binding link (Decision 22).
 """
@@ -49,12 +50,14 @@ from countersign.mandates.errors import (
     NonceMismatchError,
     SdHashMismatchError,
     SdHashMissingError,
+    SubjectMissingError,
     UnknownExpectedVctError,
     VctMismatchError,
     VctMissingError,
 )
 from countersign.mandates.jws import ParsedJwt, parse_jwt, verify_signature
 from countersign.mandates.structure import RawLink, split_chain
+from countersign.mandates.subject import customer_id_of
 from countersign.mandates.timecheck import Clock, check_times
 
 VCT_CHECKOUT = "mandate.checkout.1"
@@ -172,6 +175,11 @@ def verify_chain(
         claims = resolve_claims(jwt.payload, raw.disclosures)
         content = _delegate_content(jwt, claims)
         vct = _check_vct(content, expected_vcts[n])
+        if n == 0 and customer_id_of(jwt.payload) is None:
+            # Decision 47: the customer id is the signed top-level `sub` of the platform's issuer JWT
+            # and is mandatory. It is read from the signed payload, never from a disclosure, so it
+            # cannot be withheld or swapped by the holder.
+            raise SubjectMissingError("the issuer JWT has no usable sub (the customer id)")
         aud: str | None = None
         nonce_claim: str | None = None
         if n > 0:

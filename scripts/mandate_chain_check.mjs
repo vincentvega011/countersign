@@ -353,6 +353,14 @@ function checkTimes(claims, now, requireExp) {
 }
 
 // ----- chain -----
+// Decision 47: the customer id is the signed top-level `sub` of the issuer JWT. A usable one is a
+// string of 1 to 128 characters that is printable and not padded (same rule as customer_id_of).
+function usableSubject(sub) {
+  if (typeof sub !== "string" || sub === "" || sub !== sub.trim()) return false;
+  const chars = [...sub];
+  return chars.length <= 128 && chars.every((c) => c === " " || !/[\p{C}\p{Z}]/u.test(c));
+}
+
 async function verifyChain(vector) {
   const { token, expected_vcts: expected, audience, nonce, now } = vector;
   if (!expected.length || expected.some((v) => !KNOWN_VCTS.has(v))) fail("vct_unknown_expected");
@@ -380,6 +388,7 @@ async function verifyChain(vector) {
     const content = resolved[0];
     if (!content.has("vct")) fail("vct_missing");
     if (content.get("vct") !== expected[n]) fail("vct_mismatch");
+    if (n === 0 && !usableSubject(jwt.payload.get("sub"))) fail("subject_missing");
     if (n > 0) {
       for (const name of ["aud", "nonce"]) {
         if (typeof claims.get(name) !== "string" || claims.get(name) === "") {

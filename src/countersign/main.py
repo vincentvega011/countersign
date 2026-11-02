@@ -7,8 +7,9 @@ ablation together with baseline) stops the process with a clear message and no s
 the real thing; the same mode is on `GET /health` and in the `X-Countersign-Mode` response header.
 
 Environment, besides the mode variables in `countersign.runtime`: `DATABASE_URL`,
-`MERCHANT_KEY_PATH`, `PLATFORM_KEY_PATH` (the public JWK of the trusted platform provider, Decision
-5; without it no mandate verifies), `PUBLIC_BASE_URL`, `MERCHANT_ID`, `MERCHANT_NAME`,
+`MERCHANT_KEY_PATH`, `PLATFORM_KEY_PATH` (the ES256 JWK of the trusted platform provider, Decision
+5, private half included: it signs mandates after consent, the public half verifies them; without
+it no mandate verifies and no consent is accepted), `PUBLIC_BASE_URL`, `MERCHANT_ID`, `MERCHANT_NAME`,
 `PAYPAL_MERCHANT_ID` and the PayPal sandbox variables of `countersign.paypal.config`.
 """
 

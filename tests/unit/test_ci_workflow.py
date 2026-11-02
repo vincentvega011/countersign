@@ -52,3 +52,14 @@ def test_make_setup_installs_the_node_packages_from_the_lockfile() -> None:
     makefile = (ROOT / "Makefile").read_text()
     assert "setup: node-deps" in makefile
     assert "node-deps:\n\tpnpm install --frozen-lockfile" in makefile
+
+
+def test_the_python_job_installs_the_browser_before_pytest_and_does_not_skip_without_it() -> None:
+    steps = _python_steps()
+    install = _index(steps, "pnpm install")
+    browser = _index(steps, "playwright install --with-deps chromium")
+    pytest_step = _index(steps, "uv run pytest")
+    assert install < browser < pytest_step
+    assert "@countersign/approve" in steps[browser]["run"]
+    runner = (ROOT / "tests/integration/test_approve_browser.py").read_text()
+    assert "skip" not in runner.lower().replace("fails, it is not skipped", "")

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Countersign: this device</title>
+    <link rel="stylesheet" href="../ui/fonts.css" />
+    <link rel="stylesheet" href="../ui/tokens.css" />
+    <link rel="stylesheet" href="../ui/components.css" />
+    <link rel="stylesheet" href="approve.css" />
+  </head>
+  <body class="cs-scope">
+    <div class="ts">
+      <header class="ts__head">
+        <span class="ts__brand">Countersign</span>
+        <span class="ts__where">Trusted Surface</span>
+      </header>
+      <main class="ts__main">
+        <h1 class="ts__title">This device</h1>
+        <p class="ts__lead cs-muted">
+          Your device key proves that an approval came from you. It is made and
+          kept in this browser.
+        </p>
+        <div id="app" aria-live="polite"></div>
+      </main>
+      <footer class="ts__foot cs-muted">
+        The private part of the key cannot be exported. Countersign never sees
+        it.
+      </footer>
+    </div>
+    <noscript>
+      <p class="ts__noscript">This page needs JavaScript to create a key.</p>
+    </noscript>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

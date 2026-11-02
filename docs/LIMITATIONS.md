@@ -159,13 +159,13 @@ not on a later read.
 
 ## Principal lock
 
-### L19. The customer id depends on the platform writing `sub`
+### L19. The customer id depends on the platform writing `sub` (RESOLVED in P3.3)
 
 The lock's customer id is the `sub` claim of the platform-signed mandate ([PROTOCOL.md](PROTOCOL.md)
-Decision 47). The Trusted Surface backend that will write it is built in P3, so until then mandates
-carry none (the test issuer adds one). A mandate without it is an unknown customer: under "require AP2
-for all agents", or when a matching lock names a customer, it is denied. The vault principal of
-Decision 40 is still the agent key alone.
+Decisions 47 and 82). The Trusted Surface backend writes it on every mandate it issues, and `verify_chain`
+refuses a mandate without a usable one, so the customer is always known for a verified mandate. The lock
+still fails closed for an unknown customer (defence in depth, tested at the lock level) and the vault
+principal of Decision 40 is still the agent key alone (L32).
 
 ### L20. The principal is what the agent presents
 
@@ -349,13 +349,14 @@ What remains, stated plainly:
 - A refused cancel is a business outcome (HTTP 200 on UCP, 405 on ACP); a platform that wants to abandon
   a checkout must wait for the completion to end. The specs allow this ("cancellation can race completion").
 
-### L31. The open mandate digest depends on how the agent presents it
+### L31. The open mandate digest depends on how the agent presents it (narrowed in P3.3)
 
 The identity used for single use, the budget row and a revocation is the digest of the serialization the
-agent presents, and the agent can reorder or withhold the nested disclosures of link 0. Today the open
-Checkout Mandate digest is pinned by `payment.reference`, and the Merchant reservation and the gate's
-revocation check use the pinned digest, so no purchase escapes. It would matter if revocation were keyed
-on the Payment Mandate digest or if constraint elements became selectively disclosable. Planned before P3.
+agent presents. For mandates issued by the Trusted Surface this has one possible serialization: the issuer
+never makes a constraint element selectively disclosable and the mandate has one disclosure, the whole
+content ([PROTOCOL.md](PROTOCOL.md) Decision 84), and an unreferenced extra disclosure is refused. The
+Merchant reservation and the gate's revocation check use the digest pinned by `payment.reference`. What
+remains is the planned re-keying on a presentation-independent identity (P3.4), as defence in depth.
 
 ### L32. The payer vault is keyed on the agent key only
 
@@ -377,3 +378,51 @@ and a crash or log failure in the first complete before the attempt row commits 
 moves money. Planned: log the pending answer, and return such a checkout to `ready_for_complete` after a
 fence (P5.1).
 
+## Trusted Surface
+
+### L35. Creating a customer is unauthenticated
+
+Anyone who can reach `POST /trusted-surface/keys` can enrol a key and receive a new customer id; there is no
+merchant or platform login in the demo. Proof of possession shows that the caller holds the key, not who the
+caller is. A real deployment would bind enrolment to the merchant's or the platform's own login (an invitation
+the customer id is created under). Until then a customer id says only "the holder of this device key", and
+the principal lock and later consent are only as strong as the first enrolment of a key
+([threat-model.md](threat-model.md)). Adding a key to an existing customer is not open: it needs a signature
+from one of that customer's current keys.
+
+### L36. The key lives in one browser and recovery is a new customer
+
+The device key exists only in the browser that made it. The browser may clear its storage (the page asks for
+persistent storage and says when it is refused), and a lost key cannot be recovered or copied to another
+device. Re-enrolment makes a new customer id, so mandates and the principal lock tied to the old id do not
+carry over. Registering a second device for the same customer needs the first device to sign for it; the API
+supports this and the page does not offer it yet.
+
+### L37. Enrolment endpoints have no rate limit
+
+The challenge and registration endpoints are unauthenticated and every refusal appends a log entry, so a
+caller can grow the `key_challenges` table and the log. Neither moves money. Planned: rate limiting and
+expiry of old challenges with the other P5.1 hardening.
+
+### L38. Revocation has an API and no page yet (narrowed in P3.3)
+
+A key is revoked through `POST /trusted-surface/keys/revoke`, signed by a non-revoked key of the same
+customer ([PROTOCOL.md](PROTOCOL.md) Decision 83), and every check honours it. The page does not offer it
+yet. A customer whose only key is lost cannot revoke it (no other key can sign), and the demo has no
+recovery path: the old key stays registered and usable by whoever holds it, and the customer enrols again as
+a new customer (L36). A real deployment would pair revocation with the platform or merchant login (L35).
+
+### L40. The agent hands its request to the page through the address
+
+The Approve intent page reads the agent's request from the address fragment (`#intent=...`) and the agent
+has no channel yet to fetch the mandates it caused to be issued: the page shows them and the consent record
+stores them. The shopping agent end to end (P3.4) adds the retrieval path. The request carries only
+structured values and is never trusted: the store name and item titles come from the store, and the
+backend rebuilds and compares everything before it signs.
+
+### L41. One consent is one purchase
+
+The issued payment mandate has `payment.agent_recurrence` with `max_occurrences` 1 and a budget equal to the
+ceiling, so one consent backs at most one purchase of at most the ceiling. Recurring or multi-purchase
+mandates would need a different constraint set and a different amount of care about the open mandate
+identity (L31), and are not offered.

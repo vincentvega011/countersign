@@ -171,6 +171,15 @@ class UnknownExpectedVctError(MandateError):
     code = "vct_unknown_expected"
 
 
+# --- subject ---
+
+
+class SubjectMissingError(MandateError):
+    """The platform-signed issuer JWT has no usable `sub` (the customer id, Decision 47)."""
+
+    code = "subject_missing"
+
+
 # --- cnf ---
 
 

@@ -21,17 +21,13 @@ def make_lock(
 
 
 def delegation(keys: Keys, *, sub: str | None = "cust-1", agent: int = 0) -> str:
-    """An open Checkout Mandate signed by the platform for one customer and one agent key."""
+    """An open Checkout Mandate signed by the platform for one customer and one agent key.
 
-    def payload(p: dict[str, Any]) -> None:
-        if sub is not None:
-            p["sub"] = sub
-
+    `sub=None` builds the defect "an issuer JWT with no customer id", which the verifier refuses (Decision
+    47: the `sub` is mandatory), so such a delegation names nobody.
+    """
     return issue(
-        "checkout",
-        keys=keys,
-        cnf={"jwk": public_jwk(keys.agents[agent])},
-        edit_open_payload=payload,
+        "checkout", keys=keys, cnf={"jwk": public_jwk(keys.agents[agent])}, sub=sub
     ).open_token
 
 

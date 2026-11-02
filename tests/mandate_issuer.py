@@ -27,6 +27,8 @@ from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 from joserfc.jwk import ECKey
 
 NOW = 1_800_000_000
+# The customer id the platform writes into every issuer JWT (the mandatory `sub`, Decision 47).
+SUBJECT = "cus_AAAAAAAAAAAAAAAAAAAAAA"
 OPEN_VCT = {"checkout": "mandate.checkout.open.1", "payment": "mandate.payment.open.1"}
 CLOSED_VCT = {"checkout": "mandate.checkout.1", "payment": "mandate.payment.1"}
 
@@ -125,6 +127,7 @@ def issue(
     open_nbf: int | None = None,
     open_iat: int | None = None,
     cnf: dict[str, Any] | None | str = "default",
+    sub: str | None = SUBJECT,
     issuer_typ: str = "dc+sd-jwt",
     issuer_alg_header: str = "ES256",
     issuer_sign_alg: str = "ES256",
@@ -135,6 +138,7 @@ def issue(
     edit_open_payload: Callable[[dict[str, Any]], None] | None = None,
     edit_open_content: Callable[[dict[str, Any]], None] | None = None,
     extra_open_disclosures: int = 0,
+    extra_open_disclosure_texts: list[str] | None = None,
     plaintext_delegate: bool = False,
     two_delegate_elements: bool = False,
     duplicate_open_disclosure: bool = False,
@@ -215,6 +219,7 @@ def issue(
     for _ in range(extra_open_disclosures):
         extra, _ = disclosure("unreferenced")
         open_disclosures.append(extra)
+    open_disclosures.extend(extra_open_disclosure_texts or [])
     if duplicate_open_disclosure:
         open_disclosures.append(open_disclosures[0])
     open_payload: dict[str, Any] = {
@@ -222,6 +227,8 @@ def issue(
         "delegate_payload": delegate,
         "_sd_alg": "sha-256",
     }
+    if sub is not None:  # None builds the defect "an issuer JWT with no customer id"
+        open_payload["sub"] = sub
     if edit_open_payload:
         edit_open_payload(open_payload)
     open_header: dict[str, Any] = {"alg": issuer_alg_header, "typ": issuer_typ, "kid": "platform-1"}
@@ -329,6 +336,7 @@ def issue_human_present(
     exp: int | None = NOW + 600,
     signer: ECKey | None = None,
     checkout_hash_value: str | None = None,
+    sub: str | None = SUBJECT,
 ) -> str:
     """A closed Checkout Mandate signed directly by the platform key (Human Present mode)."""
     cj_disc, d_cj = disclosure(checkout_jwt_value, "checkout_jwt")
@@ -343,7 +351,11 @@ def issue_human_present(
     content_disc, d_content = disclosure(content)
     jwt = sign_jwt(
         {"alg": "ES256", "typ": "dc+sd-jwt", "kid": "platform-1"},
-        {"iss": "https://platform.example", "delegate_payload": [{"...": d_content}]},
+        {
+            "iss": "https://platform.example",
+            **({"sub": sub} if sub is not None else {}),
+            "delegate_payload": [{"...": d_content}],
+        },
         signer or keys.issuer,
     )
     return f"{jwt}~{cj_disc}~{content_disc}~"

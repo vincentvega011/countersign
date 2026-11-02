@@ -125,12 +125,16 @@ function panel(theme) {
     group(
       "Amount",
       stack(
-        ...[0, 1, 99, 100, 123456789, -250].map((minor) => {
+        ...[0, 1, -1, 99, 100, 123456789, -250].map((minor) => {
           const line = document.createElement("div");
           line.className = "cs-row";
           line.append(
             amount(minor),
-            text("span", "cs-muted cs-mono", `${minor} minor units`),
+            text(
+              "span",
+              "cs-muted cs-mono",
+              `${minor} minor ${Math.abs(minor) === 1 ? "unit" : "units"}`,
+            ),
           );
           return line;
         }),

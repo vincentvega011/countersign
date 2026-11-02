@@ -14,6 +14,8 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import Engine, create_engine
 
 from countersign.api.acp_routes import install as install_acp
+from countersign.api.static_routes import install as install_static
+from countersign.api.trusted_surface_routes import install as install_trusted_surface
 from countersign.api.ucp_routes import install as install_ucp
 from countersign.api.webhook_routes import install as install_webhooks
 from countersign.canonical.jsonstrict import loads_strict
@@ -26,6 +28,7 @@ from countersign.protocols.ucp.profile import REST_BASE_PATH, build_profile
 from countersign.protocols.ucp.requests import JsonLoader
 from countersign.protocols.ucp.service import CompletionPort, UcpService, now_us
 from countersign.runtime import ABLATIONS_HEADER, MODE_HEADER, RuntimeSettings
+from countersign.trusted_surface import TrustedSurface
 from countersign.webhooks import WebhookService
 
 UI_DIR = Path(__file__).resolve().parents[3] / "web" / "ui"
@@ -47,6 +50,7 @@ def create_app(
     webhooks: WebhookService | None = None,
     runtime: RuntimeSettings | None = None,
     unmandated: UnmandatedCompletion | None = None,
+    trusted_surface: TrustedSurface | None = None,
     json_loader: JsonLoader = loads_strict,
 ) -> FastAPI:
     """Create the app. Without an explicit `key`, load `MERCHANT_KEY_PATH` or fail.
@@ -58,6 +62,8 @@ def create_app(
     `lock` is the shared principal lock; the composition root passes the same one to the completion
     coordinator and to the capture gate. `runtime` is the mode and the ablations chosen at start: they
     are reported by `GET /health` and by a header on every response, and they change nothing here.
+    `trusted_surface` is the device key enrolment service; the Trusted Surface page and its shared
+    files are served in every mode, the enrolment routes only when the service is given.
     `unmandated` and `json_loader` are the composition root's injection points for the evaluation
     modes; the defaults are the `full` behaviour (deny, strict).
     """
@@ -96,6 +102,10 @@ def create_app(
     if runtime.app_env in UI_ENVS and UI_DIR.is_dir():
         # The shared visual system and its component gallery are review tools: dev and eval only.
         app.mount("/_ui", StaticFiles(directory=UI_DIR), name="ui")
+
+    install_static(app)
+    if trusted_surface is not None:
+        install_trusted_surface(app, trusted_surface)
 
     @app.get("/.well-known/ucp")
     def well_known_ucp() -> JSONResponse:

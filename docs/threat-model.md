@@ -59,8 +59,9 @@ Notes on what the cases do and do not cover:
 
 - `consent_missing` is defined as "a well formed mandate chain whose issuer link is not signed by the
   trusted platform key", because the platform signs only after the customer's device key signed consent
-  ([PROTOCOL.md](PROTOCOL.md) Decision 5). The device consent signature itself belongs to the Trusted
-  Surface (P3) and is not verified yet, so that half is untested.
+  ([PROTOCOL.md](PROTOCOL.md) Decisions 5 and 81). The device consent signature is verified at issuance
+  (`tests/integration/test_consent.py`); a chain verifier never sees it, so the case tests the platform
+  key and the issuance tests test the consent.
 - `category_escape` tests the mandate level `checkout.line_items` constraint. A merchant level category
   policy (Decision 3) is not built, so it has no case yet.
 - `webhook_spoof` runs against the simulator's verification verdict. Live delivery is not confirmed
@@ -85,6 +86,68 @@ Notes on what the cases do and do not cover:
   forced interleavings; `tests/integration/test_cancel_during_completion.py`.
 - **Not defended.** An expiry that cancels a completing checkout is caught by the gate only if it runs;
   otherwise `recover` voids the authorization (P5.1 schedules it).
+
+## Device key enrolment
+
+The Trusted Surface key is the root of "the customer approved this" ([PROTOCOL.md](PROTOCOL.md) Decision 5), so
+enrolment is where a false customer would be created. Code: `src/countersign/trusted_surface/`, tests
+`tests/integration/test_trusted_surface.py`, `tests/unit/test_trusted_surface_keys.py`,
+`tests/unit/test_approve_static.py` and the browser tests in `web/approve/test/`.
+
+| Attack | Actor | Defense | Code |
+| --- | --- | --- | --- |
+| Register a key with a private part or extra members, a weak curve or an off-curve point | malicious client | strict JWK validation, thumbprint computed on the server | `jwk_*` |
+| Register a key the caller does not hold | malicious client | proof of possession over a server-rebuilt record | `proof_invalid` |
+| Replay a captured registration | network attacker | single use challenge (INSERT with a unique key), 5 minute expiry from the issue time | `challenge_used`, `challenge_expired` |
+| Use a challenge for another purpose, key, customer or origin | malicious client or page | all of them are inside the signed record | `proof_invalid`, `challenge_purpose_mismatch` |
+| Enrol from a look-alike page on another origin | phishing page | the signed record names the page origin, and the server compares it to the configured origin and the `Origin` header | `origin_mismatch` |
+| Add the attacker's key to a victim's customer id | malicious client | the same record must be signed by a current, non-revoked key of that customer | `authorizer_*` |
+| Claim a key that belongs to another customer | malicious client | thumbprint is the primary key; a different customer is a conflict | `key_conflict` |
+| Race many registrations on one challenge | malicious client | exactly one INSERT on the challenge id commits | `challenge_used` |
+| Rewrite or delete a registered key | compromised application | no UPDATE or DELETE grant; an immutability trigger | database error |
+| Steal the private key from the page | cross-site script | the key is non-extractable; a strict CSP with no inline script and no other origin; no model text | n/a |
+| Make the page show attacker text | malicious service answer | fixed templates; the only dynamic text is a code that matches a plain pattern | n/a |
+
+Invariants: INV-1 (all checks deterministic), INV-2 (non-agentic page, non-extractable key), INV-8 (strict JSON
+before anything else), INV-10 (fail closed, including a log failure), INV-12 (log before answer).
+
+- **Not defended.** Creating a new customer is unauthenticated, so an attacker can enrol their own key and
+  get a customer id of their own ([LIMITATIONS.md](LIMITATIONS.md) L35); they cannot take over another
+  customer's id. A compromised browser or device can use the key it holds. Challenges and refusals are not
+  rate limited (L37).
+
+## Consent, mandate issuance and revocation
+
+Where "the customer approved this" becomes a signed mandate. Code: `src/countersign/trusted_surface/`
+(`consent.py`, `service.py`, `issuer.py`), tests `tests/integration/test_consent.py`,
+`tests/integration/test_trusted_surface.py`, `tests/unit/test_mandates_subject.py`, the shared mandate
+vectors and the browser tests in `web/approve/test/`.
+
+| Attack | Actor | Defense | Code |
+| --- | --- | --- | --- |
+| Get mandates issued with no consent | malicious agent or client | the platform signs only inside a verified consent; there is no other issuing path | `consent_*` |
+| Change the terms after the person looked (ceiling, item, merchant, expiry, agent key) | page script, proxy, malicious agent | the device signs the JCS bytes of the record the page rendered; any change breaks the signature | `consent_signature_invalid` |
+| A signed record whose claims say more than its terms | compromised or buggy page | the backend rebuilds the mandate contents from the terms and compares the JCS bytes | `consent_claims_mismatch` |
+| Terms that are signed but not honest (another store, an item as titled by the agent, a huge ceiling, a long expiry) | malicious agent | the terms are checked against this store's merchant record and catalog and fixed limits | `consent_terms_invalid` |
+| Replay a consent or reuse its nonce | network attacker | single use nonce (INSERT), 5 minutes, record expiry | `challenge_used`, `challenge_expired`, `consent_expired` |
+| Consent from a look-alike origin | phishing page | the signed record names the origin; the server compares it and the `Origin` header | `origin_mismatch` |
+| Consent with an unregistered, revoked or another customer's key | malicious client | the stored key of that customer is the only verifier; revoked keys are refused | `device_key_*` |
+| Consent racing a revocation | malicious client | one per-customer lock serializes them; the second one sees the first | `device_key_revoked` |
+| Put agent-written text on the approval page | malicious agent (an LLM) | the proposal carries only ids, numbers and a key; store name and item titles come from the store; fixed templates | `intent_invalid` |
+| Hide or reorder parts of an issued mandate | malicious agent | the issuer never makes a constraint element selectively disclosable; one disclosure; unreferenced disclosures are refused | `constraint_element_disclosure` |
+| Use a mandate that names no customer | malicious agent, compromised issuer | `sub` is mandatory and read from the signed payload | `subject_missing` |
+| Make a revoked key valid again, or revoke another customer's key | malicious client | revocations are insert only; the signer must be a live key of the same customer | `key_revoked`, `signer_*`, `key_unknown` |
+| Two keys revoking each other so nobody can speak for a customer | malicious client | per-customer lock: exactly one revocation wins | `signer_revoked` |
+
+Invariants: INV-1 (all checks deterministic, no model input), INV-2 (non-agentic page, non-extractable key, no
+agent text), INV-6 (single use nonce), INV-8 (strict JSON and JCS), INV-9 (integer minor units), INV-10 (fail
+closed, including a log failure), INV-12 (log before answer).
+
+- **Not defended.** A person who is shown a faithful request can still approve a bad one; the page shows
+  exactly what will be signed, no more. The platform key is the one trusted issuer, and the same entity plays
+  Merchant, Credential Provider and processor ([LIMITATIONS.md](LIMITATIONS.md)); the device signature is the
+  independent check on a rogue platform key. A compromised device can sign what its key holds. Creating a
+  customer is unauthenticated (L35).
 
 ## Review of the phase 2 implementation
 

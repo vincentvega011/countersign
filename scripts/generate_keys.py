@@ -1,4 +1,4 @@
-"""Create the merchant ES256 signing key if it does not exist. Prints only the public `kid`."""
+"""Create the merchant and the platform ES256 signing keys if they do not exist. Prints only `kid`s."""
 
 from __future__ import annotations
 
@@ -8,10 +8,21 @@ import sys
 from countersign.merchant.keys import MerchantKeyError, load_merchant_key, write_key_file
 
 DEFAULT_PATH = "secrets/merchant_es256.jwk.json"
+DEFAULT_PLATFORM_PATH = "secrets/platform_es256.jwk.json"
 
 
 def main() -> int:
-    path = os.environ.get("MERCHANT_KEY_PATH", DEFAULT_PATH)
+    for variable, default in (
+        ("MERCHANT_KEY_PATH", DEFAULT_PATH),
+        ("PLATFORM_KEY_PATH", DEFAULT_PLATFORM_PATH),
+    ):
+        status = ensure(os.environ.get(variable) or default)
+        if status:
+            return status
+    return 0
+
+
+def ensure(path: str) -> int:
     if os.path.exists(path):
         try:
             key = load_merchant_key(path)

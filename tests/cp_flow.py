@@ -12,6 +12,7 @@ tokens. They hold public keys and signatures only; the private keys are discarde
 from __future__ import annotations
 
 import json
+import secrets
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from typing import Any
@@ -76,6 +77,7 @@ def build_fixture(checkout_id: str, catalog: Catalog | None = None) -> FlowFixtu
     checkout = flow_checkout(checkout_id, catalog)
     merchant_key = validate_jwk(generate_jwk())
     keys = Keys()
+    customer_id = "cus_" + secrets.token_urlsafe(16)  # the shape the platform issuer writes
     jwt = checkout_jwt(signed_response(checkout, merchant_key))
     total = next(t.amount for t in checkout.totals if t.type == "total")
 
@@ -85,7 +87,7 @@ def build_fixture(checkout_id: str, catalog: Catalog | None = None) -> FlowFixtu
             for line in checkout.line_items[:1]
         ]
 
-    cm = issue("checkout", keys=keys, checkout_jwt_value=jwt, nonce="rec-checkout",
+    cm = issue("checkout", keys=keys, sub=customer_id, checkout_jwt_value=jwt, nonce="rec-checkout",
                edit_open_content=open_checkout)  # fmt: skip
     digest = sd_hash(cm.open_token)
 
@@ -95,7 +97,7 @@ def build_fixture(checkout_id: str, catalog: Catalog | None = None) -> FlowFixtu
     def closed_payment(content: dict[str, Any]) -> None:
         content.update(closed_payment_values(total.minor, total.currency))
 
-    pm = issue("payment", keys=keys, audience="credential-provider", checkout_jwt_value=jwt,
+    pm = issue("payment", keys=keys, sub=customer_id, audience="credential-provider", checkout_jwt_value=jwt,
                nonce="rec-payment", edit_open_content=open_payment,
                edit_kb_content=closed_payment)  # fmt: skip
     return FlowFixture(

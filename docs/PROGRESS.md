@@ -190,6 +190,29 @@ recorded request ids again, so:
   third-party origin test, amount and fingerprint tests, and review screenshots at 375 and 1280 px.
   Decisions 73 to 75 in [PROTOCOL.md](PROTOCOL.md). No product pages yet.
 
+- P3.2 (done): device keys on the Trusted Surface (first of the P3.2 and P3.3 pair; one commit covers both). Backend
+  (`src/countersign/trusted_surface/`, `api/trusted_surface_routes.py`, migration 0007): a single use
+  enrolment challenge (consumed by an INSERT, 5 minutes from issue), registration with a proof of
+  possession over a JCS record that names purpose, challenge, thumbprint, customer and origin, strict
+  P-256 JWK validation, server side RFC 7638 thumbprint, add-only keys, the old key signature needed to add
+  a key to an existing customer, stable refusal codes logged before the answer. The page (`web/approve`):
+  WebCrypto non-extractable key kept in IndexedDB, the fingerprint component, fixed message templates for
+  every state and failure, no build step. Served in every mode from an exact allowlist (`api/static_routes.py`).
+  Browser tests in `web/approve/test` run by pytest on a real Postgres. Decisions 76 to 80 in
+  [PROTOCOL.md](PROTOCOL.md); limits L35 to L38 in [LIMITATIONS.md](LIMITATIONS.md). Small fixes: the gallery
+  says "1 minor unit", and the shared loading button sets `aria-busy="true"`.
+
+- P3.3 (done): consent and platform-issued open mandates, and insert-only revocation (the second of the P3.2 and P3.3
+  pair; one commit covers both). The Approve intent screen renders the terms from one structured record with
+  fixed templates, the device key signs that record, and the backend verifies the device key, the nonce, the
+  origin and the record, rebuilds the mandate contents and compares them byte for byte before the platform key
+  signs the open Checkout and Payment Mandates (`sub` is the customer id). `sub` is now mandatory in
+  `verify_chain` (152 shared vectors, Python and Node). Revocation is a table that is only ever inserted into
+  (migration 0008, the 0007 trigger is gone). The platform issuer refuses selectively disclosable constraint
+  elements. Decisions 81 to 85 in [PROTOCOL.md](PROTOCOL.md); L19 resolved, L31 narrowed, L38 to L41 in
+  [LIMITATIONS.md](LIMITATIONS.md). CI installs the browser. The two real-sandbox cassettes (`cp_authorize`,
+  `gate_flow`) were re-recorded with `sub` mandates; the scripts void or capture everything they create.
+
 ## P2 gate (run 2026-10-30): passed
 
 Gate evidence:
@@ -247,8 +270,7 @@ Findings from the P1 review that belong to P2 and are not optional there:
 ## Carried forward
 
 - **P5.1:** rate limit completes and `complete_in_progress` log growth per checkout and per principal (Decision 68).
-- **P3.4:** add the device-consent half of `consent_missing` once the Trusted Surface signs consent.
-- **P3.4:** key single use, budget and revocation on a presentation-independent open mandate identity, and forbid selective disclosure of whole constraint elements in the platform issuer (L31).
+- **P3.4:** key single use, budget and revocation on a presentation-independent open mandate identity (L31; the platform issuer already refuses selectively disclosable constraint elements, Decision 84).
 - **Before vault mode is enabled:** key the payer vault on (customer id, agent thumbprint), not the agent key alone (L32).
 - **P4.5:** wire `check_category_policy` into the Merchant verifier and the Policy view (`category_escape` currently covers the `line_items` constraint only).
 - **P5.1:** run `CaptureGate.recover` and the CP recovery on a schedule (L26).
@@ -258,8 +280,7 @@ Findings from the P1 review that belong to P2 and are not optional there:
 - **P5.1:** log the "pending" answer, and let a resumed checkout with no attempt return to `ready_for_complete` after a fence (L34).
 - **P5.1:** create the PayPal webhook, record its id, and confirm live delivery and `verify-webhook-signature` against a real notification (ENV section 11).
 
-- **P3.3:** make the `sub` claim mandatory in mandates once the Trusted Surface backend writes it; remove the
-  sub-less leniency of Decision 47 and L19.
+- **P3.4:** the shopping agent retrieves the mandates it caused to be issued and binds them (L40); the page offers revoking a key and adding a second device (L36, L38).
 
 ## Open risks
 

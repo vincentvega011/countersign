@@ -1,0 +1,75 @@
+"""The Trusted Surface page and the shared UI files it needs, served in every mode.
+
+Security reasoning. This is a product page, unlike the component gallery (`/_ui`, dev and eval only,
+Decision 75), so it is served in demo too. Nothing here serves a directory: each URL is an entry in a
+fixed table that names one file, its media type and nothing else, so a path that is not in the table
+is a 404 before the file system is touched, and a traversal attempt (plain or encoded) never matches
+an entry. A test fails if a file appears under `web/approve` that is not in the table, or if a table
+entry has no file. The page is sent with a strict Content-Security-Policy: scripts, styles, fonts and
+connections from its own origin only, no framing, no forms (Decision 76).
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from fastapi import APIRouter, FastAPI
+from fastapi.responses import FileResponse, Response
+
+WEB_DIR = Path(__file__).resolve().parents[3] / "web"
+APPROVE_DIR = WEB_DIR / "approve"
+UI_DIR = WEB_DIR / "ui"
+
+APPROVE_PATH = "/approve/"
+CSS, JS, HTML, WOFF2 = "text/css", "text/javascript", "text/html", "font/woff2"
+FONTS = (
+    "instrument-sans-latin-wght-normal.woff2",
+    "jetbrains-mono-latin-wght-normal.woff2",
+    "newsreader-latin-wght-normal.woff2",
+)
+
+# URL path -> (file, media type). The whole of what is served.
+PAGE_FILES: dict[str, tuple[Path, str]] = {
+    APPROVE_PATH: (APPROVE_DIR / "index.html", HTML),
+    "/approve/approve.css": (APPROVE_DIR / "approve.css", CSS),
+    "/approve/app.js": (APPROVE_DIR / "app.js", JS),
+    "/approve/consent.js": (APPROVE_DIR / "consent.js", JS),
+    "/approve/device-key.js": (APPROVE_DIR / "device-key.js", JS),
+    "/approve/messages.js": (APPROVE_DIR / "messages.js", JS),
+}
+UI_FILES: dict[str, tuple[Path, str]] = {
+    "/ui/tokens.css": (UI_DIR / "tokens.css", CSS),
+    "/ui/components.css": (UI_DIR / "components.css", CSS),
+    "/ui/fonts.css": (UI_DIR / "fonts.css", CSS),
+    "/ui/ui.js": (UI_DIR / "ui.js", JS),
+    **{f"/ui/fonts/{name}": (UI_DIR / "fonts" / name, WOFF2) for name in FONTS},
+}
+SERVED: dict[str, tuple[Path, str]] = {**PAGE_FILES, **UI_FILES}
+
+CSP = (
+    "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; "
+    "connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; "
+    "frame-ancestors 'none'"
+)
+_HEADERS = {
+    "Content-Security-Policy": CSP,
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "Cache-Control": "no-cache",
+}
+
+
+def install(app: FastAPI) -> None:
+    router = APIRouter()
+
+    def make(path: str) -> None:
+        file, media = SERVED[path]
+
+        def handler() -> Response:
+            return FileResponse(file, media_type=media, headers=_HEADERS)
+
+        router.add_api_route(path, handler, methods=["GET"], name=f"static:{path}")
+
+    for path in SERVED:
+        make(path)
+    app.include_router(router)

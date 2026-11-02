@@ -1,4 +1,4 @@
-"""SQLAlchemy Core definitions of the tables in migrations 0003 and 0004 (the schema itself is the migration)."""
+"""SQLAlchemy Core definitions of the tables added by the migrations (the schema itself is the migration)."""
 
 from __future__ import annotations
 
@@ -123,4 +123,61 @@ webhook_events = Table(
     Column("checkout_id", Text),
     Column("received_us", BigInteger, nullable=False),
     Column("finished_us", BigInteger),
+)
+
+key_challenges = Table(
+    "key_challenges",
+    metadata,
+    Column("id", Text, primary_key=True),
+    Column("purpose", Text, nullable=False),
+    Column("nonce", Text, nullable=False),
+    Column("created_us", BigInteger, nullable=False),
+)
+
+key_challenge_uses = Table(
+    "key_challenge_uses",
+    metadata,
+    Column("challenge_id", Text, primary_key=True),
+    Column("thumbprint", Text, nullable=False),
+    Column("used_us", BigInteger, nullable=False),
+)
+
+customer_keys = Table(
+    "customer_keys",
+    metadata,
+    Column("customer_id", Text, nullable=False),
+    Column("thumbprint", Text, primary_key=True),
+    Column("jwk", Text, nullable=False),
+    Column("created_us", BigInteger, nullable=False),
+)
+
+key_revocations = Table(
+    "key_revocations",
+    metadata,
+    Column("thumbprint", Text, primary_key=True),
+    Column("customer_id", Text, nullable=False),
+    Column("signer_thumbprint", Text, nullable=False),
+    Column("challenge_id", Text, nullable=False),
+    Column("record", Text, nullable=False),
+    Column("signature", Text, nullable=False),
+    Column("revoked_us", BigInteger, nullable=False),
+)
+
+consent_records = Table(
+    "consent_records",
+    metadata,
+    Column("id", Text, primary_key=True),
+    Column("challenge_id", Text, nullable=False),
+    Column("customer_id", Text, nullable=False),
+    Column("device_thumbprint", Text, nullable=False),
+    Column("device_jwk", Text, nullable=False),
+    Column("agent_thumbprint", Text, nullable=False),
+    Column("record", Text, nullable=False),
+    Column("signature", Text, nullable=False),
+    Column("checkout_mandate", Text, nullable=False),
+    Column("payment_mandate", Text, nullable=False),
+    Column("checkout_open_digest", Text, nullable=False),
+    Column("payment_open_digest", Text, nullable=False),
+    Column("mandate_exp", BigInteger, nullable=False),
+    Column("created_us", BigInteger, nullable=False),
 )

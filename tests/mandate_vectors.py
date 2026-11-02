@@ -20,11 +20,13 @@ from tests.mandate_issuer import (
     CLOSED_VCT,
     NOW,
     OPEN_VCT,
+    SUBJECT,
     Issued,
     Keys,
     b64e,
     compact_json,
     digest,
+    disclosure,
     issue,
     public_jwk,
 )
@@ -121,6 +123,39 @@ def main() -> None:
         "valid-iat-skew-60",
         "iat is exactly 60 s ahead of now: inside the skew.",
         issue(open_iat=NOW + 60, kb_iat=NOW + 60),
+    )
+
+    # ----- the customer id: the signed top-level `sub` of the issuer JWT is mandatory -----
+    add(
+        "valid-sub-128-chars",
+        "A 128 character sub is the longest usable one.",
+        issue(sub="c" * 128),
+    )
+    for vid, why, bad in (
+        ("sub-missing", "The issuer JWT has no sub.", None),
+        ("sub-empty", "An empty sub is no customer id.", ""),
+        ("sub-padded", "A sub with leading or trailing space is not usable.", " cus_x"),
+        ("sub-too-long", "A 129 character sub is too long.", "c" * 129),
+        ("sub-control-character", "A sub with a control character is not printable.", "cus\u0007x"),
+    ):
+        add(vid, why, issue(sub=bad), code="subject_missing")
+    add(
+        "sub-not-a-string",
+        "A numeric sub is not a customer id.",
+        issue(edit_open_payload=lambda p: p.update(sub=7)),
+        code="subject_missing",
+    )
+    withheld_text, withheld_digest = disclosure(SUBJECT, "sub")
+
+    def hide_sub(payload: dict[str, Any]) -> None:
+        payload.pop("sub", None)
+        payload["_sd"] = [withheld_digest]
+
+    add(
+        "sub-only-as-selective-disclosure",
+        "A sub that is only a selectively disclosable claim is not the signed top-level sub.",
+        issue(sub=None, edit_open_payload=hide_sub, extra_open_disclosure_texts=[withheld_text]),
+        code="subject_missing",
     )
 
     # ----- structure -----

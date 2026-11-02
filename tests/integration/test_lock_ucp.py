@@ -145,20 +145,21 @@ def test_a_locked_principal_that_completes_without_a_mandate_is_denied(
         assert conn.execute(select(reservations)).all() == []
 
 
-def test_under_require_all_a_mandate_naming_no_customer_is_denied_and_released(
+def test_a_mandate_with_no_customer_id_is_refused_before_anything_is_reserved_or_authorized(
     ucp: tuple[Stack, Any],
 ) -> None:
+    """Decision 47: the `sub` is mandatory. A mandate without one no longer gets as far as the lock."""
     stack, lock = ucp
     lock.set_policy("all", reason="strict")
     token = delegation(stack.keys)
     created = post_checkout(stack, delegation_token=token, capability=True).json()
-    cm, pm = mandates(stack, created)  # signed with no `sub`
+    cm, pm = mandates(stack, created, no_sub=True)
     response = complete(stack, created["id"], complete_body(cm, pm))
-    assert "mandate_required" in codes(response) and response.json()["status"] == "canceled"
+    assert "mandate_invalid_signature" in codes(response)
     assert stack.sim.orders == {}
     with stack.engine.connect() as conn:
         states = {r.role: r.state for r in conn.execute(select(reservations)).all()}
-    assert states == {"merchant": "released"}
+    assert states in ({}, {"merchant": "released"})
 
 
 def test_under_require_all_a_mandate_that_names_the_customer_goes_through(
@@ -197,11 +198,8 @@ def test_the_ucp_adapter_has_no_lock_logic_of_its_own() -> None:
 
 
 def sub_payload(sub: str | None) -> dict[str, Any]:
-    def edit(payload: dict[str, Any]) -> None:
-        if sub is not None:
-            payload["sub"] = sub
-
-    return {"edit_open_payload": edit}
+    """Keyword for the test issuer: the customer id, or None for an issuer JWT with none."""
+    return {"sub": sub}
 
 
 @pytest.fixture
@@ -229,15 +227,21 @@ def test_g_lock_uses_the_real_lock_and_a_valid_mandate_captures(gworld: GateWorl
     assert kinds.index("lock.decision") < kinds.index("gate.paypal.capture.started")
 
 
-def test_a_policy_tightened_between_authorize_and_capture_voids_a_nameless_mandate(
-    gworld: GateWorld,
-) -> None:
-    authorize_with(gworld, None)
-    gworld.lock.set_policy("all", reason="tightened after authorization")
-    outcome = gate_run(gworld)
-    assert isinstance(outcome, GateRejected) and outcome.code == "G-LOCK"
-    assert outcome.reason == "lock_denied:denied:customer_unknown"
-    assert gworld.sim.count("/capture") == 0 and gworld.sim.count("/void") == 1
+def test_a_mandate_with_no_customer_id_never_reaches_authorization(gworld: GateWorld) -> None:
+    """The gate's old "nameless mandate" cases cannot be built any more: the Merchant refuses it first."""
+    from countersign.merchant.verify import Rejected
+
+    mandates_ = gworld.base.mandates(
+        checkout=gworld.checkout,
+        payment_kwargs=sub_payload(None),
+        checkout_kwargs=sub_payload(None),
+    )
+    verdict = gworld.merchant.verify(
+        mandate=mandates_.checkout_mandate, issued_checkout=None, current=gworld.checkout
+    )
+    assert isinstance(verdict, Rejected)
+    assert verdict.ucp_code == "mandate_invalid_signature" and "subject_missing" in verdict.reason
+    assert gworld.sim.orders == {}
 
 
 def test_a_policy_tightened_between_authorize_and_capture_still_captures_a_named_mandate(
@@ -247,19 +251,6 @@ def test_a_policy_tightened_between_authorize_and_capture_still_captures_a_named
     gworld.lock.set_policy("all", reason="tightened after authorization")
     outcome = gate_run(gworld)
     assert isinstance(outcome, GatePassed) and gworld.sim.count("/capture") == 1
-
-
-def test_a_lock_added_between_authorize_and_capture_voids_a_nameless_mandate(
-    gworld: GateWorld,
-) -> None:
-    authorize_with(gworld, None)
-    agent = gworld.base.keys.agents[0].thumbprint()
-    gworld.lock.decide(
-        LockRequest("create", "chk_other", Principal("cust-9", agent), True, False, None)
-    )
-    outcome = gate_run(gworld)
-    assert isinstance(outcome, GateRejected) and outcome.code == "G-LOCK"
-    assert gworld.sim.count("/capture") == 0 and gworld.sim.count("/void") == 1
 
 
 def test_a_lock_added_between_authorize_and_capture_still_captures_a_named_mandate(

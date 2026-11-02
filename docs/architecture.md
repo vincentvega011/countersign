@@ -561,6 +561,34 @@ dispute steps ([PROTOCOL.md](PROTOCOL.md) section 1.2.8), then checks the device
 against the mandate content, checks the PayPal objects against the checkout terms, and checks the
 log proofs. Tampering with any byte makes verification fail at the correct step with a clear message.
 
+### 5.13 trusted_surface (device keys, consent, platform issuer)
+
+`src/countersign/trusted_surface/`, mounted by `api/trusted_surface_routes.py` and wired by the composition
+root with the origin of `PUBLIC_BASE_URL`, the platform key, the issuer and this store's merchant record
+([PROTOCOL.md](PROTOCOL.md) Decisions 76 to 85).
+
+- `keys.py`: pure checks. JWK validation (exactly `kty`, `crv`, `x`, `y`; P-256; canonical coordinates; on
+  the curve), the RFC 7638 thumbprint through the one JCS function, origin normalization, the JCS records the
+  device key signs to register and to revoke, and ES256 verification of the raw `r || s` form.
+- `consent.py`: pure. The consent record (strict shape), the meaning of its terms against this store's
+  merchant record and catalog, and `build_mandate`, the rebuild the backend compares byte for byte.
+- `issuer.py`: the only code that signs a mandate with the platform key. Writes the plaintext `sub`, refuses
+  any selectively disclosable constraint element, emits one disclosure.
+- `service.py`: challenges (rows; single use is an INSERT into `key_challenge_uses`; 5 minutes from issue) for
+  three purposes (register, revoke, consent), `register`, `revoke` and `consent`. Keys are add-only;
+  revocations are rows in the insert-only `key_revocations`; consents are rows in `consent_records` with the
+  device public key and both mandates. A per-customer advisory lock serializes revocation, vouched
+  registration and consent. Every refusal is logged before the answer, a success in the same transaction.
+  Migrations 0007 to 0009; the runtime role has SELECT and INSERT only.
+- `GET /trusted-surface/store`: the store's own merchant record and item titles, so the page never shows text
+  an agent wrote.
+- Static serving (`api/static_routes.py`): the page (`web/approve`) and the shared UI files from an exact
+  allowlist, in every mode, with a strict CSP.
+- The page (`web/approve`): `device-key.js` (WebCrypto, IndexedDB, registration), `consent.js` (the proposal,
+  the record, the fixed templates), `messages.js` (every sentence), `app.js` (the state machine: setup, then
+  the Approve intent screen: request, signing, approved, declined, expired, refused), `approve.css`,
+  `index.html`. No build step.
+
 ### 5.12 api, llm, catalog
 
 - `api`: the FastAPI app, the edge checks (strict JSON, size limits, request hashing), the customer
@@ -642,8 +670,9 @@ themes, shared tokens and components.
 
 `web/approve`, mobile first at 375 px. All text comes from fixed templates and structured data.
 
-- **Setup:** one tap creates the device key and shows a short fingerprint.
-- **Approve intent:** each term of the open mandates rendered from fixed templates (the exact item
+- **Setup:** one tap creates the device key, registers it with a challenge and a proof of possession, and
+  shows its fingerprint (the RFC 7638 thumbprint, grouped). Built in P3.2.
+- **Approve intent (built in P3.3):** each term of the open mandates rendered from fixed templates (the exact item
   list, "Up to $80.00 in total", "Expires Sun 25 Oct, 18:00"), the merchant name and the agent
   fingerprint. Approve and Decline. Approve signs the consent record.
 - **Approve purchase:** for Human Present, the exact line items and totals, then consent.

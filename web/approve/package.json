@@ -1,5 +1,13 @@
 {
   "name": "@countersign/approve",
   "version": "0.0.0",
-  "private": true
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "prettier --check --ignore-path .prettierignore .",
+    "test": "node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.50.0"
+  }
 }

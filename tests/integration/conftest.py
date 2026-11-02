@@ -148,3 +148,33 @@ def clean_payments(admin_engine: Engine) -> None:
                 "checkout_sessions, decision_log CASCADE"
             )
         )
+
+
+START = 1_800_000_000_000_000  # microseconds: the fixed clock of the Trusted Surface tests
+
+
+class Clock:
+    """A settable clock in microseconds."""
+
+    def __init__(self) -> None:
+        self.now = START
+
+    def __call__(self) -> int:
+        return self.now
+
+
+@pytest.fixture
+def clean_keys(admin_engine: Engine) -> None:
+    """Empty Trusted Surface tables and log for the test (the administrator may truncate)."""
+    with admin_engine.begin() as conn:
+        conn.execute(
+            text(
+                "TRUNCATE consent_records, key_revocations, key_challenge_uses, key_challenges, "
+                "customer_keys, decision_log CASCADE"
+            )
+        )
+
+
+@pytest.fixture
+def clock() -> Clock:
+    return Clock()

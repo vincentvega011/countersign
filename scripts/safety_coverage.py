@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = (
     "merchant", "cp", "gate", "lock", "constraints", "canonical", "ledger", "mandates", "webhooks",
-    "protocols", "paypal", "degraded", "checkout", "evidence", "mpp",
+    "protocols", "paypal", "degraded", "checkout", "evidence", "mpp", "trusted_surface",
 )  # fmt: skip
 
 

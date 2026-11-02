@@ -28,6 +28,15 @@ Recording is off unless you opt in:
 
 Credentials come from the environment or the git-ignored .env (PAYPAL_API_BASE, PAYPAL_CLIENT_ID,
 PAYPAL_CLIENT_SECRET). The sandbox host is enforced. Nothing secret is printed.
+
+Nothing is left open in the sandbox. A passes through the gate and is CAPTURED; B is VOIDED by the gate.
+If the run stops half way, every authorization that was created and is neither captured nor voided is
+voided by the script with a second client that is not recording, so the cassette is not touched. The
+throwaway discovery order is never approved, so it holds no funds and PayPal lets it lapse.
+
+The mandates carry the mandatory `sub` (the customer id, `cus_` plus 22 characters, exactly the shape
+the Trusted Surface issuer writes), so the cassette and its fixture are valid for the verifier as it is
+now. The mandates are signed with throwaway keys; only the public keys are kept.
 """
 
 from __future__ import annotations
@@ -55,6 +64,7 @@ from scripts.record_cp_cassette import (
     discover_payee_merchant_id,
     drop_database,
     scratch_database,
+    void_leftover,
 )
 from scripts.record_paypal_cassette import parse_env_file
 from tests.cp_flow import authorized
@@ -113,6 +123,11 @@ def main() -> int:
     )
     fixtures = GateFixtures(build_gate_fixture(clean_id), build_gate_fixture(changed_id))
     now = lambda: dt.datetime.now(dt.UTC)
+    open_authorizations: dict[
+        str, str
+    ] = {}  # checkout id -> authorization not yet captured or voided
+    outcome_a: object = None
+    outcome_b: object = None
     try:
         with PayPalClient(config, transport=transport) as client:
             print("\n=== Scenario A: a clean flow ends in a capture ===")
@@ -120,7 +135,10 @@ def main() -> int:
                            paypal_now=now)  # fmt: skip
             _, finished = authorize_flow(a, fixtures.clean, approve)
             authorized(finished)
+            open_authorizations[clean_id] = finished.authorization_id
             outcome_a = run_gate(a, fixtures.clean)
+            if isinstance(outcome_a, GatePassed):
+                del open_authorizations[clean_id]  # captured
             print(f"  gate: {type(outcome_a).__name__}")
 
             print("\n=== Scenario B: the order is raised after approval, before authorization ===")
@@ -133,7 +151,10 @@ def main() -> int:
 
             _, finished_b = authorize_flow(b, fixtures.changed, approve, between=raise_order)
             authorized(finished_b)
+            open_authorizations[changed_id] = finished_b.authorization_id
             outcome_b = run_gate(b, fixtures.changed)
+            if isinstance(outcome_b, GateRejected):
+                del open_authorizations[changed_id]  # voided by the gate
             print(f"  gate: {type(outcome_b).__name__}")
 
             print("\n=== Error body probe: a second void of the voided authorization ===")
@@ -145,6 +166,8 @@ def main() -> int:
     finally:
         engine.dispose()
         drop_database(admin_url, name, role)
+        for checkout, authorization in open_authorizations.items():
+            void_leftover(config, checkout, authorization)
     if not isinstance(outcome_a, GatePassed):
         print(f"Not saved: scenario A ended with {outcome_a}", file=sys.stderr)
         return 1

@@ -36,6 +36,14 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # The Trusted Surface browser tests (tests/integration/test_approve_browser.py) drive a real
+      # Chromium and fail, on purpose, when it is missing. The browser download is cached by the
+      # lockfile (it pins the Playwright version); the system libraries are installed every run.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm --filter @countersign/approve exec playwright install --with-deps chromium
       - uses: astral-sh/setup-uv@v10.3.0
       - run: uv sync --locked
       - run: uv run ruff check .

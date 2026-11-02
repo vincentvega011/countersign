@@ -1,0 +1,148 @@
+/* Layout of the Trusted Surface setup page. Components and tokens come from ../ui. */
+body {
+  margin: 0;
+}
+.ts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 30rem;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: var(--space-4);
+}
+.ts__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.ts__brand {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 500;
+}
+.ts__where {
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+.ts__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ts__title {
+  font-size: var(--text-3xl);
+}
+.ts__lead {
+  margin: 0 0 var(--space-2);
+}
+.ts__foot {
+  font-size: var(--text-sm);
+  padding-top: var(--space-3);
+  border-top: var(--border-width) solid var(--color-border);
+}
+.ts__noscript {
+  max-width: 30rem;
+  margin: 0 auto;
+  padding: var(--space-4);
+}
+
+.ts-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.ts-card[data-tone="success"] {
+  border-color: var(--color-success);
+}
+.ts-card[data-tone="danger"] {
+  border-color: var(--color-danger);
+}
+.ts-card[data-tone="warning"] {
+  border-color: var(--color-warning);
+}
+.ts-card__tag {
+  display: flex;
+}
+.ts-card .cs-card__title {
+  margin: 0;
+}
+.ts-card .cs-card__title:focus {
+  outline: none;
+}
+/* The title takes focus only so a screen reader announces the new state; it is not a control. */
+.ts-card__body,
+.ts-card__note {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.ts-card__note {
+  font-size: var(--text-sm);
+}
+.ts-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.ts-field__label {
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+.ts-code {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.ts-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.ts-actions .cs-btn {
+  width: 100%;
+}
+@media (min-width: 560px) {
+  .ts {
+    padding: var(--space-6) var(--space-4);
+  }
+}
+
+/* Approve intent */
+.ts-value {
+  overflow-wrap: anywhere;
+}
+.ts-list {
+  margin: 0;
+  padding-left: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.ts-details > summary {
+  min-height: var(--target-min);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 600;
+}
+.ts-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.ts-details .cs-code {
+  max-width: 100%;
+}

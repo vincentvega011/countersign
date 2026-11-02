@@ -464,7 +464,7 @@
   },
   {
    "actor": "malicious agent",
-   "captured_minor": 0,
+   "captured_minor": 1100,
    "captures_without_log": 0,
    "case": "double_spend_across_protocols",
    "category": "double_spend_across_protocols",
@@ -476,10 +476,10 @@
    "matches_expectation": true,
    "mode": "full",
    "outcome": "blocked",
-   "paypal_authorizations": 0,
-   "paypal_calls": 0,
-   "paypal_captures": 0,
-   "paypal_orders": 0,
+   "paypal_authorizations": 1,
+   "paypal_calls": 11,
+   "paypal_captures": 1,
+   "paypal_orders": 1,
    "reason_code": "mandate_required",
    "side_effects": [],
    "unauthorized_captures": 0,
@@ -1221,8 +1221,8 @@
    "violations": []
   }
  ],
- "generated_at": "2026-11-01T06:33:16Z",
- "report": "20261101T063316Z/report.json",
+ "generated_at": "2026-11-02T07:53:40Z",
+ "report": "20261102T075340Z/report.json",
  "suite": "attacks",
  "summary": {
   "baseline": {

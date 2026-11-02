@@ -17,8 +17,16 @@ Recording is off unless you opt in:
     PAYPAL_RECORD_CASSETTES=1 uv run python scripts/record_cp_cassette.py
 
 Credentials come from the environment or the git-ignored .env (PAYPAL_API_BASE, PAYPAL_CLIENT_ID,
-PAYPAL_CLIENT_SECRET). The sandbox host is enforced. Nothing secret is printed. The authorization is
-left in the sandbox (it expires by itself); it is not captured and not voided.
+PAYPAL_CLIENT_SECRET). The sandbox host is enforced. Nothing secret is printed.
+
+Nothing is left open in the sandbox. The authorization the flow creates is not captured (the replay
+never captures); once the cassette is saved (or the run failed) the script VOIDS it, with a second
+client that is not recording, so the cassette holds exactly the calls the replay test makes and no
+more. The throwaway discovery order is never approved, so it holds no funds and PayPal lets it lapse.
+
+The mandates carry the mandatory `sub` (the customer id, `cus_` plus 22 characters, exactly the shape
+the Trusted Surface issuer writes), so the cassette and its fixture are valid for the verifier as it is
+now. The mandates are signed with throwaway keys; only the public keys are kept.
 """
 
 from __future__ import annotations
@@ -113,6 +121,23 @@ def discover_payee_merchant_id(config: PayPalConfig) -> str:
     return merchant_id
 
 
+def void_leftover(
+    config: PayPalConfig,
+    checkout_id: str,
+    authorization_id: str,
+    transport: httpx.BaseTransport | None = None,
+) -> bool:
+    """Void an authorization with a client that is NOT recording: the cassette is not touched."""
+    try:
+        with PayPalClient(config, transport=transport) as client:
+            client.void_authorization(checkout_id, authorization_id)
+        print(f"  voided authorization {authorization_id} (not recorded)")
+    except PayPalError as exc:
+        print(f"  could not void {authorization_id}: {exc}. It expires by itself.", file=sys.stderr)
+        return False
+    return True
+
+
 def approve(url: str) -> None:
     print()
     print("Approve the order as the sandbox buyer (a US-based sandbox account), then come back.")
@@ -151,6 +176,7 @@ def main() -> int:
         meta=meta,
     )
     fixture = build_fixture(checkout_id)
+    finished: object = None
     try:
         with PayPalClient(config, transport=transport) as client:
             provider = make_provider(engine, client, fixture, payee_merchant_id=merchant_id)
@@ -168,15 +194,20 @@ def main() -> int:
             f"Not saved: the flow ended with {type(finished).__name__}: {finished}", file=sys.stderr
         )
         return 1
-    transport.save(CASSETTE)
-    FIXTURE.write_text(fixture.to_json(), encoding="utf-8")
+    try:
+        transport.save(CASSETTE)
+        FIXTURE.write_text(fixture.to_json(), encoding="utf-8")
+    finally:
+        void_leftover(config, checkout_id, finished.authorization_id)
     print()
     print(f"Saved {CASSETTE.relative_to(ROOT)} and {FIXTURE.relative_to(ROOT)}")
     print(f"  checkout {checkout_id}")
     print(
         f"  order {finished.order_id}, authorization {finished.authorization_id}, {finished.amount}"
     )
-    print("The authorization was not captured. Check the files before you commit them.")
+    print(
+        "The authorization was voided after the recording. Check the files before you commit them."
+    )
     return 0
 
 

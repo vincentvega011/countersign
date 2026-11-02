@@ -55,6 +55,14 @@ REQUIRED = {
     "json-duplicate-key-header",
     "json-nan-payload",
     "json-duplicate-key-disclosure",
+    "valid-sub-128-chars",
+    "sub-missing",
+    "sub-empty",
+    "sub-padded",
+    "sub-too-long",
+    "sub-control-character",
+    "sub-not-a-string",
+    "sub-only-as-selective-disclosure",
 }
 
 

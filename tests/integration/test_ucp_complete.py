@@ -134,14 +134,14 @@ def mandates(stack: Stack, body: dict[str, Any], **kw: Any) -> tuple[str, str]:
             checkout_constraints()[1],
         ]
 
-    sub = kw.get("sub")
-
-    def edit_payload(payload: dict[str, Any]) -> None:
-        if sub is not None:
-            payload["sub"] = sub
+    # The issuer JWT always carries a `sub` now (Decision 47); `sub=` names the customer and `no_sub=True`
+    # builds the defect "no customer id", which the verifier refuses.
+    who: dict[str, Any] = {"sub": None} if kw.get("no_sub") else {}
+    if kw.get("sub") is not None:
+        who["sub"] = kw["sub"]
 
     cm = issue("checkout", keys=stack.keys, checkout_jwt_value=jwt, nonce="nc-1",
-               edit_open_content=edit_open, edit_open_payload=edit_payload)  # fmt: skip
+               edit_open_content=edit_open, **who)  # fmt: skip
     from countersign.canonical import sd_hash
 
     digest = sd_hash(cm.open_token)
@@ -154,7 +154,7 @@ def mandates(stack: Stack, body: dict[str, Any], **kw: Any) -> tuple[str, str]:
 
     pm = issue("payment", keys=stack.keys, audience="credential-provider", checkout_jwt_value=jwt,
                nonce="np-1", edit_open_content=edit_payment, edit_kb_content=edit_closed,
-               edit_open_payload=edit_payload)  # fmt: skip
+               **who)  # fmt: skip
     return cm.token, pm.token
 
 
