@@ -68,7 +68,7 @@ def reset(admin: Engine) -> None:
         conn.execute(
             text(
                 "TRUNCATE reservations, spend_entries, open_payment_mandates, "
-                "payment_attempts, payer_vault, attempt_mandates, mandate_revocations, "
+                "payment_attempts, payer_vault, attempt_mandates, open_mandate_revocations, "
                 "lock_events, lock_policies, webhook_events, "
                 "checkout_sessions, decision_log CASCADE"
             )

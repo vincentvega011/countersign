@@ -13,7 +13,6 @@ export const PURPOSE_CONSENT = "countersign.consent.open-mandates.v1";
 export const CHALLENGE_PURPOSE_CONSENT = "consent_open_mandates";
 export const RECORD_VERSION = 1;
 export const RECORD_SECONDS = 300;
-export const MAX_PROPOSAL_CHARS = 8192;
 
 const TEXT = /^[\x20-\x7e]{1,200}$/;
 const THUMBPRINT = /^[A-Za-z0-9_-]{43}$/;
@@ -44,29 +43,35 @@ const exactly = (value, members) =>
 
 export class ProposalError extends Error {}
 
-function fromBase64url(text) {
-  if (!/^[A-Za-z0-9_-]+$/.test(text)) throw new ProposalError("encoding");
-  const padded = text.split("-").join("+").split("_").join("/");
-  const binary = atob(padded + "=".repeat((4 - (padded.length % 4)) % 4));
-  return new TextDecoder("utf-8", { fatal: true }).decode(
-    Uint8Array.from(binary, (c) => c.charCodeAt(0)),
-  );
+export const PROPOSAL_ID = /^prp_[A-Za-z0-9_-]{16}$/;
+
+// `#proposal=<id>`: the short opaque id of a proposal the agent filed with the backend. Returns the id
+// or null when there is none; throws ProposalError for an id that is there but not an id.
+export function proposalIdFromHash(hash) {
+  const match = /^#proposal=([^&]*)$/.exec(hash);
+  if (match === null) return null;
+  if (!PROPOSAL_ID.test(match[1])) throw new ProposalError("proposal id");
+  return match[1];
 }
 
-// `#intent=<base64url of the proposal JSON>`. Returns the proposal object or null when there is none;
-// throws ProposalError for a proposal that is there but not usable.
-export function proposalFromHash(hash) {
-  const match = /^#intent=([^&]*)$/.exec(hash);
-  if (match === null) return null;
-  if (match[1].length === 0 || match[1].length > MAX_PROPOSAL_CHARS)
-    throw new ProposalError("size");
-  let value;
-  try {
-    value = JSON.parse(fromBase64url(match[1]));
-  } catch {
-    throw new ProposalError("json");
-  }
-  return checkProposal(value);
+// What the backend returns for a proposal id: the proposal plus its id and its own expiry. Returns the
+// proposal members only.
+export function proposalFromView(view) {
+  if (
+    !exactly(view, [
+      "proposal_id",
+      "items",
+      "ceiling_minor",
+      "currency",
+      "mandate_expires_at",
+      "agent_jwk",
+      "expires_us",
+    ])
+  )
+    throw new ProposalError("members");
+  // eslint-disable-next-line no-unused-vars
+  const { proposal_id, expires_us, ...proposal } = view;
+  return checkProposal(proposal);
 }
 
 // What an agent proposes: structured values only. Item ids and quantities, a ceiling, an expiry and

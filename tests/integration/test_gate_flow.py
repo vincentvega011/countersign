@@ -254,23 +254,29 @@ def test_g_amount_fails_when_the_authorized_amount_differs(
 
 def test_g_mandate_fails_when_the_open_payment_mandate_is_revoked(world: GateWorld) -> None:
     mandates, _ = world.authorize()
-    revoke_mandate(world.engine, _open_digest(mandates), lambda: 1)
+    revoke_mandate(world.engine, _open_digest(mandates), _checkout_identity(mandates), lambda: 1)
     outcome = run(world)
     assert outcome.reason == "mandate_revoked"
     assert_voided_and_released(world, outcome, "G-MANDATE")
 
 
 def _open_digest(mandates: Any) -> str:
-    from countersign.canonical import sd_hash
+    """The open payment mandate identity (the key of the budget row and of revocation)."""
+    from tests.mandate_issuer import open_identity
 
-    return sd_hash(mandates.payment.open_token)
+    return open_identity(mandates.payment.open_token, "payment")
+
+
+def _checkout_identity(mandates: Any) -> str:
+    from tests.mandate_issuer import open_identity
+
+    return open_identity(mandates.checkout.open_token, "checkout")
 
 
 def test_g_mandate_fails_when_the_checkout_open_mandate_is_revoked(world: GateWorld) -> None:
-    from countersign.canonical import sd_hash
-
     mandates, _ = world.authorize()
-    revoke_mandate(world.engine, sd_hash(mandates.checkout.open_token), lambda: 1)
+    # A revocation row names both identities of the pair, so either one finds it.
+    revoke_mandate(world.engine, "unrelated", _checkout_identity(mandates), lambda: 1)
     outcome = run(world)
     assert outcome.reason == "mandate_revoked"
     assert_voided_and_released(world, outcome, "G-MANDATE")
@@ -516,7 +522,7 @@ def test_a_mandate_revoked_between_authorize_and_capture_voids_and_releases_the_
     from countersign.merchant.pg_reservations import PostgresReservationStore
 
     mandates, _ = world.authorize()
-    revoke_mandate(world.engine, _open_digest(mandates), lambda: 1)
+    revoke_mandate(world.engine, _open_digest(mandates), _checkout_identity(mandates), lambda: 1)
     outcome = run(world)
     assert_voided_and_released(world, outcome, "G-MANDATE")
     # The open mandate is no longer reserved or consumed (so a new checkout may be tried) ...

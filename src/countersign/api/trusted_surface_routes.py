@@ -10,6 +10,7 @@ shape is logged by `reject_request` before the answer, like every other refusal 
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import APIRouter, FastAPI, Request
@@ -30,7 +31,7 @@ _NO_STORE = {"Cache-Control": "no-store"}
 _REVOKE_MEMBERS = frozenset(
     {"challenge_id", "customer_id", "target", "signer", "origin", "signature"}
 )
-_CONSENT_MEMBERS = frozenset({"record", "signature", "agent_jwk"})
+_CONSENT_MEMBERS = frozenset({"record", "signature", "proposal_id"})
 _REGISTER_MEMBERS = frozenset(
     {"jwk", "challenge_id", "customer_id", "origin", "signature", "authorizer"}
 )
@@ -201,7 +202,7 @@ def install(app: FastAPI, service: TrustedSurface) -> None:
                 done = service.consent(
                     record=body["record"],
                     signature=body["signature"],
-                    agent_jwk=body["agent_jwk"],
+                    proposal_id=body["proposal_id"],
                     origin_header=origin_header,
                 )
             except Refused as error:
@@ -209,6 +210,7 @@ def install(app: FastAPI, service: TrustedSurface) -> None:
             return JSONResponse(
                 {
                     "consent_id": done.consent_id,
+                    "open_mandate": done.open_mandate,
                     "customer_id": done.customer_id,
                     "agent_thumbprint": done.agent_thumbprint,
                     "expires_at": done.expires_at,
@@ -223,3 +225,215 @@ def install(app: FastAPI, service: TrustedSurface) -> None:
 
     app.include_router(consent_router)
     app.include_router(consent_get)
+    _install_lifecycle(app, service)
+
+
+PROPOSAL_MEMBERS = frozenset({"challenge_id", "agent_jwk", "proposal", "origin", "signature"})
+FETCH_MEMBERS = frozenset({"challenge_id", "origin", "signature"})
+OFFER_MEMBERS = frozenset({"checkout_id"})
+PURCHASE_MEMBERS = frozenset({"record", "signature"})
+SESSION_MEMBERS = frozenset(
+    {"challenge_id", "customer_id", "device_thumbprint", "origin", "signature"}
+)
+MANDATE_REVOKE_MEMBERS = frozenset(
+    {"challenge_id", "customer_id", "device_thumbprint", "open_mandate", "origin", "signature"}
+)
+
+
+def _install_lifecycle(app: FastAPI, service: TrustedSurface) -> None:
+    """Agent channel, Human Present purchase and activity routes (Decisions 87 to 92)."""
+    from countersign.trusted_surface import agent_channel, purchase
+
+    router = APIRouter(prefix="/trusted-surface")
+
+    def reply(run: Callable[[], JSONResponse]) -> Callable[[], JSONResponse]:
+        def wrapped() -> JSONResponse:
+            try:
+                return run()
+            except Refused as error:
+                return _refusal(error)
+
+        return wrapped
+
+    @router.post("/proposals")
+    async def propose(request: Request) -> JSONResponse:
+        raw = await _read(request)
+        origin_header = request.headers.get("origin")
+
+        def run() -> JSONResponse:
+            kind = agent_channel.LOG_KIND_PROPOSAL_REFUSED
+            body = _object(service, request, raw, kind)
+            if set(body) != PROPOSAL_MEMBERS:
+                raise service.reject_request("malformed_request", kind)
+            done = service.create_proposal(
+                challenge_id=body["challenge_id"], agent_jwk=body["agent_jwk"],
+                proposal=body["proposal"], origin=body["origin"], signature=body["signature"],
+                origin_header=origin_header,
+            )  # fmt: skip
+            return JSONResponse(
+                {
+                    "proposal_id": done.proposal_id,
+                    "expires_us": done.expires_us,
+                    "agent_thumbprint": done.agent_thumbprint,
+                },
+                status_code=201, headers=_NO_STORE,
+            )  # fmt: skip
+
+        return await run_in_threadpool(reply(run))
+
+    @router.get("/proposals/{proposal_id}")
+    def proposal(proposal_id: str) -> JSONResponse:
+        def run() -> JSONResponse:
+            view = service.view_proposal(proposal_id)
+            return JSONResponse(
+                {
+                    "proposal_id": view.proposal_id, "items": view.items,
+                    "ceiling_minor": view.ceiling_minor, "currency": view.currency,
+                    "mandate_expires_at": view.mandate_expires_at, "agent_jwk": view.agent_jwk,
+                    "expires_us": view.expires_us,
+                },
+                headers=_NO_STORE,
+            )  # fmt: skip
+
+        return reply(run)()
+
+    @router.post("/proposals/{proposal_id}/mandates")
+    async def mandates(proposal_id: str, request: Request) -> JSONResponse:
+        raw = await _read(request)
+        origin_header = request.headers.get("origin")
+
+        def run() -> JSONResponse:
+            kind = agent_channel.LOG_KIND_FETCH_REFUSED
+            body = _object(service, request, raw, kind)
+            if set(body) != FETCH_MEMBERS:
+                raise service.reject_request("malformed_request", kind)
+            done = service.fetch_mandates(
+                proposal_id=proposal_id, challenge_id=body["challenge_id"],
+                origin=body["origin"], signature=body["signature"], origin_header=origin_header,
+            )  # fmt: skip
+            return JSONResponse(
+                {
+                    "consent_id": done.consent_id, "customer_id": done.customer_id,
+                    "expires_at": done.expires_at, "checkout_mandate": done.checkout_mandate,
+                    "payment_mandate": done.payment_mandate,
+                },
+                headers=_NO_STORE,
+            )  # fmt: skip
+
+        return await run_in_threadpool(reply(run))
+
+    @router.post("/purchases/offer")
+    async def offer(request: Request) -> JSONResponse:
+        raw = await _read(request)
+
+        def run() -> JSONResponse:
+            body = _object(service, request, raw, purchase.LOG_KIND_REFUSED)
+            if set(body) != OFFER_MEMBERS:
+                raise service.reject_request("malformed_request", purchase.LOG_KIND_REFUSED)
+            done = service.create_offer(body["checkout_id"])
+            return JSONResponse(
+                {
+                    "offer_id": done.offer_id, "terms": done.terms,
+                    "checkout_hash": done.checkout_hash, "expires_us": done.expires_us,
+                },
+                status_code=201, headers=_NO_STORE,
+            )  # fmt: skip
+
+        return await run_in_threadpool(reply(run))
+
+    @router.post("/purchases/consent")
+    async def purchase_consent(request: Request) -> JSONResponse:
+        raw = await _read(request)
+        origin_header = request.headers.get("origin")
+
+        def run() -> JSONResponse:
+            kind = purchase.LOG_KIND_REFUSED
+            body = _object(service, request, raw, kind)
+            if set(body) != PURCHASE_MEMBERS:
+                raise service.reject_request("malformed_request", kind)
+            done = service.consent_purchase(
+                record=body["record"], signature=body["signature"], origin_header=origin_header
+            )
+            return JSONResponse(
+                {
+                    "consent_id": done.consent_id, "customer_id": done.customer_id,
+                    "checkout_id": done.checkout_id, "expires_at": done.expires_at,
+                    "checkout_mandate": done.checkout_mandate,
+                    "payment_mandate": done.payment_mandate,
+                },
+                status_code=201, headers=_NO_STORE,
+            )  # fmt: skip
+
+        return await run_in_threadpool(reply(run))
+
+    @router.post("/activity/session")
+    async def session(request: Request) -> JSONResponse:
+        raw = await _read(request)
+        origin_header = request.headers.get("origin")
+
+        def run() -> JSONResponse:
+            kind = "ts.activity.refused"
+            body = _object(service, request, raw, kind)
+            if set(body) != SESSION_MEMBERS:
+                raise service.reject_request("malformed_request", kind)
+            done = service.open_activity_session(
+                challenge_id=body["challenge_id"], customer_id=body["customer_id"],
+                device_thumbprint=body["device_thumbprint"], origin=body["origin"],
+                signature=body["signature"], origin_header=origin_header,
+            )  # fmt: skip
+            return JSONResponse(
+                {"token": done.token, "customer_id": done.customer_id, "expires_us": done.expires_us},
+                status_code=201, headers=_NO_STORE,
+            )  # fmt: skip
+
+        return await run_in_threadpool(reply(run))
+
+    @router.get("/activity")
+    async def activity_list(request: Request) -> JSONResponse:
+        header = request.headers.get("authorization", "")
+        token = header[7:] if header.startswith("Bearer ") else None
+
+        def run() -> JSONResponse:
+            done = service.read_activity(token)
+            return JSONResponse(
+                {
+                    "customer_id": done.customer_id,
+                    "now": done.now_s,
+                    "mandates": [
+                        {
+                            "id": m.id, "state": m.state, "ceiling_minor": m.ceiling_minor,
+                            "currency": m.currency, "exp": m.exp, "created_us": m.created_us,
+                            "agent_thumbprint": m.agent_thumbprint, "purchase": m.purchase,
+                        }
+                        for m in done.mandates
+                    ],
+                },
+                headers=_NO_STORE,
+            )  # fmt: skip
+
+        return await run_in_threadpool(reply(run))
+
+    @router.post("/activity/revoke")
+    async def mandate_revoke(request: Request) -> JSONResponse:
+        raw = await _read(request)
+        origin_header = request.headers.get("origin")
+
+        def run() -> JSONResponse:
+            kind = "ts.mandate.revoke.refused"
+            body = _object(service, request, raw, kind)
+            if set(body) != MANDATE_REVOKE_MEMBERS:
+                raise service.reject_request("malformed_request", kind)
+            done = service.revoke_open_mandate(
+                challenge_id=body["challenge_id"], customer_id=body["customer_id"],
+                device_thumbprint=body["device_thumbprint"], open_mandate=body["open_mandate"],
+                origin=body["origin"], signature=body["signature"], origin_header=origin_header,
+            )  # fmt: skip
+            return JSONResponse(
+                {"open_mandate": done.open_mandate, "revoked": True,
+                 "new_revocation": done.new_revocation},
+                status_code=201 if done.new_revocation else 200, headers=_NO_STORE,
+            )  # fmt: skip
+
+        return await run_in_threadpool(reply(run))
+
+    app.include_router(router)

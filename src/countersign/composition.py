@@ -164,7 +164,7 @@ def build_app(settings: RuntimeSettings, wiring: Wiring) -> FastAPI:
         webhooks=webhooks, runtime=settings,
         trusted_surface=TrustedSurface(
             engine, public_origin=base, clock_us=clock_us, platform_key=wiring.platform_key,
-            issuer=issuer,
+            issuer=issuer, merchant_key=key,
             merchant=Merchant(
                 wiring.merchant_constraint_id, str(wiring.payee.get("name", "")), base
             ),

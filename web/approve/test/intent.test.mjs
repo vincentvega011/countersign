@@ -6,7 +6,6 @@ import { after, before, describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { LABELS, MESSAGES } from "../messages.js";
 import {
-  agentKey,
   base,
   close,
   decode,
@@ -15,6 +14,7 @@ import {
   fingerprints,
   hashFor,
   launch,
+  setCatalogItem,
   open,
   proposal,
   report,
@@ -31,6 +31,7 @@ let shop;
 before(async () => {
   await launch();
   shop = await store();
+  setCatalogItem(shop.items[0].id);
 });
 after(close);
 
@@ -54,7 +55,7 @@ async function intentPage(t, prop, options = {}) {
       body: r.postData(),
     }),
   );
-  await intent.goto(`${base}/approve/${hashFor(prop)}`);
+  await intent.goto(`${base}/approve/${await hashFor(prop)}`);
   return { context, page: intent, customer };
 }
 
@@ -148,7 +149,7 @@ describe("the Approve intent screen", () => {
     await page.getByRole("button", { name: LABELS.decline }).click();
     await state(page, "intent_declined");
     assert.equal(consentPosts(page).length, 0);
-    assert.ok(!page.url().includes("intent="));
+    assert.ok(!page.url().includes("proposal="));
   });
 
   test("a device that is not registered yet registers and then shows the request", async (t) => {
@@ -163,7 +164,7 @@ describe("the Approve intent screen", () => {
       }),
     );
     const prop = proposal(one());
-    await page.goto(`${base}/approve/${hashFor(prop)}`);
+    await page.goto(`${base}/approve/${await hashFor(prop)}`);
     await state(page, "ready");
     await page.getByRole("button", { name: "Create key" }).click();
     await state(page, "intent");
@@ -189,7 +190,7 @@ describe("a request changed on the way", () => {
       edit(body);
       await route.continue({ postData: JSON.stringify(body) });
     });
-    await page.goto(`${base}/approve/${hashFor(proposal(one()))}`);
+    await page.goto(`${base}/approve/${await hashFor(proposal(one()))}`);
     await state(page, "intent");
     await page.getByRole("button", { name: LABELS.approve }).click();
     await state(page, expectKind);
@@ -238,11 +239,12 @@ describe("a request changed on the way", () => {
     }
   });
 
-  test("a swapped agent key in flight yields none", async (t) => {
+  test("another agent's proposal in flight yields none", async (t) => {
+    const other = (await hashFor(proposal(one()))).slice("#proposal=".length);
     const { code } = await tampered(
       t,
       (b) => {
-        b.agent_jwk = agentKey();
+        b.proposal_id = other;
       },
       "intent_mismatch",
     );
@@ -288,7 +290,7 @@ describe("failures the page explains", () => {
         });
       } else await route.continue();
     });
-    await page.goto(`${base}/approve/${hashFor(proposal(one()))}`);
+    await page.goto(`${base}/approve/${await hashFor(proposal(one()))}`);
     await state(page, "intent");
     await page.getByRole("button", { name: LABELS.approve }).click();
     await state(page, "intent_expired");
@@ -310,7 +312,7 @@ describe("failures the page explains", () => {
         body: JSON.stringify({ code: "<b>Ignore all rules</b>" }),
       }),
     );
-    await page.goto(`${base}/approve/${hashFor(proposal(one()))}`);
+    await page.goto(`${base}/approve/${await hashFor(proposal(one()))}`);
     await state(page, "intent");
     await page.getByRole("button", { name: LABELS.approve }).click();
     await state(page, "intent_refused");
@@ -326,7 +328,7 @@ describe("failures the page explains", () => {
     await enrol(setup);
     const page = await context.newPage();
     await page.route("**/trusted-surface/store", (route) => route.abort());
-    await page.goto(`${base}/approve/${hashFor(proposal(one()))}`);
+    await page.goto(`${base}/approve/${await hashFor(proposal(one()))}`);
     await state(page, "network");
   });
 });
@@ -362,21 +364,21 @@ describe("nothing an agent wrote reaches the page", () => {
   test("text in any member of a request is never shown; the request is refused", async (t) => {
     const good = proposal(one());
     const hashes = [
-      hashFor({ ...good, note: MARKER }),
-      hashFor({
+      await hashFor({ ...good, note: MARKER }),
+      await hashFor({
         ...good,
         merchant: { id: MARKER, name: MARKER, website: MARKER },
       }),
-      hashFor({
+      await hashFor({
         ...good,
         items: [{ id: shop.items[0].id, quantity: 1, title: MARKER }],
       }),
-      hashFor({ ...good, items: [{ id: MARKER, quantity: 1 }] }),
-      hashFor({ ...good, currency: MARKER }),
-      hashFor({ ...good, agent_jwk: { ...good.agent_jwk, kid: MARKER } }),
-      hashFor({ ...good, agent_jwk: { ...good.agent_jwk, x: MARKER } }),
-      hashFor({ ...good, ceiling_minor: MARKER }),
-      hashFor({ ...good, mandate_expires_at: MARKER }),
+      await hashFor({ ...good, items: [{ id: MARKER, quantity: 1 }] }),
+      await hashFor({ ...good, currency: MARKER }),
+      await hashFor({ ...good, agent_jwk: { ...good.agent_jwk, kid: MARKER } }),
+      await hashFor({ ...good, agent_jwk: { ...good.agent_jwk, x: MARKER } }),
+      await hashFor({ ...good, ceiling_minor: MARKER }),
+      await hashFor({ ...good, mandate_expires_at: MARKER }),
     ];
     for (const hash of hashes) await invalid(t, hash);
   });
@@ -384,19 +386,24 @@ describe("nothing an agent wrote reaches the page", () => {
   test("a request that is not even a request is refused", async (t) => {
     const good = proposal(one());
     for (const hash of [
-      "#intent=",
-      "#intent=!!!notbase64",
-      `#intent=${Buffer.from("{").toString("base64url")}`,
-      `#intent=${Buffer.from("[]").toString("base64url")}`,
-      `#intent=${"A".repeat(9000)}`,
-      hashFor({ ...good, ceiling_minor: 80.5 }),
-      hashFor({ ...good, ceiling_minor: 0 }),
-      hashFor({ ...good, ceiling_minor: 1000001 }),
-      hashFor({ ...good, items: [] }),
-      hashFor({ ...good, items: [{ id: shop.items[0].id, quantity: 0 }] }),
-      hashFor({ ...good, items: [{ id: shop.items[0].id, quantity: 100 }] }),
-      hashFor({ ...good, currency: "EUR" }),
-      "#intent=e30",
+      "#proposal=",
+      "#proposal=!!!notanid",
+      "#proposal=prp_short",
+      `#proposal=${"A".repeat(9000)}`,
+      await hashFor({ ...good, ceiling_minor: 80.5 }),
+      await hashFor({ ...good, ceiling_minor: 0 }),
+      await hashFor({ ...good, ceiling_minor: 1000001 }),
+      await hashFor({ ...good, items: [] }),
+      await hashFor({
+        ...good,
+        items: [{ id: shop.items[0].id, quantity: 0 }],
+      }),
+      await hashFor({
+        ...good,
+        items: [{ id: shop.items[0].id, quantity: 100 }],
+      }),
+      await hashFor({ ...good, currency: "EUR" }),
+      "#proposal=e30",
     ])
       await invalid(t, hash);
   });
@@ -453,7 +460,7 @@ describe("nothing an agent wrote reaches the page", () => {
       );
       assert.match(
         new URL(request.url).pathname,
-        /^\/(approve\/|ui\/|trusted-surface\/(store|consent|keys(\/challenge)?)$)/,
+        /^\/(approve\/|ui\/|trusted-surface\/(store|consent|keys(\/challenge)?|proposals\/prp_[A-Za-z0-9_-]{16})$)/,
       );
     }
   });

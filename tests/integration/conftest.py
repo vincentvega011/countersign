@@ -143,7 +143,7 @@ def clean_payments(admin_engine: Engine) -> None:
         conn.execute(
             text(
                 "TRUNCATE reservations, spend_entries, open_payment_mandates, "
-                "payment_attempts, payer_vault, attempt_mandates, mandate_revocations, "
+                "payment_attempts, payer_vault, attempt_mandates, open_mandate_revocations, "
                 "lock_events, lock_policies, webhook_events, "
                 "checkout_sessions, decision_log CASCADE"
             )
@@ -170,7 +170,8 @@ def clean_keys(admin_engine: Engine) -> None:
         conn.execute(
             text(
                 "TRUNCATE consent_records, key_revocations, key_challenge_uses, key_challenges, "
-                "customer_keys, decision_log CASCADE"
+                "customer_keys, open_mandate_revocations, purchase_offers, activity_sessions, "
+                "decision_log CASCADE"
             )
         )
 

@@ -349,14 +349,12 @@ What remains, stated plainly:
 - A refused cancel is a business outcome (HTTP 200 on UCP, 405 on ACP); a platform that wants to abandon
   a checkout must wait for the completion to end. The specs allow this ("cancellation can race completion").
 
-### L31. The open mandate digest depends on how the agent presents it (narrowed in P3.3)
+### L31. The open mandate digest depends on how the agent presents it (RESOLVED in P3.4)
 
-The identity used for single use, the budget row and a revocation is the digest of the serialization the
-agent presents. For mandates issued by the Trusted Surface this has one possible serialization: the issuer
-never makes a constraint element selectively disclosable and the mandate has one disclosure, the whole
-content ([PROTOCOL.md](PROTOCOL.md) Decision 84), and an unreferenced extra disclosure is refused. The
-Merchant reservation and the gate's revocation check use the digest pinned by `payment.reference`. What
-remains is the planned re-keying on a presentation-independent identity (P3.4), as defence in depth.
+Single use, the budget row and revocation now key on the issuer-signed identity of the mandate
+([PROTOCOL.md](PROTOCOL.md) Decision 86), not on the digest of the presented serialization. Residual: the AP2
+`payment.reference` constraint still pins the `sd_hash` of the presented open checkout mandate, as the spec says,
+so a rewritten checkout mandate fails that constraint instead of being treated as the same mandate.
 
 ### L32. The payer vault is keyed on the agent key only
 
@@ -412,13 +410,10 @@ yet. A customer whose only key is lost cannot revoke it (no other key can sign),
 recovery path: the old key stays registered and usable by whoever holds it, and the customer enrols again as
 a new customer (L36). A real deployment would pair revocation with the platform or merchant login (L35).
 
-### L40. The agent hands its request to the page through the address
+### L40. The agent hands its request to the page through the address (RESOLVED in P3.4)
 
-The Approve intent page reads the agent's request from the address fragment (`#intent=...`) and the agent
-has no channel yet to fetch the mandates it caused to be issued: the page shows them and the consent record
-stores them. The shopping agent end to end (P3.4) adds the retrieval path. The request carries only
-structured values and is never trusted: the store name and item titles come from the store, and the
-backend rebuilds and compares everything before it signs.
+The agent now files a proposal with the backend and collects the mandates with a proof of its key
+([PROTOCOL.md](PROTOCOL.md) Decision 87). The address carries only a short opaque id.
 
 ### L41. One consent is one purchase
 
@@ -426,3 +421,26 @@ The issued payment mandate has `payment.agent_recurrence` with `max_occurrences`
 ceiling, so one consent backs at most one purchase of at most the ceiling. Recurring or multi-purchase
 mandates would need a different constraint set and a different amount of care about the open mandate
 identity (L31), and are not offered.
+
+### L42. A proposal id is a bearer capability to consent
+
+Whoever has the id can open the page and consent to the agent's proposal as their own customer; the mandates then
+name that customer in `sub`, and only the agent key can fetch them. The terms are the agent's own proposal, so this
+cannot add authority, but it can put a different customer behind an agent's proposal. A real deployment would bind
+the proposal to a customer (an invitation). Proposals expire after 15 minutes.
+
+### L43. Approve purchase issues mandates and stops there
+
+The Human Present page shows the signed mandates; nothing completes the checkout with them yet (the shopping agent
+and demo store do, in P3.5 and later). A revoke does not void an authorization by itself: the next gate run or
+recovery does, and an unscheduled `recover` leaves it until then (L26).
+
+### L44. The activity screen reads only; keys and second devices are still API only
+
+Revoking a device key and adding a second device have no page (L36, L38 stay open). The activity token is a bearer
+token for 5 minutes; a stolen token can list a customer's approvals (it cannot revoke), and it stops working when the
+device key is revoked. `in_flight` and `used` are read from the payment tables, not from PayPal, until webhooks are live (L26).
+
+### L39 (note)
+
+L39 was removed when the two cassettes were re-recorded (Decision 85). The numbers are not reused or shifted.

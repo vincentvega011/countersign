@@ -8,7 +8,8 @@ import {
   ProposalError,
   buildRecord,
   checkStore,
-  proposalFromHash,
+  proposalFromView,
+  proposalIdFromHash,
   recordBytes,
   termsView,
 } from "./consent.js";
@@ -214,18 +215,19 @@ async function recreate() {
 
 // ------------------------------------------------------------------------------------ approve intent
 
-// The request an agent sent in the address (`#intent=...`), read once: a proposal, "invalid" if it is
-// there but not usable, or null. It is untrusted; it is validated, shown from fixed templates and
-// signed as part of the record, and the store checks it again.
-function readProposal() {
+// The proposal id an agent filed with the backend, read once from the address (`#proposal=<id>`): the
+// id, "invalid" if something is there that is not an id, or null. The id is only an address. The
+// proposal itself is loaded from the backend, validated, shown from fixed templates and signed as part
+// of the record, and the backend checks it again against what the agent stored.
+function readProposalId() {
   try {
-    return proposalFromHash(location.hash);
+    return proposalIdFromHash(location.hash);
   } catch (error) {
     if (error instanceof ProposalError) return "invalid";
     throw error;
   }
 }
-const pending = readProposal();
+const pending = readProposalId();
 
 function leaveRequest() {
   history.replaceState(null, "", location.pathname + location.search);
@@ -290,7 +292,11 @@ async function startIntent(ctx) {
   show("intent_loading");
   let challenge;
   let store;
+  let proposal;
   try {
+    proposal = proposalFromView(
+      await getJson(`/trusted-surface/proposals/${pending}`),
+    );
     store = checkStore(await getJson("/trusted-surface/store"));
     challenge = await postJson("/trusted-surface/keys/challenge", {
       purpose: CHALLENGE_PURPOSE_CONSENT,
@@ -300,6 +306,14 @@ async function startIntent(ctx) {
       show("intent_invalid", { tone: "danger" });
       return;
     }
+    if (
+      error instanceof DeviceKeyError &&
+      error.kind === "register_rejected" &&
+      Object.hasOwn(CONSENT_REFUSALS, error.code ?? "")
+    ) {
+      show(CONSENT_REFUSALS[error.code], { tone: "danger" });
+      return;
+    }
     fail(error, () => startIntent(ctx));
     return;
   }
@@ -307,7 +321,7 @@ async function startIntent(ctx) {
   let record;
   try {
     record = await buildRecord({
-      proposal: pending,
+      proposal,
       store,
       challenge,
       customerId: ctx.customerId,
@@ -371,7 +385,7 @@ async function approveIntent(ctx, record) {
     result = await postJson("/trusted-surface/consent", {
       record,
       signature,
-      agent_jwk: pending.agent_jwk,
+      proposal_id: pending,
     });
   } catch (error) {
     intentFailure(error, ctx);

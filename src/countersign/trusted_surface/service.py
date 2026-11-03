@@ -61,7 +61,9 @@ from countersign.canonical.jcs import JcsError, canonicalize
 from countersign.canonical.jsonstrict import loads_strict
 from countersign.catalog.catalog import Catalog, load_catalog
 from countersign.ledger import store as ledger_store
+from countersign.merchant.keys import MerchantKey
 from countersign.merchant.policy import policy_hash as ledger_policy_hash
+from countersign.openmandates import register_in
 from countersign.tables import (
     consent_records,
     customer_keys,
@@ -69,6 +71,7 @@ from countersign.tables import (
     key_challenges,
     key_revocations,
 )
+from countersign.trusted_surface import activity, agent_channel, purchase
 from countersign.trusted_surface.consent import (
     CHALLENGE_PURPOSE_CONSENT,
     MAX_RECORD_SECONDS,
@@ -97,7 +100,16 @@ log = structlog.get_logger("countersign.trusted_surface")
 CHALLENGE_PURPOSE = "register_device_key"
 CHALLENGE_PURPOSE_REVOKE = "revoke_device_key"
 CHALLENGE_PURPOSES = frozenset(
-    {CHALLENGE_PURPOSE, CHALLENGE_PURPOSE_REVOKE, CHALLENGE_PURPOSE_CONSENT}
+    {
+        CHALLENGE_PURPOSE,
+        CHALLENGE_PURPOSE_REVOKE,
+        CHALLENGE_PURPOSE_CONSENT,
+        "agent_proposal",
+        "agent_fetch",
+        "consent_checkout",
+        "activity_read",
+        "revoke_open_mandate",
+    }
 )
 CHALLENGE_TTL_US = 5 * 60 * 1_000_000
 CUSTOMER_ID = re.compile(r"cus_[A-Za-z0-9_-]{22}")
@@ -143,6 +155,23 @@ _STATUS = {
     "log_unavailable": 503,
     "unavailable": 503,
     "signing_unavailable": 503,
+    "proposal_unknown": 404,
+    "proposal_expired": 410,
+    "proposal_used": 409,
+    "consent_pending": 409,
+    "offer_unknown": 404,
+    "offer_expired": 410,
+    "offer_used": 409,
+    "checkout_unknown": 404,
+    "session_unknown": 401,
+    "session_expired": 401,
+    "open_mandate_unknown": 404,
+    "in_flight": 409,
+    "already_used": 409,
+    "checkout_not_ready": 409,
+    "checkout_expired": 410,
+    "checkout_changed": 409,
+    "merchant_authorization_invalid": 502,
 }
 
 
@@ -176,6 +205,7 @@ class Revoked:
 
 @dataclass(frozen=True)
 class Consented:
+    open_mandate: str  # the payment open mandate identity (Decision 86)
     consent_id: str
     customer_id: str
     agent_thumbprint: str
@@ -232,7 +262,9 @@ class TrustedSurface:
         issuer: str | None = None,
         merchant: Merchant | None = None,
         catalog: Catalog | None = None,
+        merchant_key: MerchantKey | None = None,
     ) -> None:
+        self._merchant_key = merchant_key
         self._engine = engine
         self._origin = normalize_origin(public_origin)  # a bad configuration stops the start
         self._clock_us = clock_us
@@ -247,6 +279,56 @@ class TrustedSurface:
     @property
     def origin(self) -> str:
         return origin_string(self._origin)
+
+    # The package's own helpers, public to the modules that extend this service.
+    @property
+    def engine(self) -> Engine:
+        return self._engine
+
+    def now_us(self) -> int:
+        return self._clock_us()
+
+    def refusal_for(self, code: str) -> Refused:
+        return refusal(code)
+
+    def check_origin(self, origin: object, header: str | None) -> None:
+        self._check_origin(origin, header)
+
+    def challenge(
+        self, conn: Any, challenge_id: str, purpose: str, now: int, nonce: str | None = None
+    ) -> Any:
+        return self._challenge(conn, challenge_id, purpose, now, nonce)
+
+    def consume(self, conn: Any, challenge_id: str, thumbprint: str, now: int) -> None:
+        self._consume(conn, challenge_id, thumbprint, now)
+
+    def append(self, conn: Any, kind: str, now: int, payload: dict[str, Any]) -> None:
+        self._append(conn, kind, now, payload)
+
+    def guard(self, kind: str, seen: _Seen, work: Callable[[], Any]) -> Any:
+        return self._guard(kind, seen, work)
+
+    def lock_customer(self, conn: Any, customer_id: str) -> None:
+        self._lock_customer(conn, customer_id)
+
+    def key_by_thumbprint(self, conn: Any, thumbprint: str) -> Any:
+        return self._key_by_thumbprint(conn, thumbprint)
+
+    @property
+    def merchant_key(self) -> MerchantKey | None:
+        return self._merchant_key
+
+    @property
+    def platform_key(self) -> ECKey | None:
+        return self._platform_key
+
+    @property
+    def issuer_name(self) -> str:
+        return self._issuer
+
+    @property
+    def merchant(self) -> Merchant:
+        return self._merchant
 
     @property
     def can_issue(self) -> bool:
@@ -643,13 +725,13 @@ class TrustedSurface:
         *,
         record: object,
         signature: object,
-        agent_jwk: object,
+        proposal_id: object,
         origin_header: str | None = None,
     ) -> Consented:
         seen = _Seen()
         result: Consented = self._guard(
             LOG_KIND_CONSENT_REFUSED, seen,
-            lambda: self._consent(seen, record, signature, agent_jwk, origin_header),
+            lambda: self._consent(seen, record, signature, proposal_id, origin_header),
         )  # fmt: skip
         return result
 
@@ -658,7 +740,7 @@ class TrustedSurface:
         seen: _Seen,
         raw: object,
         signature: object,
-        agent_jwk: object,
+        proposal_id: object,
         origin_header: str | None,
     ) -> Consented:
         if not isinstance(signature, str):
@@ -704,9 +786,23 @@ class TrustedSurface:
             if now_s >= parsed.expires_at:
                 raise refusal("consent_expired")
 
-            agent = validate_public_jwk(agent_jwk)
+            # The agent key comes from the stored proposal (Decision 87), never from the request.
+            proposal = agent_channel.load_proposal(self, conn, proposal_id)
+            if now_us >= int(proposal.created_us) + agent_channel.PROPOSAL_TTL_US:
+                raise refusal("proposal_expired")
+            agent = validate_public_jwk(loads_strict(str(proposal.agent_jwk).encode()))
             if agent.thumbprint != parsed.terms.agent_thumbprint:
                 raise ConsentRefused("agent_key_mismatch")
+            stored = loads_strict(str(proposal.terms).encode())
+            if not (
+                isinstance(stored, dict)
+                and stored["items"]
+                == [{"id": i["id"], "quantity": i["quantity"]} for i in parsed.terms.items]
+                and stored["ceiling_minor"] == parsed.terms.ceiling_minor
+                and stored["currency"] == parsed.terms.currency
+                and stored["mandate_expires_at"] == parsed.terms.mandate_expires_at
+            ):
+                raise ConsentRefused("consent_proposal_mismatch")
             validate_terms(
                 parsed.terms,
                 merchant=self._merchant.as_dict(),
@@ -754,9 +850,23 @@ class TrustedSurface:
                     created_us=now_us,
                 )
             )  # fmt: skip
+            register_in(
+                conn,
+                payment_identity=payment.identity,
+                checkout_identity=checkout.identity,
+                customer_id=parsed.customer_id,
+                consent_id=consent_id,
+                agent_thumbprint=agent.thumbprint,
+                ceiling_minor=parsed.terms.ceiling_minor,
+                currency=parsed.terms.currency,
+                exp=parsed.terms.mandate_expires_at,
+                now_us=now_us,
+            )
+            agent_channel.spend_proposal(self, conn, str(proposal.id), consent_id, now_us)
             self._append(
                 conn, LOG_KIND_CONSENT, now_us,
                 {
+                    "proposal_id": str(proposal.id), "open_mandate": payment.identity,
                     "consent_id": consent_id, "customer_id": parsed.customer_id,
                     "device_thumbprint": device.thumbprint, "agent_thumbprint": agent.thumbprint,
                     "challenge_id": seen.challenge_id,
@@ -766,6 +876,7 @@ class TrustedSurface:
                 },
             )  # fmt: skip
             return Consented(
+                payment.identity,
                 consent_id,
                 parsed.customer_id,
                 agent.thumbprint,
@@ -773,3 +884,29 @@ class TrustedSurface:
                 payment.token,
                 parsed.terms.mandate_expires_at,
             )
+
+    # ------------------------------------------------------------------ extensions (own modules)
+
+    def create_proposal(self, **kw: Any) -> agent_channel.Proposed:
+        return agent_channel.create_proposal(self, **kw)
+
+    def view_proposal(self, proposal_id: object) -> agent_channel.ProposalView:
+        return agent_channel.view_proposal(self, proposal_id)
+
+    def fetch_mandates(self, **kw: Any) -> agent_channel.Fetched:
+        return agent_channel.fetch_mandates(self, **kw)
+
+    def create_offer(self, checkout_id: object) -> purchase.Offer:
+        return purchase.create_offer(self, checkout_id)
+
+    def consent_purchase(self, **kw: Any) -> purchase.Purchased:
+        return purchase.consent_purchase(self, **kw)
+
+    def open_activity_session(self, **kw: Any) -> activity.Session:
+        return activity.open_session(self, **kw)
+
+    def read_activity(self, token: object) -> activity.Activity:
+        return activity.read_activity(self, token)
+
+    def revoke_open_mandate(self, **kw: Any) -> activity.MandateRevoked:
+        return activity.revoke_open_mandate(self, **kw)

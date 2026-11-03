@@ -138,9 +138,14 @@ vectors and the browser tests in `web/approve/test/`.
 | Use a mandate that names no customer | malicious agent, compromised issuer | `sub` is mandatory and read from the signed payload | `subject_missing` |
 | Make a revoked key valid again, or revoke another customer's key | malicious client | revocations are insert only; the signer must be a live key of the same customer | `key_revoked`, `signer_*`, `key_unknown` |
 | Two keys revoking each other so nobody can speak for a customer | malicious client | per-customer lock: exactly one revocation wins | `signer_revoked` |
+| Present a used open mandate again, rewritten (new nonce, checkout, key binding or `(r, n - s)` signature) | malicious agent | single use, the budget row and revocation key on the issuer-signed identity (Decision 86) | `open_mandate_in_use`, `mandate_scope_mismatch` |
+| Buy after the customer revoked, or revoke racing the capture | malicious agent, customer | revocation checked at reservation, before authorizing and at the claim under the open mandate's row lock; a started capture answers `in_flight` and nothing is written | `mandate_revoked`, `in_flight` |
+| Collect another agent's mandates, or consent on its behalf | stolen proposal id, other agent | the agent key stored with the proposal must sign a fresh single use challenge; the id is only an address | `proof_invalid`, `challenge_used` |
+| Sign a checkout that differs from the merchant's | page script, proxy | terms come from the VERIFIED merchant JWT; the backend rebuilds terms and mandates and compares bytes; changed, expired or unready checkouts yield nothing | `consent_claims_mismatch`, `checkout_changed` |
+| Read or revoke another customer's approvals, or revoke with a stolen token | malicious client, token thief | reading needs a device-key proof (5 minute token, hash stored); revoking needs its own signature naming the mandate; other customers' mandates look nonexistent | `session_*`, `proof_invalid`, `open_mandate_unknown` |
 
 Invariants: INV-1 (all checks deterministic, no model input), INV-2 (non-agentic page, non-extractable key, no
-agent text), INV-6 (single use nonce), INV-8 (strict JSON and JCS), INV-9 (integer minor units), INV-10 (fail
+agent text), INV-6 (single use nonce and open mandate identity), INV-8 (strict JSON and JCS), INV-9 (integer minor units), INV-10 (fail
 closed, including a log failure), INV-12 (log before answer).
 
 - **Not defended.** A person who is shown a faithful request can still approve a bad one; the page shows

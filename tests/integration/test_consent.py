@@ -49,10 +49,13 @@ from tests.surface_support import (
     consent_body,
     consent_record_for,
     mandate_twin,
+    proposal_body_for,
+    proposal_of,
     terms_for,
 )
 
 CONSENT = "/trusted-surface/consent"
+PROPOSALS = "/trusted-surface/proposals"
 START_S = START // 1_000_000
 SCHEMAS = Path(__file__).resolve().parents[2] / "spec/vendor/ap2/schemas/ap2"
 ITEMS = load_catalog().items
@@ -82,12 +85,51 @@ def client(app_engine: Engine, surface: TrustedSurface, clock: Clock) -> Iterato
 
 
 class Setup:
-    def __init__(self, client: TestClient) -> None:
+    def __init__(self, client: TestClient, engine: Engine | None = None) -> None:
         self.client = client
+        self.engine = engine
         self.device, self.cid = customer(client)
-        self.agent = ECKey.generate_key("P-256")
+        self.agent = ECKey.generate_key(
+            "P-256"
+        )  # signs key bindings in the tests that bind mandates
         self.agent_jwk = public_jwk(self.agent)
+        self.agent_device = Device(private=self.agent.raw_value)  # the same key, signing proposals
         self.exp = START_S + 7 * 86400
+
+    def proposal(self, terms: dict[str, Any], agent: Device | None = None) -> str:
+        """A proposal for these terms through the endpoint (signed by `agent`).
+
+        A test that exercises a consent refusal for terms the endpoint would itself refuse (an item
+        outside the catalog, an expiry out of range) gets the proposal inserted directly instead: what
+        is under test is the consent check, which must not trust the proposal's own validation.
+        """
+        who = agent or self.agent_device
+        proposal = proposal_of(terms)
+        issued = challenge_for(self.client, "agent_proposal")
+        r = self.client.post(PROPOSALS, json=proposal_body_for(who, issued, proposal))
+        if r.status_code == 201:
+            return str(r.json()["proposal_id"])
+        assert code(r) == "proposal_invalid", r.text
+        assert self.engine is not None
+        import secrets
+
+        from sqlalchemy import text as sql
+
+        pid = "prp_" + secrets.token_urlsafe(12)
+        with self.engine.begin() as conn:
+            conn.execute(
+                sql(
+                    "INSERT INTO agent_proposals (id, challenge_id, agent_thumbprint, agent_jwk, "
+                    "terms, signature, created_us) VALUES (:i, :c, :t, :j, :m, 'x', :u)"
+                ),
+                {
+                    "i": pid, "c": issued["challenge_id"], "t": who.thumbprint,
+                    "j": json.dumps(who.jwk, sort_keys=True, separators=(",", ":")),
+                    "m": json.dumps(proposal, sort_keys=True, separators=(",", ":")),
+                    "u": START,
+                },
+            )  # fmt: skip
+        return pid
 
     def terms(self, **kw: Any) -> dict[str, Any]:
         return terms_for(self.agent_jwk, mandate_exp=kw.pop("mandate_exp", self.exp), **kw)
@@ -98,18 +140,19 @@ class Setup:
     def body(self, **kw: Any) -> dict[str, Any]:
         terms = kw.pop("terms", None) or self.terms()
         issued = kw.pop("issued", None) or self.issued()
-        agent_jwk = kw.pop("agent_jwk", self.agent_jwk)
+        proposer = kw.pop("proposer", None)
         signer = kw.pop("sign_with", None)
+        proposal_id = kw.pop("proposal_id", None) or self.proposal(terms, proposer)
         record = consent_record_for(self.device, self.cid, issued, terms, **kw)
-        return consent_body(self.device, record, agent_jwk, sign_with=signer)
+        return consent_body(self.device, record, proposal_id, sign_with=signer)
 
     def post(self, body: dict[str, Any], **headers: str) -> Any:
         return self.client.post(CONSENT, json=body, headers=headers)
 
 
 @pytest.fixture
-def setup(client: TestClient) -> Setup:
-    return Setup(client)
+def setup(client: TestClient, app_engine: Engine) -> Setup:
+    return Setup(client, app_engine)
 
 
 def decode(part: str) -> Any:
@@ -249,8 +292,8 @@ def nothing_issued(admin_engine: Engine, response: Any) -> None:
 def test_no_consent_means_no_mandate(setup: Setup, admin_engine: Engine) -> None:
     for body in (
         {},
-        {"record": {}, "signature": "x", "agent_jwk": setup.agent_jwk},
-        {"record": setup.body()["record"], "agent_jwk": setup.agent_jwk},
+        {"record": {}, "signature": "x", "proposal_id": "prp_AAAAAAAAAAAAAAAA"},
+        {"record": setup.body()["record"], "proposal_id": "prp_AAAAAAAAAAAAAAAA"},
         {**setup.body(), "signature": ""},
         {**setup.body(), "signature": "A" * 86},
     ):
@@ -361,14 +404,18 @@ def test_a_record_with_a_member_added_after_signing_is_refused(setup: Setup) -> 
     assert code(setup.post(body)) == "consent_malformed"
 
 
-def test_a_tampered_agent_key_in_the_request_is_refused(setup: Setup, admin_engine: Engine) -> None:
-    other = public_jwk(ECKey.generate_key("P-256"))
-    r = setup.post(setup.body(agent_jwk=other))
+def test_a_proposal_from_another_agent_key_is_refused(setup: Setup, admin_engine: Engine) -> None:
+    """The agent key comes from the stored proposal, never from the request (Decision 87)."""
+    r = setup.post(setup.body(proposer=Device()))
     assert r.status_code == 400 and code(r) == "agent_key_mismatch"
     nothing_issued(admin_engine, r)
-    for bad in ({**setup.agent_jwk, "d": "x" * 43}, {**setup.agent_jwk, "alg": "ES256"}, "x", None):
-        r = setup.post(setup.body(agent_jwk=bad))
-        assert code(r).startswith("jwk_"), (bad, r.text)
+
+
+def test_a_proposal_for_other_terms_is_refused(setup: Setup, admin_engine: Engine) -> None:
+    other_terms = setup.terms(ceiling=7000)
+    r = setup.post(setup.body(proposal_id=setup.proposal(other_terms)))
+    assert r.status_code == 400 and code(r) == "consent_proposal_mismatch"
+    nothing_issued(admin_engine, r)
 
 
 # ------------------------------------------------------------------------------------ the device key
@@ -380,7 +427,7 @@ def test_a_consent_signed_by_an_unregistered_key_is_refused(
     stranger = Device()
     issued = setup.issued()
     record = consent_record_for(stranger, setup.cid, issued, setup.terms())
-    r = setup.post(consent_body(stranger, record, setup.agent_jwk))
+    r = setup.post(consent_body(stranger, record, setup.proposal(setup.terms())))
     assert r.status_code == 403 and code(r) == "device_key_unknown"
     nothing_issued(admin_engine, r)
 
@@ -392,15 +439,17 @@ def test_a_consent_signed_by_another_customers_key_is_refused(
     issued = setup.issued()
     # their key, our customer id
     record = consent_record_for(other, setup.cid, issued, setup.terms())
-    r = setup.post(consent_body(other, record, setup.agent_jwk))
+    r = setup.post(consent_body(other, record, setup.proposal(setup.terms())))
     assert r.status_code == 403 and code(r) == "device_key_customer_mismatch"
     # our key named, their key signing
     record = consent_record_for(setup.device, setup.cid, setup.issued(), setup.terms())
-    r = setup.post(consent_body(setup.device, record, setup.agent_jwk, sign_with=other))
+    r = setup.post(
+        consent_body(setup.device, record, setup.proposal(setup.terms()), sign_with=other)
+    )
     assert code(r) == "consent_signature_invalid"
     # their customer id with our key
     record = consent_record_for(setup.device, other_cid, setup.issued(), setup.terms())
-    r = setup.post(consent_body(setup.device, record, setup.agent_jwk))
+    r = setup.post(consent_body(setup.device, record, setup.proposal(setup.terms())))
     assert code(r) == "device_key_customer_mismatch"
 
 
@@ -414,7 +463,9 @@ def test_a_consent_signed_by_a_revoked_key_is_refused(
     nothing_issued(admin_engine, r)
     # the customer's other key still works
     record = consent_record_for(second, setup.cid, setup.issued(), setup.terms())
-    assert setup.post(consent_body(second, record, setup.agent_jwk)).status_code == 201
+    assert (
+        setup.post(consent_body(second, record, setup.proposal(setup.terms()))).status_code == 201
+    )
 
 
 def test_the_stored_key_verifies_not_one_from_the_request(setup: Setup) -> None:
@@ -628,7 +679,7 @@ def race_consent(surface: TrustedSurface, bodies: list[dict[str, Any]]) -> list[
         gate.wait()
         try:
             surface.consent(
-                record=body["record"], signature=body["signature"], agent_jwk=body["agent_jwk"]
+                record=body["record"], signature=body["signature"], proposal_id=body["proposal_id"]
             )
         except Refused as error:
             return error.code
@@ -642,7 +693,7 @@ def test_exactly_one_of_many_simultaneous_consents_on_one_nonce_wins(
     surface: TrustedSurface, client: TestClient, admin_engine: Engine
 ) -> None:
     for _ in range(3):
-        setup = Setup(client)
+        setup = Setup(client, surface._engine)
         issued = setup.issued()
         results = race_consent(surface, [setup.body(issued=issued) for _ in range(10)])
         assert results.count("ok") == 1, results
@@ -662,7 +713,7 @@ def test_consent_waits_for_the_customer_lock_so_it_serializes_with_a_revocation(
 
     def work() -> Any:
         return surface.consent(
-            record=body["record"], signature=body["signature"], agent_jwk=body["agent_jwk"]
+            record=body["record"], signature=body["signature"], proposal_id=body["proposal_id"]
         )
 
     assert blocked_until_released(admin_engine, setup.cid, work).customer_id == setup.cid
@@ -745,7 +796,7 @@ def test_without_a_platform_signing_key_nothing_is_issued_and_the_nonce_is_kept(
         clock_us=clock, trusted_surface=surface,
     )  # fmt: skip
     with TestClient(app, raise_server_exceptions=False) as c:
-        setup = Setup(c)
+        setup = Setup(c, app_engine)
         body = setup.body()
         r = c.post(CONSENT, json=body)
         assert r.status_code == 503 and code(r) == "signing_unavailable"

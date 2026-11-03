@@ -21,6 +21,8 @@ ORIGIN = "https://surface.example.test"
 PURPOSE = "countersign.device-key.register.v1"
 PURPOSE_REVOKE = "countersign.device-key.revoke.v1"
 PURPOSE_CONSENT = "countersign.consent.open-mandates.v1"
+PURPOSE_PROPOSAL = "countersign.agent.proposal.v1"
+PURPOSE_FETCH = "countersign.agent.fetch.v1"
 BASE = "/trusted-surface/keys"
 
 
@@ -268,12 +270,240 @@ def consent_record_for(
 def consent_body(
     device: Device,
     record: dict[str, Any],
-    agent_jwk: dict[str, Any],
+    proposal_id: str,
     *,
     sign_with: Device | None = None,
 ) -> dict[str, Any]:
     return {
         "record": record,
         "signature": (sign_with or device).sign(canonicalize(record)),
-        "agent_jwk": agent_jwk,
+        "proposal_id": proposal_id,
+    }
+
+
+# ------------------------------------------------------------------------------------ agent channel
+
+
+def proposal_of(terms: dict[str, Any]) -> dict[str, Any]:
+    """The structured proposal an agent would send for these consent terms."""
+    return {
+        "items": [{"id": i["id"], "quantity": i["quantity"]} for i in terms["items"]],
+        "ceiling_minor": terms["ceiling_minor"],
+        "currency": terms["currency"],
+        "mandate_expires_at": terms["mandate_expires_at"],
+    }
+
+
+def proposal_record_for(
+    issued: dict[str, Any],
+    agent: Device,
+    proposal: dict[str, Any],
+    *,
+    origin: str = ORIGIN,
+    override: dict[str, Any] | None = None,
+) -> bytes:
+    fields: dict[str, Any] = {
+        "v": 1,
+        "purpose": PURPOSE_PROPOSAL,
+        "challenge_id": issued["challenge_id"],
+        "challenge": issued["nonce"],
+        "agent_thumbprint": agent.thumbprint,
+        "origin": origin,
+        "proposal": proposal,
+    }
+    fields.update(override or {})
+    return canonicalize(fields)
+
+
+def proposal_body_for(
+    agent: Device,
+    issued: dict[str, Any],
+    proposal: dict[str, Any],
+    *,
+    sign_with: Device | None = None,
+    origin: str = ORIGIN,
+    override: dict[str, Any] | None = None,
+    body_override: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    record = proposal_record_for(issued, agent, proposal, origin=origin, override=override)
+    body: dict[str, Any] = {
+        "challenge_id": issued["challenge_id"],
+        "agent_jwk": agent.jwk,
+        "proposal": proposal,
+        "origin": origin,
+        "signature": (sign_with or agent).sign(record),
+    }
+    body.update(body_override or {})
+    return body
+
+
+def fetch_record_for(
+    issued: dict[str, Any],
+    agent: Device,
+    proposal_id: str,
+    *,
+    origin: str = ORIGIN,
+    override: dict[str, Any] | None = None,
+) -> bytes:
+    fields: dict[str, Any] = {
+        "v": 1,
+        "purpose": PURPOSE_FETCH,
+        "challenge_id": issued["challenge_id"],
+        "challenge": issued["nonce"],
+        "agent_thumbprint": agent.thumbprint,
+        "origin": origin,
+        "proposal_id": proposal_id,
+    }
+    fields.update(override or {})
+    return canonicalize(fields)
+
+
+def fetch_body_for(
+    signer: Device,
+    issued: dict[str, Any],
+    proposal_id: str,
+    *,
+    agent: Device | None = None,
+    origin: str = ORIGIN,
+    override: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """A fetch body signed by `signer` over the record that names `agent` (default: the signer)."""
+    record = fetch_record_for(
+        issued, agent or signer, proposal_id, origin=origin, override=override
+    )
+    return {
+        "challenge_id": issued["challenge_id"],
+        "origin": origin,
+        "signature": signer.sign(record),
+    }
+
+
+# ------------------------------------------------------------------------------------ purchase
+
+PURPOSE_CHECKOUT = "countersign.consent.checkout.v1"
+
+
+def closed_twin(terms: dict[str, Any], checkout_hash: str, issued_at: int) -> dict[str, Any]:
+    """The closed mandate contents for an offer, written independently of the backend."""
+    exp = min(int(terms["checkout_expires_at"]), issued_at + 900)
+    merchant = dict(terms["merchant"])
+    return {
+        "checkout": {"vct": "mandate.checkout.1", "checkout_hash": checkout_hash, "exp": exp},
+        "payment": {
+            "vct": "mandate.payment.1",
+            "transaction_id": checkout_hash,
+            "payee": merchant,
+            "payment_amount": {"amount": terms["total_minor"], "currency": terms["currency"]},
+            "payment_instrument": {
+                "id": "wallet",
+                "type": "wallet",
+                "description": "Payment wallet",
+            },
+            "exp": exp,
+        },
+    }
+
+
+def purchase_record_for(
+    device: Device,
+    customer_id: str,
+    issued: dict[str, Any],
+    offer: dict[str, Any],
+    *,
+    origin: str = ORIGIN,
+    lifetime: int = 300,
+    terms: dict[str, Any] | None = None,
+    mandate: dict[str, Any] | None = None,
+    override: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    start = int(issued["issued_at"])
+    shown = terms if terms is not None else offer["terms"]
+    record: dict[str, Any] = {
+        "v": 1,
+        "purpose": PURPOSE_CHECKOUT,
+        "customer_id": customer_id,
+        "device_thumbprint": device.thumbprint,
+        "challenge_id": issued["challenge_id"],
+        "challenge": issued["nonce"],
+        "issued_at": start,
+        "expires_at": start + lifetime,
+        "origin": origin,
+        "offer_id": offer["offer_id"],
+        "terms": shown,
+        "mandate": mandate
+        if mandate is not None
+        else closed_twin(offer["terms"], offer["checkout_hash"], start),
+    }
+    record.update(override or {})
+    return record
+
+
+def purchase_body(
+    device: Device, record: dict[str, Any], *, sign_with: Device | None = None
+) -> dict[str, Any]:
+    return {"record": record, "signature": (sign_with or device).sign(canonicalize(record))}
+
+
+# ------------------------------------------------------------------------------------ activity
+
+PURPOSE_READ = "countersign.activity.read.v1"
+PURPOSE_MANDATE_REVOKE = "countersign.open-mandate.revoke.v1"
+
+
+def read_body(
+    device: Device,
+    issued: dict[str, Any],
+    customer_id: str,
+    *,
+    sign_with: Device | None = None,
+    origin: str = ORIGIN,
+    override: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    fields: dict[str, Any] = {
+        "v": 1,
+        "purpose": PURPOSE_READ,
+        "challenge_id": issued["challenge_id"],
+        "challenge": issued["nonce"],
+        "customer_id": customer_id,
+        "device_thumbprint": device.thumbprint,
+        "origin": origin,
+    }
+    fields.update(override or {})
+    return {
+        "challenge_id": issued["challenge_id"],
+        "customer_id": customer_id,
+        "device_thumbprint": device.thumbprint,
+        "origin": origin,
+        "signature": (sign_with or device).sign(canonicalize(fields)),
+    }
+
+
+def mandate_revoke_body(
+    device: Device,
+    issued: dict[str, Any],
+    customer_id: str,
+    open_mandate: str,
+    *,
+    sign_with: Device | None = None,
+    origin: str = ORIGIN,
+    override: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    fields: dict[str, Any] = {
+        "v": 1,
+        "purpose": PURPOSE_MANDATE_REVOKE,
+        "challenge_id": issued["challenge_id"],
+        "challenge": issued["nonce"],
+        "customer_id": customer_id,
+        "device_thumbprint": device.thumbprint,
+        "open_mandate": open_mandate,
+        "origin": origin,
+    }
+    fields.update(override or {})
+    return {
+        "challenge_id": issued["challenge_id"],
+        "customer_id": customer_id,
+        "device_thumbprint": device.thumbprint,
+        "open_mandate": open_mandate,
+        "origin": origin,
+        "signature": (sign_with or device).sign(canonicalize(fields)),
     }

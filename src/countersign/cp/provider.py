@@ -66,6 +66,7 @@ from countersign.merchant.reservations import (
     Reservation,
     ReservationRequest,
 )
+from countersign.openmandates import revoked_in
 from countersign.paypal.client import PayPalClient
 from countersign.paypal.errors import PayPalError
 from countersign.paypal.models import (
@@ -298,6 +299,11 @@ class CredentialProvider:
         currency, amount = verified.total.currency, verified.total.minor
         with self._engine.begin() as conn:
             self._ledger.lock(conn, verified.open_payment_digest, currency)
+            # Revocation, under the open mandate's row lock (Decision 88): a revoke that committed
+            # before this point is seen; one that arrives later waits for this transaction.
+            revoked = revoked_in(
+                conn, [verified.open_payment_digest, verified.checkout_chain.identity]
+            )
             spend = self._ledger.view(conn, verified.open_payment_digest, currency)
             result = self._evaluator.evaluate_payment(
                 payment_chain=verified.payment_chain,
@@ -305,7 +311,9 @@ class CredentialProvider:
                 spend=spend,
                 now=now,
             )
-            if not isinstance(result, ConstraintOutcome) or result.satisfied is not True:
+            if revoked:
+                rejection = CpRejection("C5", "mandate_revoked", MANDATE_SCOPE_MISMATCH)
+            elif not isinstance(result, ConstraintOutcome) or result.satisfied is not True:
                 ok_shape = isinstance(result, ConstraintOutcome)
                 unresolved = ok_shape and result.unresolved is True
                 detail = (
@@ -551,6 +559,7 @@ class CredentialProvider:
                 raise CpRejection("C8", f"order_not_approvable:{order.status.lower()}"[:60],
                                   MANDATE_SCOPE_MISMATCH)  # fmt: skip
             if not self._config.ablations.no_preauth_check:
+                self._check_not_revoked(row.mandate_digest)
                 problem = check_terms(
                     order, current, custom_id=row.custom_id,
                     payee_merchant_id=self._config.paypal_payee_merchant_id,
@@ -576,6 +585,12 @@ class CredentialProvider:
                 CpRejection("C8", "internal_error", PAYMENT_FAILED), "", checkout_id,
                 attempt.payment_reference, cleaned=True,
             )  # fmt: skip
+
+    def _check_not_revoked(self, payment_identity: str) -> None:
+        """The pre-authorize revocation check (Decision 88): reads fresh, never from a cache."""
+        with self._engine.connect() as conn:
+            if revoked_in(conn, [payment_identity]):
+                raise CpRejection("C8", "preauthorize_mandate_revoked", MANDATE_SCOPE_MISMATCH)
 
     def _authorize(self, checkout_id: str, order_id: str) -> None:
         """Authorize with the deterministic Request-Id; resolve an unknown outcome by GET first."""

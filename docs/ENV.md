@@ -398,15 +398,28 @@ length, gallery image limits and count.
 
 ## 6. Model provider
 
-Fallback, written because no provider is chosen yet:
+Checked 2026-11-03. The provider and model are NOT chosen yet (open until P3.6); the gateway (P3.5) is
+provider-agnostic and takes `LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY` from the environment
+([PROTOCOL.md](PROTOCOL.md) Decisions 94 to 97). `.env.example` keeps them empty.
 
-- The LLM provider and model ids are chosen at P3.5, when the shopping agent and assistant are
-  built. They are not chosen now.
-- The gateway is provider-agnostic: no verification, gate or lock code depends on a model
-  (INV-1), and model calls sit behind the `llm` module interface.
-- `.env.example` keeps `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_MODEL_AGENT` and `LLM_MODEL_ASSISTANT`
-  as empty placeholders.
-- Record and replay for model calls is built and checked at P3.5 with the provider chosen then.
+- **Gemini, OpenAI compatibility.** Base URL `https://generativelanguage.googleapis.com/v1beta/openai/`, chat
+  completions at `.../chat/completions`, `Authorization: Bearer <key>`. Structured output is documented only
+  through the SDK parse helper; a raw `response_format` body, `seed` and `temperature` are not documented on
+  that page. Stable text models listed: `gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`
+  (`gemini-3.8-flash` is badged New). No per-model free-tier numbers on the docs pages (AI Studio shows them).
+- **Groq.** Base URL `https://api.groq.com/openai/v1`, `Authorization: Bearer <key>`. `json_schema` (strict)
+  on `openai/gpt-oss-20b`, `openai/gpt-oss-120b` and some preview models; JSON mode for the others. Temperature
+  0 is sent as `1e-8`; `seed` is not documented. Production text models listed: `llama-3.1-8b-instant`,
+  `llama-3.3-70b-versatile`, `openai/gpt-oss-120b`, `openai/gpt-oss-20b`. Rate-limit table (unlabelled plan, likely
+  free): 30 requests per minute, 1K per day, 8K tokens per minute for the gpt-oss models; the pages disagree with
+  each other, so read the account limits page.
+- Sources: <https://ai.google.dev/gemini-api/docs/openai>, <https://ai.google.dev/gemini-api/docs/models>,
+  <https://ai.google.dev/gemini-api/docs/rate-limits> (each redirects to aistudio.google.com/docs/...),
+  <https://console.groq.com/docs/openai>, <https://console.groq.com/docs/models>,
+  <https://console.groq.com/docs/rate-limits>, <https://console.groq.com/docs/structured-outputs>.
+  The model ids move quickly; confirm them in the console before recording.
+- Defaults are therefore conservative: 10 calls per minute, 50 calls per run, `json_object` with the schema in
+  the prompt, and an automatic step down to plain text if the endpoint refuses `response_format`.
 
 ## 7. Running the spikes
 

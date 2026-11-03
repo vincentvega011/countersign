@@ -181,7 +181,7 @@ def verify_payment(
         total=total,
         payment_reference=payment.final.digest,
         checkout_reference=checkout.final.digest,
-        open_payment_digest=payment.links[0].digest,
+        open_payment_digest=payment.identity,
         principal=payment.links[0].cnf_thumbprint,
         customer_id=_customer(payment, checkout),
     )

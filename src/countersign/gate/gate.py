@@ -417,7 +417,7 @@ class CaptureGate:
             )  # fmt: skip
         except CpRejection as rejection:
             raise GateFailure(G_MANDATE, f"verify:{rejection.reason}") from None
-        opens = [verified.open_payment_digest, verified.checkout_chain.links[0].digest]
+        opens = [verified.open_payment_digest, verified.checkout_chain.identity]
         if self._store.revoked(opens):
             raise GateFailure(G_MANDATE, "mandate_revoked")
         held = self._store.reservation_rows(run.checkout_id)
@@ -491,6 +491,8 @@ class CaptureGate:
             return True
         if reason == "lost_claim":
             return False
+        if reason == "mandate_revoked":
+            raise GateFailure(G_MANDATE, "mandate_revoked")
         raise GateFailure(G_CHECKOUT, reason)
 
     def _confirm_and_finalize(self, run: _Run, capture_id: str, expected: Money) -> GateOutcome:

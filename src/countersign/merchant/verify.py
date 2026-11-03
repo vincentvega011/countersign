@@ -304,7 +304,7 @@ class CheckoutMandateVerifier:
             raise Rejection("M8", "nonce_scope_unavailable", MANDATE_INVALID_SIGNATURE)
         try:
             return self._store.reserve(
-                ReservationRequest(current.id, session_hash, first.digest, scope)
+                ReservationRequest(current.id, session_hash, chain.identity, scope)
             )
         except AlreadyReservedError as error:
             raise Rejection("M8", error.reason, MANDATE_SCOPE_MISMATCH) from None
@@ -370,7 +370,7 @@ class CheckoutMandateVerifier:
                     "mode": mode,
                     "checkout_hash": session_hash,
                     "reference": reference,
-                    "mandate_digest": chain.links[0].digest,
+                    "mandate_identity": chain.identity,
                 },
             )
             return Accepted(receipt, reservation, chain, mode, session_hash, reference)

@@ -13,6 +13,7 @@ variation), so a test names exactly what is wrong with a credential.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import json
@@ -359,3 +360,41 @@ def issue_human_present(
         signer or keys.issuer,
     )
     return f"{jwt}~{cj_disc}~{content_disc}~"
+
+
+def open_identity(open_token: str, kind: str) -> str:
+    """The presentation-independent identity of an open mandate (Decision 86), computed here without
+    importing the verifier: SHA-256 over the domain, a NUL and the sorted compact JSON of the signed
+    payload's issuer, customer, issue time, `delegate_payload` digests and `_sd_alg`."""
+    import base64
+
+    segment = open_token.split("~")[0].split(".")[1]
+    payload = json.loads(base64.urlsafe_b64decode(segment + "=" * (-len(segment) % 4)))
+    body = {
+        "v": 1,
+        "iss": payload.get("iss"),
+        "sub": payload.get("sub"),
+        "iat": payload.get("iat"),
+        "vct": OPEN_VCT[kind],
+        "sd_alg": payload.get("_sd_alg"),
+        "delegate": [e.get("...") for e in payload["delegate_payload"]],
+    }
+    text = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return b64e(hashlib.sha256(b"cs.mandate.identity.v1\x00" + text.encode()).digest())
+
+
+P256_ORDER = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
+
+
+def malleate_signature(token: str) -> str:
+    """The same signed credential with its issuer signature rewritten as (r, n - s).
+
+    Anyone can do this without the key and ECDSA verifiers accept both, so one issued mandate has two
+    valid serializations (and two `sd_hash` digests). The signed payload does not change.
+    """
+    jwt, rest = token.split("~", 1)
+    header, payload, signature = jwt.split(".")
+    raw = base64.urlsafe_b64decode(signature + "=" * (-len(signature) % 4))
+    r, s = int.from_bytes(raw[:32], "big"), int.from_bytes(raw[32:], "big")
+    flipped = r.to_bytes(32, "big") + (P256_ORDER - s).to_bytes(32, "big")
+    return f"{header}.{payload}.{b64e(flipped)}~{rest}"

@@ -36,6 +36,13 @@ PAGE_FILES: dict[str, tuple[Path, str]] = {
     "/approve/consent.js": (APPROVE_DIR / "consent.js", JS),
     "/approve/device-key.js": (APPROVE_DIR / "device-key.js", JS),
     "/approve/messages.js": (APPROVE_DIR / "messages.js", JS),
+    "/approve/shell.js": (APPROVE_DIR / "shell.js", JS),
+    "/approve/purchase.html": (APPROVE_DIR / "purchase.html", HTML),
+    "/approve/purchase.js": (APPROVE_DIR / "purchase.js", JS),
+    "/approve/purchase-consent.js": (APPROVE_DIR / "purchase-consent.js", JS),
+    "/approve/activity.html": (APPROVE_DIR / "activity.html", HTML),
+    "/approve/activity.js": (APPROVE_DIR / "activity.js", JS),
+    "/approve/activity-records.js": (APPROVE_DIR / "activity-records.js", JS),
 }
 UI_FILES: dict[str, tuple[Path, str]] = {
     "/ui/tokens.css": (UI_DIR / "tokens.css", CSS),

@@ -55,6 +55,7 @@ from countersign.mandates.errors import (
     VctMismatchError,
     VctMissingError,
 )
+from countersign.mandates.identity import mandate_identity
 from countersign.mandates.jws import ParsedJwt, parse_jwt, verify_signature
 from countersign.mandates.structure import RawLink, split_chain
 from countersign.mandates.subject import customer_id_of
@@ -84,6 +85,8 @@ class VerifiedLink:
     cnf_thumbprint: str | None
     audience: str | None
     nonce: str | None
+    # Presentation-independent identity of the issuer-signed credential (Decision 86). Set for link 0.
+    identity: str | None = None
 
 
 @dataclass(frozen=True)
@@ -93,6 +96,14 @@ class VerifiedChain:
     @property
     def final(self) -> VerifiedLink:
         return self.links[-1]
+
+    @property
+    def identity(self) -> str:
+        """The identity of the issuer-signed first link (the open mandate in autonomous mode)."""
+        found = self.links[0].identity
+        if found is None:
+            raise ValueError("the first link has no identity")
+        return found
 
 
 def _delegate_content(jwt: ParsedJwt, claims: Mapping[str, JsonValue]) -> Mapping[str, JsonValue]:
@@ -207,6 +218,7 @@ def verify_chain(
                 thumbprint,
                 aud,
                 nonce_claim,
+                mandate_identity(jwt.payload, vct) if n == 0 else None,
             )
         )
     return VerifiedChain(tuple(verified))

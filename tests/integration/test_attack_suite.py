@@ -141,7 +141,9 @@ FLIPS = [
     ("capture gate and pre-authorize check", NO_GATE_NO_PREAUTH, "order_raised_after_approval"),
     ("capture gate and pre-authorize check", NO_GATE_NO_PREAUTH, "order_items_changed_after_approval"),
     ("capture gate and pre-authorize check", NO_GATE_NO_PREAUTH, "custom_id_tamper"),
-    ("capture gate (G-MANDATE)", NO_GATE, "mandate_revoked"),
+    # Two layers now check revocation (Decision 88): the pre-authorize check and the capture gate. Each
+    # alone still stops the attack, so the flip needs both weakened (the same shape as the order cases).
+    ("capture gate and pre-authorize check (revocation)", NO_GATE_NO_PREAUTH, "mandate_revoked"),
     ("global single use of nonces", NO_GLOBAL_NONCE, "nonce_replay_new_session"),
     ("global single use of the open mandate", NO_GLOBAL_NONCE, "open_mandate_double_spend"),
 ]  # fmt: skip

@@ -213,6 +213,20 @@ recorded request ids again, so:
   [LIMITATIONS.md](LIMITATIONS.md). CI installs the browser. The two real-sandbox cassettes (`cp_authorize`,
   `gate_flow`) were re-recorded with `sub` mandates; the scripts void or capture everything they create.
 
+- P3.4 (done; committed together with P3.5): open mandate identity and revocation with the
+  in-flight rule (L31 resolved), the agent channel (L40 resolved), Approve purchase for Human Present, and "My agent
+  activity" (read with a device-key proof, revoke with its own signature). Migration 0010. Three attack cases
+  (29 in all; full 0 succeeded, baseline 11; two of the three do not separate the modes, see Decision 89). Pages:
+  `/approve/purchase.html#checkout=<id>` and `/approve/activity.html`. Decisions 86 to 93; limits L42 to L44.
+  **Not built, scheduled later:** the second-device and key-revoke screens (L36, L38 stay open).
+
+- P3.5 (done): the model gateway `src/countersign/llm` ([PROTOCOL.md](PROTOCOL.md) Decisions 94 to 97): one
+  interface with schema-validated output and a single retry, an OpenAI-compatible adapter, a fake provider, a
+  rate limiter and call budget, backoff with jitter inside a deadline, record and replay cassettes in
+  `eval/cassettes/llm/` (replay by default, no network in any test), a scrubber, and the boundary test that keeps
+  the package out of every authorization module. **The provider and model are still open until P3.6**; no
+  cassette is recorded yet (`scripts/record_llm_cassette.py` is for the owner to run). One commit covers P3.4 and P3.5.
+
 ## P2 gate (run 2026-10-30): passed
 
 Gate evidence:
@@ -270,7 +284,6 @@ Findings from the P1 review that belong to P2 and are not optional there:
 ## Carried forward
 
 - **P5.1:** rate limit completes and `complete_in_progress` log growth per checkout and per principal (Decision 68).
-- **P3.4:** key single use, budget and revocation on a presentation-independent open mandate identity (L31; the platform issuer already refuses selectively disclosable constraint elements, Decision 84).
 - **Before vault mode is enabled:** key the payer vault on (customer id, agent thumbprint), not the agent key alone (L32).
 - **P4.5:** wire `check_category_policy` into the Merchant verifier and the Policy view (`category_escape` currently covers the `line_items` constraint only).
 - **P5.1:** run `CaptureGate.recover` and the CP recovery on a schedule (L26).
@@ -280,7 +293,7 @@ Findings from the P1 review that belong to P2 and are not optional there:
 - **P5.1:** log the "pending" answer, and let a resumed checkout with no attempt return to `ready_for_complete` after a fence (L34).
 - **P5.1:** create the PayPal webhook, record its id, and confirm live delivery and `verify-webhook-signature` against a real notification (ENV section 11).
 
-- **P3.4:** the shopping agent retrieves the mandates it caused to be issued and binds them (L40); the page offers revoking a key and adding a second device (L36, L38).
+- **P3.6:** choose the provider and model, record the first cassettes, build the shopping agent on the gateway and the new channel. **Later:** the page for revoking a key and adding a second device (L36, L38).
 
 ## Open risks
 

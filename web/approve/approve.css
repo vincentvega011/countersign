@@ -146,3 +146,86 @@ body {
 .ts-details .cs-code {
   max-width: 100%;
 }
+
+/* Approve purchase and My agent activity */
+a.cs-btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ts-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.ts-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.ts-line > span:first-child {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.ts-mandates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+.ts-mandate {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.ts-purchase {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: var(--border-width) solid var(--color-border);
+  min-width: 0;
+}
+.ts-flash {
+  margin: 0;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow-wrap: anywhere;
+}
+.ts-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-danger);
+  border-radius: var(--radius-md);
+}
+.ts-confirm__title {
+  margin: 0;
+  font-weight: 600;
+}
+@media (min-width: 900px) {
+  .ts--wide {
+    max-width: 62rem;
+  }
+  .ts--wide .ts-mandates {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ts--wide .ts-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .ts--wide .ts-actions .cs-btn {
+    width: auto;
+  }
+}

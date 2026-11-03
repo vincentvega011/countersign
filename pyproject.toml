@@ -60,5 +60,6 @@ module = [
   "countersign.protocols.ucp.*", "countersign.paypal.*", "countersign.degraded.*",
   "countersign.checkout.*", "countersign.completion", "countersign.composition",
   "countersign.runtime", "countersign.ablations", "countersign.trusted_surface.*",
+  "countersign.openmandates.*",
 ]
 strict = true

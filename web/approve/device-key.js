@@ -241,23 +241,32 @@ export async function signBytes(privateKey, bytes) {
 
 // -------------------------------------------------------------------------------- registration
 
-export async function getJson(path) {
+export async function getJson(path, headers = {}) {
   let response;
   try {
     response = await fetch(path, {
       method: "GET",
+      headers,
       credentials: "same-origin",
       cache: "no-store",
     });
   } catch {
     throw new DeviceKeyError("network");
   }
-  if (!response.ok) throw new DeviceKeyError("network");
+  let json = null;
   try {
-    return await response.json();
+    json = await response.json();
   } catch {
+    json = null;
+  }
+  if (!response.ok) {
+    // A refusal carries a stable code; anything else (a proxy error, a dropped body) is the network.
+    if (typeof json?.code === "string")
+      throw new DeviceKeyError("register_rejected", json.code);
     throw new DeviceKeyError("network");
   }
+  if (json === null) throw new DeviceKeyError("network");
+  return json;
 }
 
 export async function postJson(path, body) {

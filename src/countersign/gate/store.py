@@ -27,9 +27,9 @@ from countersign.checkout.store import checkout_sessions
 from countersign.cp.ledger import SpendLedger
 from countersign.merchant.pg_reservations import PostgresReservationStore
 from countersign.merchant.reservations import Reservation
+from countersign.openmandates import lock_row, revoked_in
 from countersign.tables import (
     attempt_mandates,
-    mandate_revocations,
     payment_attempts,
     reservations,
     spend_entries,
@@ -92,14 +92,9 @@ class GateStore:
             ).first()
         return None if found is None else (str(found[0]), str(found[1]))
 
-    def revoked(self, digests: Sequence[str]) -> bool:
+    def revoked(self, identities: Sequence[str]) -> bool:
         with self.engine.connect() as conn:
-            found = conn.execute(
-                select(mandate_revocations.c.mandate_digest)
-                .where(mandate_revocations.c.mandate_digest.in_(list(digests)))
-                .limit(1)
-            ).first()
-        return found is not None
+            return revoked_in(conn, identities)
 
     def reservation_rows(self, checkout_id: str) -> dict[str, ReservationRow]:
         with self.engine.connect() as conn:
@@ -165,7 +160,8 @@ class GateStore:
         fails and voids) and a cancel that comes later waits for this transaction and is refused.
         There is no window between the check and the transition.
 
-        Returns a fixed reason when the checkout does not own the attempt (`checkout_missing`,
+        Returns `mandate_revoked` when a revocation of the open mandate exists (checked under the
+        open mandate's row lock, Decision 88). Returns a fixed reason when the checkout does not own the attempt (`checkout_missing`,
         `checkout_<status>`, `checkout_expired`) and `lost_claim` when the attempt was no longer
         `gating`. Reads the table directly (never a cache) and fails closed on a missing row.
         """
@@ -181,6 +177,21 @@ class GateStore:
                 return f"checkout_{found.status}"[:80]
             if self._clock() >= found.expires_us:
                 return "checkout_expired"
+            attempt = conn.execute(
+                select(payment_attempts.c.mandate_digest, payment_attempts.c.state).where(
+                    payment_attempts.c.checkout_id == checkout_id
+                )
+            ).first()
+            if attempt is None or attempt.state != "gating":
+                return "lost_claim"
+            # Revocation (Decision 88): hold the open mandate's row FOR SHARE, which a revoke
+            # (FOR UPDATE) waits behind, then read the revocations. A revocation that committed
+            # first is seen here; one that arrives later waits for this transaction, sees
+            # `capturing` and is refused as `in_flight`.
+            currency = str(attempt_currency(conn, checkout_id))
+            lock_row(conn, str(attempt.mandate_digest), currency, share=True)
+            if revoked_in(conn, [str(attempt.mandate_digest)]):
+                return "mandate_revoked"
             result = conn.execute(
                 update(payment_attempts)
                 .where(
@@ -296,13 +307,13 @@ class GateStore:
         return [(str(a), str(b)) for a, b in rows]
 
 
-def revoke_mandate(engine: Engine, digest: str, clock_us: Callable[[], int]) -> None:
-    """Record the revocation of an open mandate (insert only; the Trusted Surface calls this in P3)."""
-    from sqlalchemy.dialects.postgresql import insert as pg_insert
-
-    with engine.begin() as conn:
-        conn.execute(
-            pg_insert(mandate_revocations)
-            .values(mandate_digest=digest, revoked_us=clock_us())
-            .on_conflict_do_nothing(index_elements=["mandate_digest"])
+def attempt_currency(conn: Connection, checkout_id: str) -> str:
+    """The currency of the attempt's spend entry (the open mandate's row is created with it)."""
+    found = conn.execute(
+        select(spend_entries.c.currency)
+        .select_from(
+            spend_entries.join(payment_attempts, payment_attempts.c.spend_id == spend_entries.c.id)
         )
+        .where(payment_attempts.c.checkout_id == checkout_id)
+    ).scalar()
+    return str(found) if found is not None else "USD"

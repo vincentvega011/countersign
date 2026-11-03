@@ -21,12 +21,12 @@ from hypothesis import strategies as st
 from sqlalchemy import Engine
 
 from countersign.ablations import Ablations
-from countersign.canonical import sd_hash
 from countersign.cp import CpApprovalRequired, CpAuthorized, CpRejected
 from countersign.gate import revoke_mandate
 from countersign.merchant.verify import Accepted
 from tests.checkout_seed import seed_checkout
 from tests.gate_support import GateWorld, make_gate_world
+from tests.mandate_issuer import open_identity
 from tests.merchant_support import make_checkout
 
 BUDGET = 10_000
@@ -103,7 +103,12 @@ def test_captured_money_never_exceeds_the_budget_or_the_signed_total(
             done = world.base.provider.finish(checkout_id=checkout.id, current=checkout)
             assert isinstance(done, CpAuthorized)
             if kind == "revoked":
-                revoke_mandate(world.engine, sd_hash(first.payment.open_token), lambda: 1)
+                revoke_mandate(
+                    world.engine,
+                    open_identity(first.payment.open_token, "payment"),
+                    open_identity(first.checkout.open_token, "checkout"),
+                    lambda: 1,
+                )
             if kind == "expired":
                 world.tick.now += 100_000
             for _ in range(gate_runs):

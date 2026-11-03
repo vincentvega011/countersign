@@ -7,14 +7,13 @@ from typing import Any
 import pytest
 from sqlalchemy import Engine, select
 
-from countersign.canonical import sd_hash
 from countersign.cp import CpApprovalRequired, CpRejected
 from countersign.ledger.store import entries_for_checkout
 from countersign.merchant import receipts
 from countersign.tables import reservations, spend_entries
 from tests.constraint_fixtures import payment_constraints
 from tests.cp_support import CpWorld, Mandates, make_world
-from tests.mandate_issuer import NOW, Keys
+from tests.mandate_issuer import NOW, Keys, open_identity
 from tests.merchant_support import make_checkout
 
 
@@ -221,7 +220,8 @@ def test_c5_budget_exceeded(world: CpWorld) -> None:
 
 def test_c5_earlier_spend_under_the_same_open_mandate_counts(world: CpWorld) -> None:
     m = world.mandates(maximum=10_000)
-    digest = sd_hash(m.payment.open_token)
+    # The budget row is keyed on the issuer-signed identity of the open mandate (Decision 86).
+    digest = open_identity(m.payment.open_token, "payment")
     with world.engine.begin() as conn:
         world.ledger.lock(conn, digest, "USD")
         world.ledger.reserve(

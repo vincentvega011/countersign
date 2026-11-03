@@ -74,13 +74,6 @@ attempt_mandates = Table(
     Column("created_us", BigInteger, nullable=False),
 )
 
-mandate_revocations = Table(
-    "mandate_revocations",
-    metadata,
-    Column("mandate_digest", Text, primary_key=True),
-    Column("revoked_us", BigInteger, nullable=False),
-)
-
 payer_vault = Table(
     "payer_vault",
     metadata,
@@ -179,5 +172,89 @@ consent_records = Table(
     Column("checkout_open_digest", Text, nullable=False),
     Column("payment_open_digest", Text, nullable=False),
     Column("mandate_exp", BigInteger, nullable=False),
+    Column("created_us", BigInteger, nullable=False),
+)
+
+open_mandates = Table(
+    "open_mandates",
+    metadata,
+    Column("id", Text, primary_key=True),
+    Column("checkout_identity", Text, nullable=False),
+    Column("customer_id", Text, nullable=False),
+    Column("consent_id", Text, nullable=False),
+    Column("agent_thumbprint", Text, nullable=False),
+    Column("ceiling_minor", BigInteger, nullable=False),
+    Column("currency", Text, nullable=False),
+    Column("exp", BigInteger, nullable=False),
+    Column("created_us", BigInteger, nullable=False),
+)
+
+open_mandate_revocations = Table(
+    "open_mandate_revocations",
+    metadata,
+    Column("payment_identity", Text, primary_key=True),
+    Column("checkout_identity", Text, nullable=False),
+    Column("customer_id", Text),
+    Column("signer_thumbprint", Text),
+    Column("challenge_id", Text),
+    Column("record", Text),
+    Column("signature", Text),
+    Column("revoked_us", BigInteger, nullable=False),
+)
+
+agent_proposals = Table(
+    "agent_proposals",
+    metadata,
+    Column("id", Text, primary_key=True),
+    Column("challenge_id", Text, nullable=False),
+    Column("agent_thumbprint", Text, nullable=False),
+    Column("agent_jwk", Text, nullable=False),
+    Column("terms", Text, nullable=False),
+    Column("signature", Text, nullable=False),
+    Column("created_us", BigInteger, nullable=False),
+)
+
+proposal_uses = Table(
+    "proposal_uses",
+    metadata,
+    Column("proposal_id", Text, primary_key=True),
+    Column("consent_id", Text, nullable=False),
+    Column("used_us", BigInteger, nullable=False),
+)
+
+purchase_offers = Table(
+    "purchase_offers",
+    metadata,
+    Column("id", Text, primary_key=True),
+    Column("checkout_id", Text, nullable=False),
+    Column("checkout_jwt", Text, nullable=False),
+    Column("checkout_hash", Text, nullable=False),
+    Column("terms", Text, nullable=False),
+    Column("created_us", BigInteger, nullable=False),
+)
+
+purchase_consents = Table(
+    "purchase_consents",
+    metadata,
+    Column("id", Text, primary_key=True),
+    Column("offer_id", Text, nullable=False),
+    Column("challenge_id", Text, nullable=False),
+    Column("customer_id", Text, nullable=False),
+    Column("device_thumbprint", Text, nullable=False),
+    Column("device_jwk", Text, nullable=False),
+    Column("record", Text, nullable=False),
+    Column("signature", Text, nullable=False),
+    Column("checkout_mandate", Text, nullable=False),
+    Column("payment_mandate", Text, nullable=False),
+    Column("created_us", BigInteger, nullable=False),
+)
+
+activity_sessions = Table(
+    "activity_sessions",
+    metadata,
+    Column("token_hash", Text, primary_key=True),
+    Column("customer_id", Text, nullable=False),
+    Column("device_thumbprint", Text, nullable=False),
+    Column("challenge_id", Text, nullable=False),
     Column("created_us", BigInteger, nullable=False),
 )

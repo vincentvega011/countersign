@@ -69,9 +69,14 @@ def test_gates_racing_on_one_checkout_capture_exactly_once(world: GateWorld) -> 
 
 def test_gates_racing_on_a_failing_checkout_void_exactly_once(world: GateWorld) -> None:
     mandates, _ = world.authorize()
-    from countersign.canonical import sd_hash
+    from tests.mandate_issuer import open_identity
 
-    revoke_mandate(world.engine, sd_hash(mandates.payment.open_token), lambda: 1)
+    revoke_mandate(
+        world.engine,
+        open_identity(mandates.payment.open_token, "payment"),
+        open_identity(mandates.checkout.open_token, "checkout"),
+        lambda: 1,
+    )
     slow_reads(world)
     outcomes = race(world, 6)
     assert world.sim.count("/void") == 1 and world.sim.count("/capture") == 0

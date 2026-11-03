@@ -109,6 +109,114 @@ export const MESSAGES = Object.freeze({
     title: "The approval was not accepted",
     body: "Nothing was issued. The error code is below.",
   },
+  proposal_unknown: {
+    title: "This request was not found",
+    body: "The store has no request with this code. Nothing was approved. Ask your agent to send it again.",
+  },
+  proposal_expired: {
+    title: "This request has expired",
+    body: "The request ran out of time before it was approved. Nothing was issued. Ask your agent to send it again.",
+  },
+  proposal_used: {
+    title: "This request was already approved",
+    body: "This request has been approved once and cannot be used again. Nothing new was issued.",
+  },
+  purchase: {
+    title: "Approve this purchase",
+    body: "This is exactly what the store signed. Check each line. Nothing is bought until you tap Approve.",
+  },
+  purchase_loading: {
+    title: "Getting the store's checkout",
+    body: "Asking the store for the signed checkout and checking its signature. This takes a moment.",
+  },
+  purchase_signing: {
+    title: "Signing your approval",
+    body: "Signing with your device key and asking the store to issue the purchase mandates.",
+  },
+  purchase_approved: {
+    title: "Approved",
+    body: "Your approval was recorded and the signed purchase mandates were issued for this checkout.",
+  },
+  purchase_declined: {
+    title: "Declined",
+    body: "Nothing was approved and nothing was sent.",
+  },
+  purchase_missing: {
+    title: "No checkout to approve",
+    body: "This link does not name a checkout. Open the link the store gave you.",
+  },
+  purchase_unavailable: {
+    title: "This checkout cannot be approved",
+    body: "The checkout is not there or is not ready to pay. Nothing was issued. Go back to the store.",
+  },
+  purchase_expired: {
+    title: "This checkout has expired",
+    body: "The checkout or your approval code ran out of time. Nothing was issued. Go back to the store for a new one.",
+  },
+  purchase_changed: {
+    title: "The checkout changed",
+    body: "The checkout is no longer the one you were shown, so nothing was issued. Open it again to see the new terms.",
+  },
+  purchase_unsigned: {
+    title: "The store's signature did not check out",
+    body: "The checkout could not be verified as signed by the store, so it is not shown and nothing was issued.",
+  },
+  purchase_mismatch: {
+    title: "The approval did not match what was shown",
+    body: "The store could not match your signature to the checkout, so nothing was issued. Open the checkout again.",
+  },
+  purchase_key: {
+    title: "This device key cannot approve",
+    body: "The store does not accept this device key for this customer, or it was revoked. Nothing was issued.",
+  },
+  purchase_used: {
+    title: "This checkout was already approved",
+    body: "An approval for this checkout already exists. Nothing new was issued.",
+  },
+  purchase_refused: {
+    title: "The approval was not accepted",
+    body: "Nothing was issued. The error code is below.",
+  },
+  needs_key: {
+    title: "This device is not registered",
+    body: "Register this device first, then open this link again.",
+  },
+  activity: {
+    title: "My agent activity",
+    body: "Each approval you gave an agent, what became of it, and a way to take it back.",
+  },
+  activity_loading: {
+    title: "Opening your activity",
+    body: "Signing in with your device key and loading your approvals.",
+  },
+  activity_empty: {
+    title: "No approvals yet",
+    body: "When you approve an agent to shop for you, it will be listed here.",
+  },
+  activity_denied: {
+    title: "Your activity could not be opened",
+    body: "The store did not accept this device key for this customer. Nothing is shown. The error code is below.",
+  },
+  revoke_confirm: {
+    title: "Take this approval back?",
+    body: "Your agent will no longer be able to buy with it. This cannot be undone.",
+  },
+  revoke_done: {
+    title: "Approval taken back",
+    body: "Your agent can no longer buy with this approval.",
+  },
+  revoke_in_flight: {
+    title: "A payment is being taken right now",
+    body: "The purchase under this approval has already started, so it cannot be taken back. Refresh to see how it ended.",
+  },
+  revoke_already_used: {
+    title: "This approval was already used",
+    body: "A purchase was completed under this approval, so there is nothing left to take back.",
+  },
+  revoke_refused: {
+    title: "The approval was not taken back",
+    body: "Nothing was changed. The error code is below.",
+  },
   unexpected: {
     title: "Something went wrong",
     body: "The key could not be created. Nothing was registered. Try again.",
@@ -128,6 +236,10 @@ export const CONSENT_REFUSALS = Object.freeze({
   consent_malformed: "intent_mismatch",
   consent_purpose_mismatch: "intent_mismatch",
   agent_key_mismatch: "intent_mismatch",
+  consent_proposal_mismatch: "intent_mismatch",
+  proposal_unknown: "proposal_unknown",
+  proposal_expired: "proposal_expired",
+  proposal_used: "proposal_used",
   consent_terms_invalid: "intent_terms",
   consent_time_invalid: "intent_expired",
   consent_expired: "intent_expired",
@@ -162,4 +274,57 @@ export const LABELS = Object.freeze({
   working: "Working",
   finish: "Finish registration",
   recreate: "Create a new key",
+  total: "Total",
+  checkoutValid: "Checkout valid until",
+  refreshActivity: "Refresh",
+  revoke: "Take back",
+  revokeYes: "Yes, take it back",
+  revokeKeep: "Keep it",
+  state: "State",
+  spendLimit: "Spend limit",
+  purchase: "Purchase",
+  checkoutId: "Checkout",
+  captureId: "Capture ID",
+  paid: "Paid",
+  when: "When",
+  register: "Go to device setup",
+});
+
+// Which fixed message each refusal code of the purchase endpoints gets.
+export const PURCHASE_REFUSALS = Object.freeze({
+  checkout_unknown: "purchase_unavailable",
+  checkout_not_ready: "purchase_unavailable",
+  checkout_expired: "purchase_expired",
+  checkout_changed: "purchase_changed",
+  offer_expired: "purchase_expired",
+  offer_unknown: "purchase_unavailable",
+  offer_used: "purchase_used",
+  merchant_authorization_invalid: "purchase_unsigned",
+  consent_signature_invalid: "purchase_mismatch",
+  consent_claims_mismatch: "purchase_mismatch",
+  consent_malformed: "purchase_mismatch",
+  consent_purpose_mismatch: "purchase_mismatch",
+  consent_time_invalid: "purchase_expired",
+  consent_expired: "purchase_expired",
+  challenge_expired: "purchase_expired",
+  challenge_used: "purchase_expired",
+  challenge_unknown: "purchase_expired",
+  challenge_nonce_mismatch: "purchase_expired",
+  device_key_unknown: "purchase_key",
+  device_key_revoked: "purchase_key",
+  device_key_customer_mismatch: "purchase_key",
+});
+
+// The states of an open mandate on the activity screen: a fixed label, tone and glyph each.
+export const MANDATE_STATES = Object.freeze({
+  unused: { label: "Not used yet", tone: "accent", glyph: "○" },
+  in_flight: { label: "Purchase in progress", tone: "warning", glyph: "◐" },
+  used: { label: "Used", tone: "success", glyph: "✓" },
+  revoked: { label: "Taken back", tone: "neutral", glyph: "⊘" },
+  expired: { label: "Expired", tone: "neutral", glyph: "✕" },
+});
+
+export const REVOKE_REFUSALS = Object.freeze({
+  in_flight: "revoke_in_flight",
+  already_used: "revoke_already_used",
 });

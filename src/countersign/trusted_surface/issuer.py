@@ -21,14 +21,22 @@ import base64
 import hashlib
 import json
 import secrets
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from joserfc import jws
 from joserfc.jwk import ECKey
 
+from countersign.canonical import JsonValue
 from countersign.canonical.hashing import sd_hash
-from countersign.mandates import VCT_CHECKOUT_OPEN, VCT_PAYMENT_OPEN
+from countersign.mandates import (
+    VCT_CHECKOUT,
+    VCT_CHECKOUT_OPEN,
+    VCT_PAYMENT,
+    VCT_PAYMENT_OPEN,
+    mandate_identity,
+)
 
 ISSUER_TYP = "dc+sd-jwt"
 
@@ -44,7 +52,8 @@ class IssuerRefused(Exception):
 @dataclass(frozen=True)
 class OpenMandate:
     token: str  # `<issuer JWT>~<content disclosure>~`, ready for the agent to bind to
-    digest: str  # `sd_hash` of `token`: the open mandate's identity
+    digest: str  # `sd_hash` of `token`: what `payment.reference` pins (AP2), NOT the mandate's key
+    identity: str  # `mandate_identity` of the signed payload: the key of single use and revocation
 
 
 def _b64(data: bytes) -> str:
@@ -92,7 +101,7 @@ def issue_open_mandate(
     full = {**content, "cnf": {"jwk": dict(agent_jwk)}, "iat": now_s}
     disclosure = _b64(_compact([_b64(secrets.token_bytes(16)), full]))
     digest = _b64(hashlib.sha256(disclosure.encode("ascii")).digest())
-    payload = {
+    payload: dict[str, Any] = {
         "iss": issuer,
         "sub": customer_id,
         "iat": now_s,
@@ -102,4 +111,62 @@ def issue_open_mandate(
     header = {"alg": "ES256", "typ": ISSUER_TYP, "kid": key.thumbprint()}
     compact = jws.serialize_compact(header, _compact(payload), key, algorithms=["ES256"])
     token = f"{compact}~{disclosure}~"
-    return OpenMandate(token, sd_hash(token))
+    return OpenMandate(
+        token,
+        sd_hash(token),
+        mandate_identity(cast("Mapping[str, JsonValue]", payload), str(content["vct"])),
+    )
+
+
+def issue_closed_mandate(
+    content: dict[str, Any],
+    *,
+    kind: str,
+    customer_id: str,
+    issuer: str,
+    key: ECKey,
+    now_s: int,
+    checkout_jwt: str | None = None,
+) -> OpenMandate:
+    """Sign one Human Present closed mandate: a single link, no key binding (Decision 29).
+
+    `content` has the vct, `exp` and the claims of the mandate (`checkout_hash` for a checkout,
+    `transaction_id`, `payee`, `payment_amount`, `payment_instrument` for a payment). For a checkout the
+    merchant-signed `checkout_jwt` is disclosed as a property of the content, as the verifier expects.
+    """
+    expected_vct = {"checkout": VCT_CHECKOUT, "payment": VCT_PAYMENT}.get(kind)
+    if expected_vct is None or content.get("vct") != expected_vct:
+        raise IssuerRefused("vct_mismatch")
+    if not isinstance(customer_id, str) or not customer_id or customer_id != customer_id.strip():
+        raise IssuerRefused("subject_missing")
+    if not key.is_private:
+        raise IssuerRefused("signing_key_not_private")
+    if "exp" not in content:
+        raise IssuerRefused("exp_missing")
+    body = {**content, "iat": now_s}
+    disclosures: list[str] = []
+    if kind == "checkout":
+        if checkout_jwt is None:
+            raise IssuerRefused("checkout_jwt_missing")
+        named = _b64(_compact([_b64(secrets.token_bytes(16)), "checkout_jwt", checkout_jwt]))
+        disclosures.append(named)
+        body["_sd"] = [_b64(hashlib.sha256(named.encode("ascii")).digest())]
+    elif checkout_jwt is not None:
+        raise IssuerRefused("content_members")
+    main = _b64(_compact([_b64(secrets.token_bytes(16)), body]))
+    disclosures.append(main)
+    payload: dict[str, Any] = {
+        "iss": issuer,
+        "sub": customer_id,
+        "iat": now_s,
+        "delegate_payload": [{"...": _b64(hashlib.sha256(main.encode("ascii")).digest())}],
+        "_sd_alg": "sha-256",
+    }
+    header = {"alg": "ES256", "typ": ISSUER_TYP, "kid": key.thumbprint()}
+    compact = jws.serialize_compact(header, _compact(payload), key, algorithms=["ES256"])
+    token = compact + "~" + "~".join(disclosures) + "~"
+    return OpenMandate(
+        token,
+        sd_hash(token),
+        mandate_identity(cast("Mapping[str, JsonValue]", payload), str(content["vct"])),
+    )

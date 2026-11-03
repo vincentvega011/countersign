@@ -675,8 +675,9 @@ themes, shared tokens and components.
 - **Approve intent (built in P3.3):** each term of the open mandates rendered from fixed templates (the exact item
   list, "Up to $80.00 in total", "Expires Sun 25 Oct, 18:00"), the merchant name and the agent
   fingerprint. Approve and Decline. Approve signs the consent record.
-- **Approve purchase:** for Human Present, the exact line items and totals, then consent.
-- **My agent activity:** the state of each open mandate (unused, in flight or used), its ceiling and expiry, the purchase made under it, and a revoke button.
+- **Approve purchase (built in P3.4, `/approve/purchase.html#checkout=<id>`):** for Human Present, the exact line items and totals of the merchant-signed checkout (signature verified first), then consent. The backend rebuilds the closed mandates and signs only on byte equality (Decision 90).
+- **My agent activity (built in P3.4, `/approve/activity.html`):** the state of each open mandate (unused, in flight, used, revoked or expired), its ceiling and expiry, the purchase made under it, and a revoke button. Read with a device-key proof and a 5 minute in-memory token; revoke needs its own signature (Decisions 91, 92).
+- **Agent channel (P3.4):** the agent files a proposal and later collects the issued mandates with a proof of its own key (Decision 87). Open mandate identity, revocation and the in-flight rule: Decisions 86, 88. Package `openmandates`.
 
 ### 7.3 Demo storefront and agent console
 
@@ -700,6 +701,17 @@ Otherwise it returns a grid state object the dashboard applies. It has no write 
   signs closed mandates with its own key (held only in its process), completes and reports.
 - `agents/adversary`: scripted attack cases plus a model-planned mode that plans across UCP and ACP
   toward a goal. It has no PayPal credentials and no database access. Every attempt is logged.
+
+### 7.6 Model text never decides (prompt-injection stance)
+
+LLM text never reaches the approval pages, the capture gate, the lock, the mandate or constraint verifiers, or
+any other decision (INV-1, INV-2). A model may only PROPOSE structured values (item ids, quantities, a ceiling,
+an expiry, a filter), through the gateway in `src/countersign/llm`, which validates them against a schema and
+returns them as untrusted data. Deterministic code then validates them again against the store and the limits
+before anything depends on them: the Trusted Surface renders fixed templates from catalog data, the backend
+rebuilds every mandate from its own state, and the gate reads PayPal. Text found in a model reply, a product
+title or a user message is never an instruction to the gateway. The boundary is a test, not a convention
+(`tests/unit/test_llm_boundary.py`, Decision 95); tests and the demo replay recorded calls (Decision 97).
 
 ## 8. Evaluation
 
