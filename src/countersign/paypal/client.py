@@ -133,6 +133,11 @@ class PayPalClient:
         self._sleep = sleep
         self._token: _Token | None = None
         self._lock = threading.Lock()
+        self._observer: Callable[[str, dict[str, Any]], None] | None = None
+
+    def observe_with(self, observer: Callable[[str, dict[str, Any]], None] | None) -> None:
+        """Receive `(kind, parsed body)` of each successful order, authorization and capture read."""
+        self._observer = observer
 
     def __repr__(self) -> str:
         return f"PayPalClient(base_url={self._config.base_url!r})"
@@ -380,20 +385,36 @@ class PayPalClient:
 
     # ------------------------------------------------------------------ reads
 
+    def _observe(self, kind: str, response: httpx.Response) -> None:
+        """Hand the parsed body of a successful read to the observer. Never headers, never a token."""
+        if self._observer is None:
+            return
+        try:
+            self._observer(kind, self._object(response))
+        except Exception as error:  # noqa: BLE001 - evidence is secondary: a read must not fail on it
+            log.warning("paypal_observer_failed", kind=kind, error=type(error).__name__)
+
     def get_order(self, order_id: str) -> Order:
         path = f"/v2/checkout/orders/{check_path_id(order_id, 'order id')}"
-        return self._parse(Order, self._call("GET", path, op="get_order", ok=(200,)))
+        response = self._call("GET", path, op="get_order", ok=(200,))
+        view = self._parse(Order, response)
+        self._observe("order", response)
+        return view
 
     def get_authorization(self, authorization_id: str) -> Authorization:
         ident = check_path_id(authorization_id, "authorization id")
         path = f"/v2/payments/authorizations/{ident}"
-        return self._parse(
-            Authorization, self._call("GET", path, op="get_authorization", ok=(200,))
-        )
+        response = self._call("GET", path, op="get_authorization", ok=(200,))
+        view = self._parse(Authorization, response)
+        self._observe("authorization", response)
+        return view
 
     def get_capture(self, capture_id: str) -> Capture:
         path = f"/v2/payments/captures/{check_path_id(capture_id, 'capture id')}"
-        return self._parse(Capture, self._call("GET", path, op="get_capture", ok=(200,)))
+        response = self._call("GET", path, op="get_capture", ok=(200,))
+        view = self._parse(Capture, response)
+        self._observe("capture", response)
+        return view
 
     # ------------------------------------------------------------------ webhook verification
 

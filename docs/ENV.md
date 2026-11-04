@@ -398,7 +398,7 @@ length, gallery image limits and count.
 
 ## 6. Model provider
 
-Checked 2026-11-03. The provider and model are NOT chosen yet (open until P3.6); the gateway (P3.5) is
+Checked 2026-11-03. The first cassettes (P3.6, 2026-11-04) were recorded with model `gemini-3.5-flash-lite` through the Gemini OpenAI compatible endpoint; the gateway (P3.5) is
 provider-agnostic and takes `LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY` from the environment
 ([PROTOCOL.md](PROTOCOL.md) Decisions 94 to 97). `.env.example` keeps them empty.
 

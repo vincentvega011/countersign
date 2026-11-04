@@ -14,12 +14,15 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import Engine, create_engine
 
 from countersign.api.acp_routes import install as install_acp
+from countersign.api.catalog_routes import install as install_catalog
+from countersign.api.evidence_routes import install as install_evidence
 from countersign.api.static_routes import install as install_static
 from countersign.api.trusted_surface_routes import install as install_trusted_surface
 from countersign.api.ucp_routes import install as install_ucp
 from countersign.api.webhook_routes import install as install_webhooks
 from countersign.canonical.jsonstrict import loads_strict
 from countersign.catalog.catalog import Catalog, load_catalog
+from countersign.evidence import EvidenceService
 from countersign.lock import LockPort
 from countersign.merchant.keys import MerchantKey, load_merchant_key
 from countersign.merchant.policy import policy_hash
@@ -51,6 +54,7 @@ def create_app(
     runtime: RuntimeSettings | None = None,
     unmandated: UnmandatedCompletion | None = None,
     trusted_surface: TrustedSurface | None = None,
+    evidence: EvidenceService | None = None,
     json_loader: JsonLoader = loads_strict,
 ) -> FastAPI:
     """Create the app. Without an explicit `key`, load `MERCHANT_KEY_PATH` or fail.
@@ -104,6 +108,9 @@ def create_app(
         app.mount("/_ui", StaticFiles(directory=UI_DIR), name="ui")
 
     install_static(app)
+    install_catalog(app, catalog or load_catalog())
+    if evidence is not None and runtime.app_env in UI_ENVS:
+        install_evidence(app, evidence)
     if trusted_surface is not None:
         install_trusted_surface(app, trusted_surface)
 

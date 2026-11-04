@@ -429,17 +429,59 @@ name that customer in `sub`, and only the agent key can fetch them. The terms ar
 cannot add authority, but it can put a different customer behind an agent's proposal. A real deployment would bind
 the proposal to a customer (an invitation). Proposals expire after 15 minutes.
 
-### L43. Approve purchase issues mandates and stops there
+### L43. Approve purchase issues mandates and stops there (RESOLVED for the autonomous flow in P3.6)
 
-The Human Present page shows the signed mandates; nothing completes the checkout with them yet (the shopping agent
-and demo store do, in P3.5 and later). A revoke does not void an authorization by itself: the next gate run or
-recovery does, and an unscheduled `recover` leaves it until then (L26).
+The shopping agent now completes a checkout with chained open and closed mandates ([PROTOCOL.md](PROTOCOL.md) Decision 98).
+The Human Present page still issues mandates and stops: nothing completes with them, and a Human Present purchase has no
+evidence bundle (L50). A revoke does not void an authorization by itself: the next gate run or recovery does, and an
+unscheduled `recover` leaves it until then (L26).
 
 ### L44. The activity screen reads only; keys and second devices are still API only
 
 Revoking a device key and adding a second device have no page (L36, L38 stay open). The activity token is a bearer
 token for 5 minutes; a stolen token can list a customer's approvals (it cannot revoke), and it stops working when the
 device key is revoked. `in_flight` and `used` are read from the payment tables, not from PayPal, until webhooks are live (L26).
+
+### L45. What the offline verifier does not compare
+
+PayPal timestamps (`create_time`, `expiration_time`, `update_time`), the status of earlier reads of an object (an order is
+CREATED, then APPROVED, then COMPLETED; only the last read of each kind is judged), the item category, `reference_id` and the
+payee's identity (only that it is the same on every read) are not compared; a change there is not detected. The currency is
+USD with two decimals only.
+
+### L46. The evidence endpoint has no login
+
+`GET /evidence/{capture_id}` is served only when `APP_ENV` is dev or eval ([PROTOCOL.md](PROTOCOL.md) Decision 104); the bundle
+names a customer id and PayPal object ids. It is not served in demo or production until the dashboard (P4) adds a merchant login.
+
+### L47. Rejection receipts are signed but not transported
+
+A rejected `complete` answers with UCP error codes and a canceled checkout, not the signed rejection receipt AP2 describes
+(Decision 101). The agent therefore treats the typed `checkout_canceled_after_rejection` as the proof that its open mandate
+may be used again. The receipt is stored with the attempt; returning it in the response is open.
+
+### L48. The log root in a bundle is not anchored
+
+The bundle carries the Merkle root of the checkout's log entries, recomputed by the verifier, but the root is not signed or
+published elsewhere. A forger with the code can drop entries and rebuild root and proofs; the verifier then still catches a
+missing required entry (`gate_result`), and the signed receipts and mandates do not depend on the log. Anchoring a root
+(Decision 15) is open.
+
+### L49. Evidence assembly is best effort
+
+The bundle is assembled after the capture is confirmed. If assembly fails (database error, a part missing) the checkout stays
+completed, the failure is logged, and no bundle exists for that capture until it is rebuilt by hand. The checkout receipt in a
+bundle is the one issued at completion, not a stored copy of any earlier receipt.
+
+### L50. Human Present purchases have no bundle
+
+A bundle needs the open mandates and the device consent record of the autonomous flow. A Human Present purchase (a closed
+mandate signed by the platform from a purchase consent) is not assembled or verified yet.
+
+### L51. The agent's catalog search is the demo catalog
+
+The agent reads `GET /catalog` of this one store; the choice is made among results that fit the ceiling for the quantity. It
+buys one line, one item, quantity 1 to 9, from one consent (L41).
 
 ### L39 (note)
 

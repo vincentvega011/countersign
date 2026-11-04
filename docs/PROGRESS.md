@@ -220,6 +220,12 @@ recorded request ids again, so:
   `/approve/purchase.html#checkout=<id>` and `/approve/activity.html`. Decisions 86 to 93; limits L42 to L44.
   **Not built, scheduled later:** the second-device and key-revoke screens (L36, L38 stay open).
 
+- P3.6 and P3.7 (done; one commit): the shopping agent `agents/shopper` ([PROTOCOL.md](PROTOCOL.md) Decisions 98 to 102;
+  closes L43 for the autonomous flow), evidence bundles `src/countersign/evidence/` and the offline verifier
+  `countersign_verify` (Decisions 103 to 105; L45 to L51). The agent's end-to-end run is recorded against the live sandbox and
+  replayed (`tests/cassettes/shopper_e2e.json`, two model cassettes); the verifier has 12 steps, 29 tampered vectors, signed
+  but inconsistent bundles from a forger, and a 35 mutant sweep (33 killed, 2 equivalent). **Next: P3.8 (browser verifier
+  checked against the vectors) and P3.9.**
 - P3.5 (done): the model gateway `src/countersign/llm` ([PROTOCOL.md](PROTOCOL.md) Decisions 94 to 97): one
   interface with schema-validated output and a single retry, an OpenAI-compatible adapter, a fake provider, a
   rate limiter and call budget, backoff with jitter inside a deadline, record and replay cassettes in
@@ -293,7 +299,7 @@ Findings from the P1 review that belong to P2 and are not optional there:
 - **P5.1:** log the "pending" answer, and let a resumed checkout with no attempt return to `ready_for_complete` after a fence (L34).
 - **P5.1:** create the PayPal webhook, record its id, and confirm live delivery and `verify-webhook-signature` against a real notification (ENV section 11).
 
-- **P3.6:** choose the provider and model, record the first cassettes, build the shopping agent on the gateway and the new channel. **Later:** the page for revoking a key and adding a second device (L36, L38).
+- **Later:** the page for revoking a key and adding a second device (L36, L38).
 
 ## Open risks
 

@@ -544,22 +544,29 @@ a second purchase races the first under one open mandate, and two gates race on 
 
 ### 5.11 evidence
 
-A bundle is written at capture, keyed by the PayPal capture id. Contents:
+`src/countersign/evidence/` ([PROTOCOL.md](PROTOCOL.md) Decisions 103 and 104). The PayPal client hands an observer the
+parsed body of each order, authorization and capture it reads; `observer.pick` keeps only allowlisted members and the result
+goes to the insert-only `paypal_observations`. When the gate passes, the coordinator calls `EvidenceService.record`, which
+assembles the bundle from stored rows and writes it to the insert-only `evidence_bundles`, keyed by the PayPal capture id.
+Contents:
 
-- the `checkout_jwt`;
-- the open and closed Checkout Mandates and the open and closed Payment Mandates, with only the
-  disclosures that were used;
+- the `checkout_jwt` (also disclosed inside the closed Checkout Mandate);
+- the open and closed Checkout and Payment Mandates (the issued disclosures are exactly the used ones);
 - the Checkout Receipt and the Payment Receipt;
-- the device consent records, consent signatures and the registered device public key;
-- the PayPal order, authorization and capture objects as fetched;
-- the gate result;
-- decision log inclusion proofs;
-- the merchant, processor, platform and agent public keys.
+- the device consent record (JCS text), its signature and the registered device public key;
+- the sanitized PayPal order, authorization and capture objects as read;
+- the checkout's decision log entries with their Merkle root and inclusion proofs (the gate result is read from them);
+- the merchant and platform public keys.
 
-An offline verifier, a Python CLI and a browser module sharing test vectors, performs the AP2
-dispute steps ([PROTOCOL.md](PROTOCOL.md) section 1.2.8), then checks the device consent signature
-against the mandate content, checks the PayPal objects against the checkout terms, and checks the
-log proofs. Tampering with any byte makes verification fail at the correct step with a clear message.
+`GET /evidence/{capture_id}` serves it in dev and eval only (L46).
+
+**The offline verifier** is `countersign_verify` at the repo root, a standalone Python CLI that imports nothing of the service
+(its own JCS, ES256, SD-JWT, log and Merkle code). Steps with stable names, in the order of AP2's dispute procedure
+([PROTOCOL.md](PROTOCOL.md) 1.2.8 and Decision 105): `bundle_structure`, `checkout_mandate`, `checkout_jwt_hash`,
+`checkout_receipt`, `payment_mandate`, `payment_receipt`, then Countersign's own `consent_signature` (the device signed the
+terms both open mandates were issued from), `paypal_objects` (amounts, ids, items against the signed checkout),
+`paypal_custom_id` (the evidence reference recomputed), `gate_result`, `decision_log` and `trusted_keys`. Vectors for the
+browser verifier (P3.8) are in `tests/vectors/evidence/`; the verifier is mutation-checked by `scripts/mutate_verifier.py`.
 
 ### 5.13 trusted_surface (device keys, consent, platform issuer)
 
@@ -695,10 +702,13 @@ Otherwise it returns a grid state object the dashboard applies. It has no write 
 
 ### 7.5 Agents
 
-- `agents/shopper`: a separate process with tools that speak only UCP over HTTP. It turns a goal
-  into structured terms, requests approval through the Trusted Surface link, searches the catalog,
-  builds and updates a checkout, verifies `merchant_authorization` before trusting the checkout,
-  signs closed mandates with its own key (held only in its process), completes and reports.
+- `agents/shopper` ([PROTOCOL.md](PROTOCOL.md) Decisions 98 to 102): a separate process that speaks only HTTP (catalog, the
+  Trusted Surface proposal channel, UCP). Goal to a wish (model call 1, clamped by code), search `GET /catalog`, choose one
+  result (model call 2, must be a result), file a proposal signed with the agent key, wait for the consent on the phone page,
+  fetch the open mandates by proving the key, check them against the proposal, create the checkout, verify
+  `merchant_authorization` before trusting it, sign the closed mandates chained to the open ones, complete (handing the PayPal
+  approval link to the payer), and report JSON lines plus a summary. `python -m agents.shopper "goal"`. Its imports are
+  limited by a test.
 - `agents/adversary`: scripted attack cases plus a model-planned mode that plans across UCP and ACP
   toward a goal. It has no PayPal credentials and no database access. Every attempt is logged.
 

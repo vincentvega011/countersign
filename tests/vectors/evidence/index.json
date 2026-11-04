@@ -1,0 +1,125 @@
+{
+ "pinned": [
+  "merchant.key.json",
+  "platform.key.json"
+ ],
+ "tampered": [
+  {
+   "file": "tampered/bundle_checkout_id.json",
+   "first_failure": "checkout_jwt_hash"
+  },
+  {
+   "file": "tampered/checkout_amount_raised.json",
+   "first_failure": "checkout_mandate"
+  },
+  {
+   "file": "tampered/checkout_jwt_signature.json",
+   "first_failure": "checkout_mandate"
+  },
+  {
+   "file": "tampered/checkout_receipt_reference.json",
+   "first_failure": "checkout_receipt"
+  },
+  {
+   "file": "tampered/checkout_receipt_signature.json",
+   "first_failure": "checkout_receipt"
+  },
+  {
+   "file": "tampered/closed_checkout_key_binding.json",
+   "first_failure": "checkout_mandate"
+  },
+  {
+   "file": "tampered/consent_key_swapped.json",
+   "first_failure": "consent_signature"
+  },
+  {
+   "file": "tampered/consent_record_altered.json",
+   "first_failure": "consent_signature"
+  },
+  {
+   "file": "tampered/consent_removed.json",
+   "first_failure": "consent_signature"
+  },
+  {
+   "file": "tampered/consent_signature_altered.json",
+   "first_failure": "consent_signature"
+  },
+  {
+   "file": "tampered/extra_member.json",
+   "first_failure": "bundle_structure"
+  },
+  {
+   "file": "tampered/gate_step_missing.json",
+   "first_failure": "gate_result"
+  },
+  {
+   "file": "tampered/log_consistently_truncated.json",
+   "first_failure": "gate_result"
+  },
+  {
+   "file": "tampered/log_last_entry_dropped.json",
+   "first_failure": "gate_result"
+  },
+  {
+   "file": "tampered/log_middle_entry_dropped.json",
+   "first_failure": "decision_log"
+  },
+  {
+   "file": "tampered/log_payload_altered.json",
+   "first_failure": "decision_log"
+  },
+  {
+   "file": "tampered/log_proof_dropped.json",
+   "first_failure": "decision_log"
+  },
+  {
+   "file": "tampered/log_proof_truncated.json",
+   "first_failure": "decision_log"
+  },
+  {
+   "file": "tampered/log_root_altered.json",
+   "first_failure": "decision_log"
+  },
+  {
+   "file": "tampered/not_captured.json",
+   "first_failure": "bundle_structure"
+  },
+  {
+   "file": "tampered/open_checkout_signature.json",
+   "first_failure": "checkout_mandate"
+  },
+  {
+   "file": "tampered/payment_closed_signature.json",
+   "first_failure": "payment_mandate"
+  },
+  {
+   "file": "tampered/payment_receipt_capture.json",
+   "first_failure": "payment_receipt"
+  },
+  {
+   "file": "tampered/paypal_capture_amount.json",
+   "first_failure": "paypal_objects"
+  },
+  {
+   "file": "tampered/paypal_custom_id.json",
+   "first_failure": "paypal_custom_id"
+  },
+  {
+   "file": "tampered/paypal_invoice.json",
+   "first_failure": "paypal_objects"
+  },
+  {
+   "file": "tampered/paypal_item_name.json",
+   "first_failure": "paypal_objects"
+  },
+  {
+   "file": "tampered/paypal_status.json",
+   "first_failure": "paypal_objects"
+  },
+  {
+   "file": "tampered/platform_key_swapped.json",
+   "first_failure": "trusted_keys"
+  }
+ ],
+ "valid": "valid.json"
+}

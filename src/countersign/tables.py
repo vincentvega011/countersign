@@ -258,3 +258,23 @@ activity_sessions = Table(
     Column("challenge_id", Text, nullable=False),
     Column("created_us", BigInteger, nullable=False),
 )
+
+
+paypal_observations = Table(
+    "paypal_observations",
+    metadata,
+    Column("seq", BigInteger, primary_key=True, autoincrement=True),
+    Column("kind", Text, nullable=False),
+    Column("object_id", Text, nullable=False),
+    Column("body", Text, nullable=False),
+    Column("observed_us", BigInteger, nullable=False),
+)
+
+evidence_bundles = Table(
+    "evidence_bundles",
+    metadata,
+    Column("capture_id", Text, primary_key=True),
+    Column("checkout_id", Text, nullable=False),
+    Column("bundle", Text, nullable=False),
+    Column("created_us", BigInteger, nullable=False),
+)

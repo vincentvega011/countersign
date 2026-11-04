@@ -1,0 +1,1017 @@
+{
+  "interactions": [
+    {
+      "request": {
+        "body": null,
+        "method": "POST",
+        "path": "/v1/oauth2/token",
+        "request_id": null
+      },
+      "response": {
+        "body": {
+          "access_token": "SCRUBBED_ACCESS_TOKEN",
+          "app_id": "SCRUBBED_APP_ID",
+          "expires_in": 32394,
+          "nonce": "SCRUBBED_NONCE",
+          "scope": "SCRUBBED_SCOPE",
+          "token_type": "Bearer"
+        },
+        "headers": {
+          "content-type": "application/json",
+          "paypal-debug-id": "f131738666f82"
+        },
+        "status": 200
+      }
+    },
+    {
+      "request": {
+        "body": {
+          "intent": "AUTHORIZE",
+          "payment_source": {
+            "paypal": {
+              "experience_context": {
+                "cancel_url": "http://127.0.0.1:49435/cancel",
+                "payment_method_preference": "IMMEDIATE_PAYMENT_REQUIRED",
+                "return_url": "http://127.0.0.1:49435/return",
+                "shipping_preference": "NO_SHIPPING",
+                "user_action": "PAY_NOW"
+              }
+            }
+          },
+          "purchase_units": [
+            {
+              "amount": {
+                "breakdown": {
+                  "item_total": {
+                    "currency_code": "USD",
+                    "value": "69.00"
+                  }
+                },
+                "currency_code": "USD",
+                "value": "69.00"
+              },
+              "custom_id": "cs1.yTxBgpMhGj0DGQkz09GFSdtEFg18EGLpKZnHvAkrAU0",
+              "invoice_id": "chk_CVqS5PCos1LSpaXRSdSTAg",
+              "items": [
+                {
+                  "category": "DIGITAL_GOODS",
+                  "name": "Veltro Orbit Wireless Headphones",
+                  "quantity": "1",
+                  "sku": "hp-veltro-orbit-wireless-headphones",
+                  "unit_amount": {
+                    "currency_code": "USD",
+                    "value": "69.00"
+                  }
+                }
+              ],
+              "reference_id": "default"
+            }
+          ]
+        },
+        "method": "POST",
+        "path": "/v2/checkout/orders",
+        "request_id": "cs1.create_order.bgtQuF6g02Q32i_dgiErWL74amRzFjp-FuyztYHt-TY"
+      },
+      "response": {
+        "body": {
+          "id": "71D29110JM720615R",
+          "intent": "AUTHORIZE",
+          "links": [
+            {
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/71D29110JM720615R",
+              "method": "GET",
+              "rel": "self"
+            },
+            {
+              "href": "https://www.sandbox.paypal.com/checkoutnow?token=71D29110JM720615R",
+              "method": "GET",
+              "rel": "payer-action"
+            }
+          ],
+          "payment_source": {},
+          "purchase_units": [
+            {
+              "amount": {
+                "breakdown": {
+                  "item_total": {
+                    "currency_code": "USD",
+                    "value": "69.00"
+                  }
+                },
+                "currency_code": "USD",
+                "value": "69.00"
+              },
+              "custom_id": "cs1.yTxBgpMhGj0DGQkz09GFSdtEFg18EGLpKZnHvAkrAU0",
+              "invoice_id": "chk_CVqS5PCos1LSpaXRSdSTAg",
+              "items": [
+                {
+                  "category": "DIGITAL_GOODS",
+                  "name": "Veltro Orbit Wireless Headphones",
+                  "quantity": "1",
+                  "sku": "hp-veltro-orbit-wireless-headphones",
+                  "unit_amount": {
+                    "currency_code": "USD",
+                    "value": "69.00"
+                  }
+                }
+              ],
+              "payee": {
+                "email_address": "SCRUBBED_EMAIL_ADDRESS",
+                "merchant_id": "SCRUBBED_MERCHANT_ID"
+              },
+              "reference_id": "default"
+            }
+          ],
+          "status": "PAYER_ACTION_REQUIRED"
+        },
+        "headers": {
+          "content-type": "application/json",
+          "paypal-debug-id": "f789215790d50"
+        },
+        "status": 200
+      }
+    },
+    {
+      "request": {
+        "body": null,
+        "method": "GET",
+        "path": "/v2/checkout/orders/71D29110JM720615R",
+        "request_id": null
+      },
+      "response": {
+        "body": {
+          "create_time": "2026-11-04T12:29:53Z",
+          "id": "71D29110JM720615R",
+          "intent": "AUTHORIZE",
+          "links": [
+            {
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/71D29110JM720615R",
+              "method": "GET",
+              "rel": "self"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/71D29110JM720615R/authorize",
+              "method": "POST",
+              "rel": "authorize"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/71D29110JM720615R",
+              "method": "PATCH",
+              "rel": "update"
+            }
+          ],
+          "payer": {},
+          "payment_source": {},
+          "purchase_units": [
+            {
+              "amount": {
+                "breakdown": {
+                  "item_total": {
+                    "currency_code": "USD",
+                    "value": "69.00"
+                  }
+                },
+                "currency_code": "USD",
+                "value": "69.00"
+              },
+              "custom_id": "cs1.yTxBgpMhGj0DGQkz09GFSdtEFg18EGLpKZnHvAkrAU0",
+              "invoice_id": "chk_CVqS5PCos1LSpaXRSdSTAg",
+              "items": [
+                {
+                  "category": "DIGITAL_GOODS",
+                  "name": "Veltro Orbit Wireless Headphones",
+                  "quantity": "1",
+                  "sku": "hp-veltro-orbit-wireless-headphones",
+                  "unit_amount": {
+                    "currency_code": "USD",
+                    "value": "69.00"
+                  }
+                }
+              ],
+              "payee": {
+                "email_address": "SCRUBBED_EMAIL_ADDRESS",
+                "merchant_id": "SCRUBBED_MERCHANT_ID"
+              },
+              "reference_id": "default"
+            }
+          ],
+          "status": "APPROVED"
+        },
+        "headers": {
+          "content-type": "application/json",
+          "paypal-debug-id": "ca553a2b1787d"
+        },
+        "status": 200
+      }
+    },
+    {
+      "request": {
+        "body": {},
+        "method": "POST",
+        "path": "/v2/checkout/orders/71D29110JM720615R/authorize",
+        "request_id": "cs1.authorize.7-5ymPrqv6cnZUmxFn9NBRkOH-HBMbXjs0EbowvA2x8"
+      },
+      "response": {
+        "body": {
+          "create_time": "2026-11-04T12:29:53Z",
+          "id": "71D29110JM720615R",
+          "intent": "AUTHORIZE",
+          "links": [
+            {
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/71D29110JM720615R",
+              "method": "GET",
+              "rel": "self"
+            }
+          ],
+          "payer": {},
+          "payment_source": {},
+          "purchase_units": [
+            {
+              "amount": {
+                "breakdown": {
+                  "handling": {
+                    "currency_code": "USD",
+                    "value": "0.00"
+                  },
+                  "insurance": {
+                    "currency_code": "USD",
+                    "value": "0.00"
+                  },
+                  "item_total": {
+                    "currency_code": "USD",
+                    "value": "69.00"
+                  },
+                  "shipping": {
+                    "currency_code": "USD",
+                    "value": "0.00"
+                  },
+                  "shipping_discount": {
+                    "currency_code": "USD",
+                    "value": "0.00"
+                  }
+                },
+                "currency_code": "USD",
+                "value": "69.00"
+              },
+              "custom_id": "cs1.yTxBgpMhGj0DGQkz09GFSdtEFg18EGLpKZnHvAkrAU0",
+              "description": "Veltro Orbit Wireless Headphones",
+              "invoice_id": "chk_CVqS5PCos1LSpaXRSdSTAg",
+              "items": [
+                {
+                  "category": "DIGITAL_GOODS",
+                  "name": "Veltro Orbit Wireless Headphones",
+                  "quantity": "1",
+                  "sku": "hp-veltro-orbit-wireless-headphones",
+                  "tax": {
+                    "currency_code": "USD",
+                    "value": "0.00"
+                  },
+                  "unit_amount": {
+                    "currency_code": "USD",
+                    "value": "69.00"
+                  }
+                }
+              ],
+              "payee": {
+                "email_address": "SCRUBBED_EMAIL_ADDRESS",
+                "merchant_id": "SCRUBBED_MERCHANT_ID"
+              },
+              "payments": {
+                "authorizations": [
+                  {
+                    "amount": {
+                      "currency_code": "USD",
+                      "value": "69.00"
+                    },
+                    "create_time": "2026-11-04T12:31:26Z",
+                    "custom_id": "cs1.yTxBgpMhGj0DGQkz09GFSdtEFg18EGLpKZnHvAkrAU0",
+                    "expiration_time": "2026-12-03T12:31:26Z",
+                    "id": "8W664811971822409",
+                    "invoice_id": "chk_CVqS5PCos1LSpaXRSdSTAg",
+                    "links": [
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409",
+                        "method": "GET",
+                        "rel": "self"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409/capture",
+                        "method": "POST",
+                        "rel": "capture"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409/void",
+                        "method": "POST",
+                        "rel": "void"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409/reauthorize",
+                        "method": "POST",
+                        "rel": "reauthorize"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/checkout/orders/71D29110JM720615R",
+                        "method": "GET",
+                        "rel": "up"
+                      }
+                    ],
+                    "seller_protection": {
+                      "dispute_categories": [
+                        "ITEM_NOT_RECEIVED",
+                        "UNAUTHORIZED_TRANSACTION"
+                      ],
+                      "status": "ELIGIBLE"
+                    },
+                    "status": "CREATED",
+                    "update_time": "2026-11-04T12:31:26Z"
+                  }
+                ]
+              },
+              "reference_id": "default"
+            }
+          ],
+          "status": "COMPLETED",
+          "update_time": "2026-11-04T12:31:26Z"
+        },
+        "headers": {
+          "content-type": "application/json",
+          "paypal-debug-id": "ca553a2b9fcba"
+        },
+        "status": 201
+      }
+    },
+    {
+      "request": {
+        "body": null,
+        "method": "GET",
+        "path": "/v2/checkout/orders/71D29110JM720615R",
+        "request_id": null
+      },
+      "response": {
+        "body": {
+          "create_time": "2026-11-04T12:31:26Z",
+          "id": "71D29110JM720615R",
+          "intent": "AUTHORIZE",
+          "links": [
+            {
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/71D29110JM720615R",
+              "method": "GET",
+              "rel": "self"
+            }
+          ],
+          "payer": {},
+          "payment_source": {},
+          "purchase_units": [
+            {
+              "amount": {
+                "breakdown": {
+                  "item_total": {
+                    "currency_code": "USD",
+                    "value": "69.00"
+                  }
+                },
+                "currency_code": "USD",
+                "value": "69.00"
+              },
+              "custom_id": "cs1.yTxBgpMhGj0DGQkz09GFSdtEFg18EGLpKZnHvAkrAU0",
+              "invoice_id": "chk_CVqS5PCos1LSpaXRSdSTAg",
+              "items": [
+                {
+                  "category": "DIGITAL_GOODS",
+                  "name": "Veltro Orbit Wireless Headphones",
+                  "quantity": "1",
+                  "sku": "hp-veltro-orbit-wireless-headphones",
+                  "unit_amount": {
+                    "currency_code": "USD",
+                    "value": "69.00"
+                  }
+                }
+              ],
+              "payee": {
+                "email_address": "SCRUBBED_EMAIL_ADDRESS",
+                "merchant_id": "SCRUBBED_MERCHANT_ID"
+              },
+              "payments": {
+                "authorizations": [
+                  {
+                    "amount": {
+                      "currency_code": "USD",
+                      "value": "69.00"
+                    },
+                    "create_time": "2026-11-04T12:31:26Z",
+                    "custom_id": "cs1.yTxBgpMhGj0DGQkz09GFSdtEFg18EGLpKZnHvAkrAU0",
+                    "expiration_time": "2026-12-03T12:31:26Z",
+                    "id": "8W664811971822409",
+                    "invoice_id": "chk_CVqS5PCos1LSpaXRSdSTAg",
+                    "links": [
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409",
+                        "method": "GET",
+                        "rel": "self"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409/capture",
+                        "method": "POST",
+                        "rel": "capture"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409/void",
+                        "method": "POST",
+                        "rel": "void"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409/reauthorize",
+                        "method": "POST",
+                        "rel": "reauthorize"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/checkout/orders/71D29110JM720615R",
+                        "method": "GET",
+                        "rel": "up"
+                      }
+                    ],
+                    "seller_protection": {
+                      "dispute_categories": [
+                        "ITEM_NOT_RECEIVED",
+                        "UNAUTHORIZED_TRANSACTION"
+                      ],
+                      "status": "ELIGIBLE"
+                    },
+                    "status": "CREATED",
+                    "update_time": "2026-11-04T12:31:26Z"
+                  }
+                ]
+              },
+              "reference_id": "default"
+            }
+          ],
+          "status": "COMPLETED",
+          "update_time": "2026-11-04T12:31:26Z"
+        },
+        "headers": {
+          "content-type": "application/json",
+          "paypal-debug-id": "ca553a2c4abc6"
+        },
+        "status": 200
+      }
+    },
+    {
+      "request": {
+        "body": null,
+        "method": "GET",
+        "path": "/v2/payments/authorizations/8W664811971822409",
+        "request_id": null
+      },
+      "response": {
+        "body": {
+          "amount": {
+            "currency_code": "USD",
+            "value": "69.00"
+          },
+          "create_time": "2026-11-04T12:31:26Z",
+          "custom_id": "cs1.yTxBgpMhGj0DGQkz09GFSdtEFg18EGLpKZnHvAkrAU0",
+          "expiration_time": "2026-12-03T12:31:26Z",
+          "id": "8W664811971822409",
+          "invoice_id": "chk_CVqS5PCos1LSpaXRSdSTAg",
+          "links": [
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409",
+              "method": "GET",
+              "rel": "self"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409/capture",
+              "method": "POST",
+              "rel": "capture"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409/void",
+              "method": "POST",
+              "rel": "void"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409/reauthorize",
+              "method": "POST",
+              "rel": "reauthorize"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/71D29110JM720615R",
+              "method": "GET",
+              "rel": "up"
+            }
+          ],
+          "payee": {
+            "email_address": "SCRUBBED_EMAIL_ADDRESS",
+            "merchant_id": "SCRUBBED_MERCHANT_ID"
+          },
+          "seller_protection": {
+            "dispute_categories": [
+              "ITEM_NOT_RECEIVED",
+              "UNAUTHORIZED_TRANSACTION"
+            ],
+            "status": "ELIGIBLE"
+          },
+          "status": "CREATED",
+          "supplementary_data": {
+            "related_ids": {
+              "order_id": "71D29110JM720615R"
+            }
+          },
+          "update_time": "2026-11-04T12:31:26Z"
+        },
+        "headers": {
+          "content-type": "application/json;charset=UTF-8",
+          "paypal-debug-id": "ca553a2cdde43"
+        },
+        "status": 200
+      }
+    },
+    {
+      "request": {
+        "body": null,
+        "method": "GET",
+        "path": "/v2/checkout/orders/71D29110JM720615R",
+        "request_id": null
+      },
+      "response": {
+        "body": {
+          "create_time": "2026-11-04T12:31:26Z",
+          "id": "71D29110JM720615R",
+          "intent": "AUTHORIZE",
+          "links": [
+            {
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/71D29110JM720615R",
+              "method": "GET",
+              "rel": "self"
+            }
+          ],
+          "payer": {},
+          "payment_source": {},
+          "purchase_units": [
+            {
+              "amount": {
+                "breakdown": {
+                  "item_total": {
+                    "currency_code": "USD",
+                    "value": "69.00"
+                  }
+                },
+                "currency_code": "USD",
+                "value": "69.00"
+              },
+              "custom_id": "cs1.yTxBgpMhGj0DGQkz09GFSdtEFg18EGLpKZnHvAkrAU0",
+              "invoice_id": "chk_CVqS5PCos1LSpaXRSdSTAg",
+              "items": [
+                {
+                  "category": "DIGITAL_GOODS",
+                  "name": "Veltro Orbit Wireless Headphones",
+                  "quantity": "1",
+                  "sku": "hp-veltro-orbit-wireless-headphones",
+                  "unit_amount": {
+                    "currency_code": "USD",
+                    "value": "69.00"
+                  }
+                }
+              ],
+              "payee": {
+                "email_address": "SCRUBBED_EMAIL_ADDRESS",
+                "merchant_id": "SCRUBBED_MERCHANT_ID"
+              },
+              "payments": {
+                "authorizations": [
+                  {
+                    "amount": {
+                      "currency_code": "USD",
+                      "value": "69.00"
+                    },
+                    "create_time": "2026-11-04T12:31:26Z",
+                    "custom_id": "cs1.yTxBgpMhGj0DGQkz09GFSdtEFg18EGLpKZnHvAkrAU0",
+                    "expiration_time": "2026-12-03T12:31:26Z",
+                    "id": "8W664811971822409",
+                    "invoice_id": "chk_CVqS5PCos1LSpaXRSdSTAg",
+                    "links": [
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409",
+                        "method": "GET",
+                        "rel": "self"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409/capture",
+                        "method": "POST",
+                        "rel": "capture"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409/void",
+                        "method": "POST",
+                        "rel": "void"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409/reauthorize",
+                        "method": "POST",
+                        "rel": "reauthorize"
+                      },
+                      {
+                        "href": "https://api.sandbox.paypal.com/v2/checkout/orders/71D29110JM720615R",
+                        "method": "GET",
+                        "rel": "up"
+                      }
+                    ],
+                    "seller_protection": {
+                      "dispute_categories": [
+                        "ITEM_NOT_RECEIVED",
+                        "UNAUTHORIZED_TRANSACTION"
+                      ],
+                      "status": "ELIGIBLE"
+                    },
+                    "status": "CREATED",
+                    "update_time": "2026-11-04T12:31:26Z"
+                  }
+                ]
+              },
+              "reference_id": "default"
+            }
+          ],
+          "status": "COMPLETED",
+          "update_time": "2026-11-04T12:31:26Z"
+        },
+        "headers": {
+          "content-type": "application/json",
+          "paypal-debug-id": "ca553a2d1be84"
+        },
+        "status": 200
+      }
+    },
+    {
+      "request": {
+        "body": null,
+        "method": "GET",
+        "path": "/v2/payments/authorizations/8W664811971822409",
+        "request_id": null
+      },
+      "response": {
+        "body": {
+          "amount": {
+            "currency_code": "USD",
+            "value": "69.00"
+          },
+          "create_time": "2026-11-04T12:31:26Z",
+          "custom_id": "cs1.yTxBgpMhGj0DGQkz09GFSdtEFg18EGLpKZnHvAkrAU0",
+          "expiration_time": "2026-12-03T12:31:26Z",
+          "id": "8W664811971822409",
+          "invoice_id": "chk_CVqS5PCos1LSpaXRSdSTAg",
+          "links": [
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409",
+              "method": "GET",
+              "rel": "self"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409/capture",
+              "method": "POST",
+              "rel": "capture"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409/void",
+              "method": "POST",
+              "rel": "void"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409/reauthorize",
+              "method": "POST",
+              "rel": "reauthorize"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/71D29110JM720615R",
+              "method": "GET",
+              "rel": "up"
+            }
+          ],
+          "payee": {
+            "email_address": "SCRUBBED_EMAIL_ADDRESS",
+            "merchant_id": "SCRUBBED_MERCHANT_ID"
+          },
+          "seller_protection": {
+            "dispute_categories": [
+              "ITEM_NOT_RECEIVED",
+              "UNAUTHORIZED_TRANSACTION"
+            ],
+            "status": "ELIGIBLE"
+          },
+          "status": "CREATED",
+          "supplementary_data": {
+            "related_ids": {
+              "order_id": "71D29110JM720615R"
+            }
+          },
+          "update_time": "2026-11-04T12:31:26Z"
+        },
+        "headers": {
+          "content-type": "application/json;charset=UTF-8",
+          "paypal-debug-id": "ca553a2d51d6f"
+        },
+        "status": 200
+      }
+    },
+    {
+      "request": {
+        "body": null,
+        "method": "GET",
+        "path": "/v2/payments/authorizations/8W664811971822409",
+        "request_id": null
+      },
+      "response": {
+        "body": {
+          "amount": {
+            "currency_code": "USD",
+            "value": "69.00"
+          },
+          "create_time": "2026-11-04T12:31:26Z",
+          "custom_id": "cs1.yTxBgpMhGj0DGQkz09GFSdtEFg18EGLpKZnHvAkrAU0",
+          "expiration_time": "2026-12-03T12:31:26Z",
+          "id": "8W664811971822409",
+          "invoice_id": "chk_CVqS5PCos1LSpaXRSdSTAg",
+          "links": [
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409",
+              "method": "GET",
+              "rel": "self"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409/capture",
+              "method": "POST",
+              "rel": "capture"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409/void",
+              "method": "POST",
+              "rel": "void"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409/reauthorize",
+              "method": "POST",
+              "rel": "reauthorize"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/71D29110JM720615R",
+              "method": "GET",
+              "rel": "up"
+            }
+          ],
+          "payee": {
+            "email_address": "SCRUBBED_EMAIL_ADDRESS",
+            "merchant_id": "SCRUBBED_MERCHANT_ID"
+          },
+          "seller_protection": {
+            "dispute_categories": [
+              "ITEM_NOT_RECEIVED",
+              "UNAUTHORIZED_TRANSACTION"
+            ],
+            "status": "ELIGIBLE"
+          },
+          "status": "CREATED",
+          "supplementary_data": {
+            "related_ids": {
+              "order_id": "71D29110JM720615R"
+            }
+          },
+          "update_time": "2026-11-04T12:31:26Z"
+        },
+        "headers": {
+          "content-type": "application/json;charset=UTF-8",
+          "paypal-debug-id": "ca553a2d8dd59"
+        },
+        "status": 200
+      }
+    },
+    {
+      "request": {
+        "body": {
+          "amount": {
+            "currency_code": "USD",
+            "value": "69.00"
+          },
+          "final_capture": true
+        },
+        "method": "POST",
+        "path": "/v2/payments/authorizations/8W664811971822409/capture",
+        "request_id": "cs1.capture.Cdfice7GR0nzVk85HjCqm7YN9rEMMiPm_H80IMwwsG0"
+      },
+      "response": {
+        "body": {
+          "amount": {
+            "currency_code": "USD",
+            "value": "69.00"
+          },
+          "create_time": "2026-11-04T12:31:32Z",
+          "custom_id": "cs1.yTxBgpMhGj0DGQkz09GFSdtEFg18EGLpKZnHvAkrAU0",
+          "final_capture": true,
+          "id": "49029167TJ689282S",
+          "invoice_id": "chk_CVqS5PCos1LSpaXRSdSTAg",
+          "links": [
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/captures/49029167TJ689282S",
+              "method": "GET",
+              "rel": "self"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/captures/49029167TJ689282S/refund",
+              "method": "POST",
+              "rel": "refund"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409",
+              "method": "GET",
+              "rel": "up"
+            }
+          ],
+          "seller_protection": {
+            "dispute_categories": [
+              "ITEM_NOT_RECEIVED",
+              "UNAUTHORIZED_TRANSACTION"
+            ],
+            "status": "ELIGIBLE"
+          },
+          "seller_receivable_breakdown": {
+            "exchange_rate": {},
+            "gross_amount": {
+              "currency_code": "USD",
+              "value": "69.00"
+            },
+            "net_amount": {
+              "currency_code": "USD",
+              "value": "66.10"
+            },
+            "paypal_fee": {
+              "currency_code": "USD",
+              "value": "2.90"
+            }
+          },
+          "status": "COMPLETED",
+          "update_time": "2026-11-04T12:31:32Z"
+        },
+        "headers": {
+          "content-type": "application/json;charset=UTF-8",
+          "paypal-debug-id": "ca553a2dbec23"
+        },
+        "status": 201
+      }
+    },
+    {
+      "request": {
+        "body": null,
+        "method": "GET",
+        "path": "/v2/payments/captures/49029167TJ689282S",
+        "request_id": null
+      },
+      "response": {
+        "body": {
+          "amount": {
+            "currency_code": "USD",
+            "value": "69.00"
+          },
+          "create_time": "2026-11-04T12:31:32Z",
+          "custom_id": "cs1.yTxBgpMhGj0DGQkz09GFSdtEFg18EGLpKZnHvAkrAU0",
+          "disbursement_mode": "INSTANT",
+          "final_capture": true,
+          "id": "49029167TJ689282S",
+          "invoice_id": "chk_CVqS5PCos1LSpaXRSdSTAg",
+          "links": [
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/captures/49029167TJ689282S",
+              "method": "GET",
+              "rel": "self"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/captures/49029167TJ689282S/refund",
+              "method": "POST",
+              "rel": "refund"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409",
+              "method": "GET",
+              "rel": "up"
+            }
+          ],
+          "payee": {
+            "email_address": "SCRUBBED_EMAIL_ADDRESS",
+            "merchant_id": "SCRUBBED_MERCHANT_ID"
+          },
+          "seller_protection": {
+            "dispute_categories": [
+              "ITEM_NOT_RECEIVED",
+              "UNAUTHORIZED_TRANSACTION"
+            ],
+            "status": "ELIGIBLE"
+          },
+          "seller_receivable_breakdown": {
+            "gross_amount": {
+              "currency_code": "USD",
+              "value": "69.00"
+            },
+            "net_amount": {
+              "currency_code": "USD",
+              "value": "66.10"
+            },
+            "paypal_fee": {
+              "currency_code": "USD",
+              "value": "2.90"
+            }
+          },
+          "status": "COMPLETED",
+          "supplementary_data": {
+            "related_ids": {
+              "authorization_id": "8W664811971822409",
+              "order_id": "71D29110JM720615R"
+            }
+          },
+          "update_time": "2026-11-04T12:31:32Z"
+        },
+        "headers": {
+          "content-type": "application/json;charset=UTF-8",
+          "paypal-debug-id": "ca553a2e86e53"
+        },
+        "status": 200
+      }
+    },
+    {
+      "request": {
+        "body": null,
+        "method": "GET",
+        "path": "/v2/payments/authorizations/8W664811971822409",
+        "request_id": null
+      },
+      "response": {
+        "body": {
+          "amount": {
+            "currency_code": "USD",
+            "value": "69.00"
+          },
+          "create_time": "2026-11-04T12:31:26Z",
+          "custom_id": "cs1.yTxBgpMhGj0DGQkz09GFSdtEFg18EGLpKZnHvAkrAU0",
+          "expiration_time": "2026-12-03T12:31:26Z",
+          "id": "8W664811971822409",
+          "invoice_id": "chk_CVqS5PCos1LSpaXRSdSTAg",
+          "links": [
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409",
+              "method": "GET",
+              "rel": "self"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409/capture",
+              "method": "POST",
+              "rel": "capture"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409/void",
+              "method": "POST",
+              "rel": "void"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/payments/authorizations/8W664811971822409/reauthorize",
+              "method": "POST",
+              "rel": "reauthorize"
+            },
+            {
+              "href": "https://api.sandbox.paypal.com/v2/checkout/orders/71D29110JM720615R",
+              "method": "GET",
+              "rel": "up"
+            }
+          ],
+          "payee": {
+            "email_address": "SCRUBBED_EMAIL_ADDRESS",
+            "merchant_id": "SCRUBBED_MERCHANT_ID"
+          },
+          "seller_protection": {
+            "dispute_categories": [
+              "ITEM_NOT_RECEIVED",
+              "UNAUTHORIZED_TRANSACTION"
+            ],
+            "status": "ELIGIBLE"
+          },
+          "status": "CAPTURED",
+          "supplementary_data": {
+            "related_ids": {
+              "order_id": "71D29110JM720615R"
+            }
+          },
+          "update_time": "2026-11-04T12:31:32Z"
+        },
+        "headers": {
+          "content-type": "application/json;charset=UTF-8",
+          "paypal-debug-id": "ca553a2ebdd86"
+        },
+        "status": 200
+      }
+    }
+  ],
+  "meta": {
+    "base_url": "http://127.0.0.1:49435",
+    "flow": "countersign shopping agent: goal, phone consent, UCP checkout, payer approval, gate capture",
+    "goal": "wireless headphones under 80 dollars, valid for one week",
+    "host": "sandbox",
+    "llm_model": "gemini-3.5-flash-lite",
+    "recorded_at": "2026-11-04T12:29:47Z"
+  },
+  "version": 1
+}

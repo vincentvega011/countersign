@@ -154,6 +154,36 @@ closed, including a log failure), INV-12 (log before answer).
   independent check on a rogue platform key. A compromised device can sign what its key holds. Creating a
   customer is unauthenticated (L35).
 
+## Shopping agent and evidence bundles
+
+The agent is an untrusted client of the service; the verifier trusts nothing of the service. Code:
+`agents/shopper/`, `src/countersign/evidence/`, `countersign_verify/`; tests `tests/integration/test_shopper*.py`,
+`tests/unit/test_shopper_*.py`, `tests/integration/test_evidence_bundle.py`, `tests/unit/test_verify_evidence.py`,
+`tests/unit/test_evidence_observer.py` ([PROTOCOL.md](PROTOCOL.md) Decisions 98 to 105).
+
+| Attack | Actor | Defense | Test |
+| --- | --- | --- | --- |
+| A model reply picks something the customer did not mean (item, ceiling, expiry, a prompt injected through a product description) | model, catalog text | replies are schema-checked data, then clamped and checked by code; the human approves the structured values on the page; the service rebuilds the mandates | `test_shopper_plan.py`, Decision 100 |
+| The agent's private key leaves the process | bug, log, error | no accessor, repr, copy or pickle; a test scans traffic, events and results for the scalar | `test_the_private_key_never_leaves_the_process` |
+| A forged or stripped `merchant_authorization` is trusted | network attacker, malicious server | the agent verifies the detached JWS against the published keys before it signs anything | `test_an_invalid_merchant_authorization_stops_the_run` |
+| The service issues mandates that differ from the proposal | compromised platform | the agent compares items, ceiling, expiry, key and payee before it shops; the device signature in the bundle is the independent check | `_check_open_mandates`, `consent_signature` |
+| An expired or never-granted consent is used | agent bug | expiry and consent deadline are checked; the service verifies everything again | `test_an_expired_mandate_is_not_used`, `test_a_consent_that_never_comes_times_out` |
+| A bundle edited after the fact (any byte of any component) | merchant insider, forger | every part is signed or hashed and every relation is recomputed; a one-character change anywhere fails | `test_changing_any_character_of_any_component_is_caught` |
+| A bundle whose parts are each genuine but do not belong together | forger with real parts | the verifier compares mandates, receipts, checkout, consent terms, PayPal objects and `custom_id` against each other | `CASES` in `test_verify_evidence.py` (forged, signed bundles) |
+| A consent that the customer never signed, or signed for other terms | rogue platform key | the device signature over the record is verified and the record must equal both open mandates | `consent_signature` |
+| PayPal personal data reaches the store or a fixture | bug, new PayPal member | allowlist at every depth; an observer failure never fails a read; committed vectors are synthetic and scanned | `test_evidence_observer.py`, the vector scan |
+| A bundle shown as proof that is only self-consistent | any | `trusted_keys` fails unless the merchant and platform keys are pinned by the reader | `test_without_pinned_keys_only_the_pinning_step_fails` |
+| Truncating the log in a bundle | merchant insider | size, proofs and root are recomputed; a required entry missing fails the gate step | `log_*` tampers |
+
+Invariants: INV-1 (the agent and the verifier decide nothing for the service; no model input to any allow), INV-8 (strict
+JSON, JCS, canonical base64url), INV-9 (integer minor units in every comparison), INV-12 (the bundle is built from rows written
+before the answer).
+
+- **Not defended.** The log root is not anchored, so a forger with the code can rebuild a shorter log (L48). The verifier does
+  not compare PayPal timestamps or earlier statuses (L45). The endpoint has no login (L46). A bundle for a Human Present
+  purchase does not exist (L50). The agent trusts the merchant keys the service publishes: it detects a forged response, not a
+  merchant that is itself the attacker.
+
 ## Review of the phase 2 implementation
 
 The whole phase 2 change set was reviewed against the invariants. Result: no finding that moves money

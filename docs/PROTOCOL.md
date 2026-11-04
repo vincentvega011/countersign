@@ -2878,6 +2878,80 @@ One adapter, `OpenAICompatProvider`, for any OpenAI-compatible chat completions 
 
 ---
 
+### Decision 98: The shopping agent is a separate process that speaks HTTP only
+
+**Flagged for the owner.** `agents/shopper` imports only the standard library, `httpx`, `rfc8785`, `cryptography` and
+`countersign.llm`; it has its own `wire.py` (JCS, ES256, SD-JWT reading, closed-mandate signing) instead of an extracted
+shared package, so it is an independent implementation of what the service verifies. `tests/unit/test_shopper_boundary.py`
+enforces the allowed imports and that nothing server-side is reachable through `countersign.llm`. The agent key is created
+in the process (`AgentKey`: no accessor for the private half, no `repr`, copy or pickle; `save` writes a 0600 file and
+refuses to overwrite); a test scans all HTTP traffic, events, results and reprs for the private scalar. The `UCP-Agent`
+profile URI is `{base}/trusted-surface` (no profile document is served there; the server does not fetch it, L11). Added
+`GET /catalog` (read-only, exact filters `category`, `q`, `max_price_minor`, fixed 400 code) because the agent had no HTTP
+view of the catalog.
+
+### Decision 99: End-to-end replay maps four per-run values and nothing else
+
+**Flagged for the owner, accepted with conditions.** A checkout id, the `custom_id` (derived from mandate digests), the
+PayPal-Request-Ids (derived from the checkout id) and the loopback port in the return URLs are new on every run, so the
+exact cassette match of the earlier replays cannot hold for a run that includes a real agent and a browser.
+`tests/shopper_e2e.SubstitutingTransport` maps those four, in requests (live to recorded) and in responses (recorded to
+live), consistently; everything else must equal the recording in order (method, path, body, and the Request-Id prefix
+`cs1.<operation>`), and one live Request-Id may not stand for two recorded ones. Tests show a changed amount, item, quantity
+or path fails the replay (`test_a_mutated_recording_no_longer_replays`) and the unit tests show the mapping both ways. No
+Request-Id or `custom_id` derivation changed.
+
+### Decision 100: The item is chosen before the proposal
+
+The mandate's `checkout.line_items` constraint names exact items, so the second model call (choose one of the search
+results) happens before the proposal is filed, not after consent. After consent the agent checks that the issued open
+mandates equal what it proposed (items, quantities, ceiling, expiry, key in `cnf`, one allowed payee) before it builds
+a checkout. The wish (call 1) is clamped by code: known categories only, integers only, quantity 1 to 9, ceiling 1 to 100,000
+minor units, 1 hour to 14 days; the choice must be one of the returned results that fits the ceiling. The agent creates the
+checkout at quantity 1 and sends a UCP update only when the approved quantity is another number.
+
+### Decision 101: The rejection receipt is not transported yet; the agent retries on the typed refusal
+
+A rejected `complete` today answers with the UCP error codes and a canceled checkout but no signed rejection receipt (only
+capture receipts are returned, `ap2.checkout_receipt` and `ap2.payment_receipt`). The agent makes one more attempt, on a new
+checkout under the same open mandate, only when the response carries a signed `Error` receipt or the typed
+`checkout_canceled_after_rejection` (the service has then released the open mandate, Decision 28). L47 records the gap.
+
+### Decision 102: Payer approval in the agent
+
+When `complete` answers `complete_in_progress` with a `continue_url`, the agent hands the link to `on_payer_approval` and,
+when it returns, completes again with an empty body. With no callback it returns `payer_approval_pending` with the link. The
+agent never approves for the payer.
+
+### Decision 103: What the service keeps of PayPal objects
+
+`PayPalClient.observe_with` gives an observer the parsed body of each successful order, authorization and capture read
+(never a header, never the access token). `evidence.observer.pick` copies only allowlisted members at every depth (no payer,
+no payee email, no shipping, no links, no free text), and the result is stored in the insert-only `paypal_observations`
+(migration 0011). An observer failure is logged and never fails a read. Bundles read these rows; assembly makes no PayPal
+call of its own, so the recorded cassettes did not change. Every committed evidence vector is synthetic and a test scans them.
+
+### Decision 104: Evidence bundles are frozen at capture, keyed by the capture id
+
+`CompleteCoordinator` calls `EvidenceService.record` when the gate passes (best effort: a failure is logged and the checkout
+stays completed). The bundle (`evidence/bundle.py`: checkout_jwt, the four mandate chains, both receipts, the device consent
+record with signature and device key, the sanitized PayPal objects, the checkout's decision log entries with a Merkle root
+and inclusion proofs, the merchant and platform public keys) is stored as JCS text in the insert-only `evidence_bundles`
+and `evidence.stored` is logged after it. `GET /evidence/{capture_id}` serves it only where the shared UI is served
+(`APP_ENV` dev or eval) until the dashboard has a login (L46).
+
+### Decision 105: The offline verifier
+
+`countersign_verify` (repo root; `python -m countersign_verify bundle.json [--merchant-key K --platform-key P] [--json]`)
+imports nothing of `countersign` (a test enforces it). Exit 0 all steps pass, 1 a step failed, 2 unreadable input. Steps, in
+order, with stable names: `bundle_structure`, `checkout_mandate` (AP2 dispute 1), `checkout_jwt_hash` (2), `checkout_receipt`
+(3), `payment_mandate` (4), `payment_receipt` (5), `consent_signature`, `paypal_objects`, `paypal_custom_id`, `gate_result`,
+`decision_log`, `trusted_keys`. Every step runs on its own; the first failure in order names the defect. Base64url must be
+canonical, JSON strict (duplicate keys, NaN refused). Without pinned keys `trusted_keys` fails on purpose: a bundle proves
+it is consistent, not whose it is. Vectors for the browser verifier (P3.8): `tests/vectors/evidence/` (`valid.json`, 29
+tampered bundles with the first failing step in `index.json`, the pinned keys); `WRITE_EVIDENCE_VECTORS=1` rewrites them
+from a real run. `scripts/mutate_verifier.py`: 35 mutants, 33 killed, 2 equivalent (explained in the script).
+
 ## 4. Confirmed PayPal facts
 
 Observed in the PayPal sandbox with `scripts/sandbox_smoke.py` and `scripts/sandbox_confirm.py`

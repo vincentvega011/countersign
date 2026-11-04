@@ -111,6 +111,10 @@ class GateLockAdapter:
         return LockDecision(verdict.allowed, verdict.reason)
 
 
+class EvidenceRecorder(Protocol):
+    def record(self, checkout_id: str, receipts: dict[str, str]) -> bool: ...
+
+
 class CompleteCoordinator:
     def __init__(
         self,
@@ -119,7 +123,9 @@ class CompleteCoordinator:
         credential_provider: CredentialProvider,
         gate: CaptureStage | None = None,
         lock: PrincipalLock | None = None,
+        evidence: EvidenceRecorder | None = None,
     ) -> None:
+        self._evidence = evidence
         self._lock = lock
         self._merchant = merchant
         self._merchant_store = merchant_store
@@ -218,6 +224,8 @@ class CompleteCoordinator:
             mandate = self._gate.presented_checkout_mandate(checkout.id)
             if mandate is not None:
                 found["checkout_receipt"] = self._merchant.completion_receipt(mandate, checkout.id)
+                if self._evidence is not None:
+                    self._evidence.record(checkout.id, found)  # best effort: money already moved
             return CompletionOutcome("captured", receipts=found)
         if isinstance(outcome, GateRejected):
             return CompletionOutcome("rejected", tuple(outcome.messages), consumed=True)

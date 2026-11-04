@@ -35,6 +35,7 @@ from countersign.canonical.jsonstrict import loads_strict
 from countersign.completion import CaptureStage, CompleteCoordinator, GateLockAdapter
 from countersign.constraints import CheckoutConstraintEvaluator, PaymentConstraintEvaluator
 from countersign.cp import CpConfig, CredentialProvider, SpendLedger
+from countersign.evidence import EvidenceService, PayPalObserver
 from countersign.gate import CaptureGate
 from countersign.gate.store import GateStore
 from countersign.lock import PrincipalLock
@@ -140,7 +141,15 @@ def build_app(settings: RuntimeSettings, wiring: Wiring) -> FastAPI:
             config, engine, wiring.paypal, GateLockAdapter(lock), clock=wiring.clock,
             clock_us=clock_us, paypal_now=paypal_now, store=gate_store,
         )  # fmt: skip
-    coordinator = CompleteCoordinator(merchant, merchant_store, cp, stage, lock)
+    evidence: EvidenceService | None = None
+    if wiring.platform_key is not None:
+        wiring.paypal.observe_with(PayPalObserver(engine, clock_us))
+        evidence = EvidenceService(
+            engine, merchant_jwk=dict(key.public_jwk),
+            platform_jwk=dict(wiring.platform_key.as_dict(private=False)),
+            clock_us=clock_us, policy_hash=policy_hash(),
+        )  # fmt: skip
+    coordinator = CompleteCoordinator(merchant, merchant_store, cp, stage, lock, evidence)
 
     unmandated: UnmandatedCompletion | None = None
     if baseline:
@@ -168,7 +177,7 @@ def build_app(settings: RuntimeSettings, wiring: Wiring) -> FastAPI:
             merchant=Merchant(
                 wiring.merchant_constraint_id, str(wiring.payee.get("name", "")), base
             ),
-        ), unmandated=unmandated, json_loader=json_loader,
+        ), evidence=evidence, unmandated=unmandated, json_loader=json_loader,
         clock_us=clock_us,
     )  # fmt: skip
 
