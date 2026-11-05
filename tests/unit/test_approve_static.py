@@ -68,6 +68,7 @@ def test_the_page_and_its_files_are_served_in_every_mode(env: str) -> None:
         assert r.headers["x-content-type-options"] == "nosniff"
         assert "default-src 'none'" in r.headers["content-security-policy"]
     assert "This device" in c.get("/approve/").text
+    assert "Verify an evidence bundle" in c.get("/verify/").text
 
 
 def test_the_served_set_is_exactly_what_the_issue_names() -> None:
@@ -80,9 +81,17 @@ def test_the_served_set_is_exactly_what_the_issue_names() -> None:
             "/ui/fonts/instrument-sans-latin-wght-normal.woff2",
             "/ui/fonts/jetbrains-mono-latin-wght-normal.woff2",
             "/ui/fonts/newsreader-latin-wght-normal.woff2",
+            "/ui/evidence/json.js",
+            "/ui/evidence/crypto.js",
+            "/ui/evidence/sdjwt.js",
+            "/ui/evidence/log.js",
+            "/ui/evidence/constraints.js",
+            "/ui/evidence/steps.js",
+            "/ui/evidence/verify.js",
         ]
     )
     assert all(path.startswith("/approve/") for path in static_routes.PAGE_FILES)
+    assert all(path.startswith("/verify/") for path in static_routes.VERIFY_FILES)
 
 
 def test_every_served_file_exists_and_every_page_file_is_served() -> None:

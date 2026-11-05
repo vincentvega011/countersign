@@ -177,7 +177,10 @@ def test_the_committed_tampered_vectors_are_current_and_synthetic() -> None:
         expected = copy.deepcopy(VALID)
         tamper(expected)
         assert json.loads((VECTORS / "tampered" / f"{name}.json").read_text()) == expected
-        assert {"file": f"tampered/{name}.json", "first_failure": step} in index["tampered"]
+        entry = next(e for e in index["tampered"] if e["file"] == f"tampered/{name}.json")
+        assert entry["first_failure"] == step
+        failed = [r for r in verify(expected, PINNED) if not r.ok]
+        assert failed[0].code == entry["code"]
 
 
 def test_no_vector_holds_an_email_a_name_a_token_or_a_private_key() -> None:
@@ -292,13 +295,81 @@ def _not_final(paypal: dict[str, Any]) -> None:
     paypal["capture"][0]["final_capture"] = False
 
 
+def _other_item(terms: dict[str, Any], checkout: dict[str, Any], _: dict[str, Any]) -> None:
+    """The customer allowed another product than the one bought (consent and mandate agree)."""
+    terms["items"][0].update(id="spk-other-speaker", title="Other Speaker")
+    checkout["constraints"][0]["items"][0]["acceptable_items"] = [
+        {"id": "spk-other-speaker", "title": "Other Speaker"}
+    ]
+
+
+def _other_merchant(_: dict[str, Any], checkout: dict[str, Any], __: dict[str, Any]) -> None:
+    checkout["constraints"][1]["allowed"] = [{"id": "m-other", "name": "Other"}]
+
+
+def _amount_range(_: dict[str, Any], __: dict[str, Any], payment: dict[str, Any]) -> None:
+    payment["constraints"][0]["max"] = 4000
+
+
+def _recurrence(_: dict[str, Any], __: dict[str, Any], payment: dict[str, Any]) -> None:
+    payment["constraints"][3]["max_occurrences"] = 2
+
+
+def _unknown_type(_: dict[str, Any], checkout: dict[str, Any], __: dict[str, Any]) -> None:
+    checkout["constraints"].append({"type": "checkout.something_new"})
+
+
+def _terms_quantity(terms: dict[str, Any], _: dict[str, Any], __: dict[str, Any]) -> None:
+    terms["items"][0]["quantity"] = 2
+
+
+def _two_bought(c: dict[str, Any]) -> None:
+    c["line_items"][0]["quantity"] = 2
+
+
 CASES: dict[str, tuple[dict[str, Any], str, str]] = {
+    "the checkout buys an item the customer did not allow": (
+        {"contents_edit": _other_item},
+        "checkout_mandate",
+        "not the items",
+    ),
+    "the checkout buys more than the allowed quantity": (
+        {"checkout_edit": _two_bought},
+        "checkout_mandate",
+        "not the items",
+    ),
+    "the merchant paid is not an allowed merchant": (
+        {"contents_edit": _other_merchant},
+        "payment_mandate",
+        "not one the customer allowed",
+    ),
+    "the amount is outside the allowed range": (
+        {"contents_edit": _amount_range},
+        "payment_mandate",
+        "outside the range",
+    ),
+    "the mandate allows more than one payment": (
+        {"contents_edit": _recurrence},
+        "payment_mandate",
+        "more than one",
+    ),
+    "an open mandate has a constraint the verifier does not know": (
+        {"contents_edit": _unknown_type},
+        "checkout_mandate",
+        "does not know",
+    ),
+    "the terms shown differ from the signed mandates": (
+        {"contents_edit": _terms_quantity},
+        "consent_signature",
+        "do not make these mandates",
+    ),
     "key binding for another open mandate": (
         {"kb_sd_hash": lambda s: s[:-5] + "AAAA~"},
         "checkout_mandate",
         "not bound",
     ),
     "key binding audience": ({"kb_aud_checkout": "somebody"}, "checkout_mandate", "audience"),
+    "key binding of the wrong typ": ({"kb_typ": "dc+sd-jwt"}, "checkout_mandate", "typ"),
     "closed after the open mandate expired": (
         {"closed_iat": 1_800_000_000 + 7200},
         "checkout_mandate",

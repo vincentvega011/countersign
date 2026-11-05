@@ -9,8 +9,8 @@ A phase starts only when the previous gate has passed.
 | P0    | Foundations: repository, CI, vendored specs, spec notes, library selection, PayPal sandbox confirmations                               | `make sandbox-smoke` passes and every Day 0 confirmation in [architecture.md](architecture.md) has an answer or a written fallback                 | Passed      |
 | P1    | Canonical core, UCP checkout and profile, `merchant_authorization`, PayPal client, decision log                                        | A UCP checkout is signed and verified by the independent Node verifier, and canonical terms round-trip through a real sandbox order                | Passed |
 | P2    | Mandates, Merchant and Credential Provider roles, constraints, capture gate, principal lock, ACP adapter, baseline mode, first attacks | Downgrade, order-changed-after-approval (nothing is authorized in full; authorized, then voided by the gate with `ABL_NO_PREAUTH_CHECK`) and replay attacks succeed in baseline and fail in full with nothing captured; concurrency tests pass | Passed      |
-| P3    | Trusted Surface with device keys and consent, shopping agent, evidence bundles and verifiers                                           | An autonomous purchase runs from phone approval to a captured sandbox order to a verified evidence bundle, with no server-held customer key        | In progress |
-| P4    | Dashboard, assistant, hostile agent, full evaluation                                                                                   | The whole demo runs from the dashboard locally and the evaluation numbers are frozen                                                               | Not started |
+| P3    | Trusted Surface with device keys and consent, shopping agent, evidence bundles and verifiers                                           | An autonomous purchase runs from phone approval to a captured sandbox order to a verified evidence bundle, with no server-held customer key        | Passed      |
+| P4    | Dashboard, assistant, hostile agent, full evaluation                                                                                   | The whole demo runs from the dashboard locally and the evaluation numbers are frozen                                                               | Next        |
 | P5    | Deployment, design polish, documentation, fresh-clone test                                                                             | A stranger can use the hosted demo end to end and can run it locally from the README alone                                                         | Not started |
 | P6    | Video, submission text, final checks                                                                                                   | Everything is submitted with time to spare                                                                                                         | Not started |
 
@@ -224,14 +224,41 @@ recorded request ids again, so:
   closes L43 for the autonomous flow), evidence bundles `src/countersign/evidence/` and the offline verifier
   `countersign_verify` (Decisions 103 to 105; L45 to L51). The agent's end-to-end run is recorded against the live sandbox and
   replayed (`tests/cassettes/shopper_e2e.json`, two model cassettes); the verifier has 12 steps, 29 tampered vectors, signed
-  but inconsistent bundles from a forger, and a 35 mutant sweep (33 killed, 2 equivalent). **Next: P3.8 (browser verifier
-  checked against the vectors) and P3.9.**
+  but inconsistent bundles from a forger, and a 35 mutant sweep (33 killed, 2 equivalent).
+- P3.8 and P3.9 (done; one commit): the browser verifier `web/ui/evidence/` (a port of the CLI on WebCrypto, no
+  dependency, no network) and the page `/verify/`; both verifiers hardened to one set of JSON and type rules with stable
+  failure codes (Decision 106); evidence served in every mode (Decision 107); the agreement test over 91 vectors and 400
+  mutations (Decision 108); the P3 gate test (Decision 109); constraint evaluation in both verifiers after the review
+  (Decision 110). L46 rewritten; L52 to L55 new. TS mutation sweep: 24 mutants, 23 killed, 1 equivalent.
 - P3.5 (done): the model gateway `src/countersign/llm` ([PROTOCOL.md](PROTOCOL.md) Decisions 94 to 97): one
   interface with schema-validated output and a single retry, an OpenAI-compatible adapter, a fake provider, a
   rate limiter and call budget, backoff with jitter inside a deadline, record and replay cassettes in
   `eval/cassettes/llm/` (replay by default, no network in any test), a scrubber, and the boundary test that keeps
   the package out of every authorization module. **The provider and model are still open until P3.6**; no
   cassette is recorded yet (`scripts/record_llm_cassette.py` is for the owner to run). One commit covers P3.4 and P3.5.
+
+## P3 gate (run 2026-11-05): passed
+
+Gate evidence (`tests/integration/test_p3_gate.py`, Decision 109):
+
+- **The purchase.** The recorded run of 4 Nov (live sandbox, capture `49029167TJ689282S`) replays end to end with no live
+  PayPal or model call: a headless phone makes a non-extractable WebCrypto key and signs the consent on the real page, the
+  agent shops over HTTP, the gate captures, and the stored bundle is served by `GET /evidence/{capture_id}` in `demo` mode.
+- **Verified twice.** The bundle passes all twelve steps in `countersign_verify` and in the browser verifier, with the
+  service's real merchant and platform public keys pinned.
+- **No server-held customer key.** The database (every row of every table), the process log, the environment and every
+  object alive in the process hold only the device's public JWK; only three modules sign anything and none handles a
+  consent; `issue_open_mandate` runs only after the device signature check; the run's mandates are the ones issued from its
+  browser-signed consent record.
+- **Independent review** of the whole P3 diff (a separate agent with fresh context), verdict verbatim:
+  `VERDICT: PASS WITH NOTES`. Findings: 1 HIGH (the verifiers did not evaluate the open mandates' constraints, so a bundle
+  for goods the customer never allowed passed) **fixed** with tests (Decision 110); 1 MEDIUM (the page overstated what
+  pinned keys cover) **fixed** in the page text, recorded as L54; 2 LOW (bundles can be linked to one customer: L46; a Human
+  Present offer is not tied to the checkout's customer: L55); 1 NOTE (log steps read stronger than they are: page text
+  reworded, L48).
+- Screen recordings of the replayed flow are in the gitignored `web/ui/.artifacts/gate/` (`GATE_VIDEO_DIR` runs them).
+
+What remains: P4 (dashboard on AG Grid, Ask Countersign, hostile agent, full evaluation) and the carry-forwards below.
 
 ## P2 gate (run 2026-10-30): passed
 
@@ -300,6 +327,10 @@ Findings from the P1 review that belong to P2 and are not optional there:
 - **P5.1:** create the PayPal webhook, record its id, and confirm live delivery and `verify-webhook-signature` against a real notification (ENV section 11).
 
 - **Later:** the page for revoking a key and adding a second device (L36, L38).
+- **P4:** tie a Human Present offer to the customer of the checkout's principal, and check whether the principal lock already stops it (L55, review finding 4).
+- **P4:** let the reader pin or recognise the customer's device key fingerprint on `/verify/` beyond showing it (L54).
+- **P5.1:** rate limit `GET /evidence/{capture_id}` (L46).
+- **Later:** anchor the decision log root so the log steps prove more than consistency (L48).
 
 ## Open risks
 

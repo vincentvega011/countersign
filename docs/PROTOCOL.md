@@ -2938,7 +2938,7 @@ stays completed). The bundle (`evidence/bundle.py`: checkout_jwt, the four manda
 record with signature and device key, the sanitized PayPal objects, the checkout's decision log entries with a Merkle root
 and inclusion proofs, the merchant and platform public keys) is stored as JCS text in the insert-only `evidence_bundles`
 and `evidence.stored` is logged after it. `GET /evidence/{capture_id}` serves it only where the shared UI is served
-(`APP_ENV` dev or eval) until the dashboard has a login (L46).
+(`APP_ENV` dev or eval) until the dashboard has a login (L46). *Superseded by Decision 107: served in every mode.*
 
 ### Decision 105: The offline verifier
 
@@ -2949,8 +2949,83 @@ order, with stable names: `bundle_structure`, `checkout_mandate` (AP2 dispute 1)
 `decision_log`, `trusted_keys`. Every step runs on its own; the first failure in order names the defect. Base64url must be
 canonical, JSON strict (duplicate keys, NaN refused). Without pinned keys `trusted_keys` fails on purpose: a bundle proves
 it is consistent, not whose it is. Vectors for the browser verifier (P3.8): `tests/vectors/evidence/` (`valid.json`, 29
-tampered bundles with the first failing step in `index.json`, the pinned keys); `WRITE_EVIDENCE_VECTORS=1` rewrites them
+tampered bundles with the first failing step in `index.json`, the pinned keys; 30 since Decision 108, with codes); `WRITE_EVIDENCE_VECTORS=1` rewrites them
 from a real run. `scripts/mutate_verifier.py`: 35 mutants, 33 killed, 2 equivalent (explained in the script).
+
+### Decision 106: The verifier's number rules, nesting cap, type-exact checks and failure codes
+
+**Flagged for the owner, approved.** Both verifiers (the Python CLI and the browser port) parse every JSON text, the bundle and
+each JSON value inside it, with the same rules, checked in this order: UTF-8 with no byte order mark, no lone surrogate, at
+most **64** arrays and objects open at once (a bundle needs 8), then in document order no `NaN` or `Infinity`, integers only
+within +/-(2^53 - 1), no excess precision (Decision 12), no duplicate key (checked when an object closes), then no escaped
+lone surrogate. A number written with a fraction or an exponent is a float and is never equal to an integer: `1.0` is not `1`
+and `true` is not `1` (`same`, `is_int`). A PayPal amount `value` must be a string of digits with an optional fraction
+(`Infinity`, exponents, signs and spaces are refused) of whole US cents. Any error inside a step fails that step with a
+stable code (`malformed` for a value of the wrong shape); nothing in a bundle can crash the verifier. `trusted_keys` passes
+only when both keys are pinned (`keys_partly_pinned` otherwise). The rules are tested identically in both verifiers from one
+table (`tests/vectors/evidence/json_rules.json`) and 20 bundles under `tests/vectors/evidence/strict/` (big integer, big float,
+excess precision, `Infinity`, overflow, lone surrogate, nesting at 64 and 65, `1.0` and `true` for `1`, float log size,
+`Infinity` and exponent amounts, negative and float `seq` and `ts_us`). Every earlier vector and the recorded shopper run keep
+their outcome; the service's own bundle parses with no float in it (`test_the_service_never_emits_what_the_strict_verifier_refuses`).
+
+### Decision 107: Evidence bundles are served in every mode (settles Decision 104 and L46)
+
+**Flagged for the owner.** `GET /evidence/{capture_id}` is served in every `APP_ENV`, so the verifier page can load a bundle
+by capture id in the hosted demo. A bundle is sanitized sandbox data (Decision 103: PayPal objects pass a member allowlist,
+the customer is a random `cus_` id); a test scans a served bundle for email-shaped text and payer or buyer name, address or id
+members. No listing endpoint. Every path under `/evidence/` answers through one handler: an unknown id, a malformed one and a
+deeper path get the same 404 `{"code":"evidence_unknown"}` with the same headers, so the answer says nothing about which ids
+are well formed. `Cache-Control: no-store`. One process log line per fetch (`evidence_fetch`, the id only when well formed);
+no decision log entry, because a read decides nothing.
+
+### Decision 108: The browser verifier and the `/verify/` page
+
+**Flagged for the owner.** `web/ui/evidence/` is a line by line port of `countersign_verify` in plain ES modules (no build step,
+no dependency, nothing vendored): its own strict parser (objects with a null prototype, floats as a `Float` type), RFC 8785,
+canonical base64url, and SHA-256 and ES256 on WebCrypto. It makes no network request. The same twelve steps, in the same order,
+raise the same codes; `tests/unit/test_verifier_agreement.py` runs both over every vector (valid, 30 tampered, 20 strict, 40
+forged) and 400 mutated bundles and fails on any difference in step name, outcome, code or first failure. The 40 signed but
+inconsistent bundles of the forger are now committed (`tests/vectors/evidence/forged/`, each verified with its own keys) so the
+browser side meets the same checks. `/verify/` (served in every mode from the exact allowlist of Decision 76, with the same
+CSP): paste, drop or choose a bundle file, or load one by capture id; optionally paste both public keys. Without pinned keys
+the page says the keys come from the bundle and are not pinned. Every sentence is a fixed template; bundle content is only ever
+set as text. The page and its modules may name PayPal as the platform the evidence comes from, in text only (the no-trademark
+test exempts these two folders for that one word). Mutation sweep of the port: `scripts/mutate_browser_verifier.py`, 24
+mutants, 23 killed, 1 equivalent (explained in the script).
+
+### Decision 109: The P3 gate test
+
+`tests/integration/test_p3_gate.py` replays the recorded run of 4 Nov (capture 49029167TJ689282S) with a headless phone, the
+real composition root in `demo` mode and the service's own keys, then checks: the capture is the recorded one; the bundle passes
+all twelve steps in the Python CLI and in the browser verifier with those keys pinned; the database, the process log, the
+environment and every object alive in the process hold no private key of the device (only its public JWK); only three modules
+sign anything and none of them handles a consent; `issue_open_mandate` is called only after the device signature check; and
+the run's mandates are the ones issued from its browser-signed consent record. With `GATE_VIDEO_DIR` set it also records the
+phone, the agent log and the verifier page (gitignored, never committed).
+
+### Decision 110: Both verifiers evaluate the open mandates' constraints (review finding, HIGH)
+
+**Flagged for the owner.** The independent review of P3 found that a bundle for goods the customer never allowed passed every
+content step: the verifiers checked signatures, bindings and the budget, not the other constraints. Fixed in both verifiers
+(`countersign_verify/constraints.py`, `web/ui/evidence/constraints.js`), with the same codes, inside the existing steps so the
+step names and order do not change:
+
+- `checkout_mandate` (AP2 dispute step 1, "verify the closed checkout conforms to every constraint"): the open Checkout
+  Mandate may hold only `checkout.line_items` (required) and `checkout.allowed_merchants`; `checkout.line_items` is evaluated
+  with the maximal flow reading of Decision 31 against the checkout the closed mandate commits to (`constraint_line_items`).
+  At most 100 requirements and 100 lines, quantities 1 to 1,000,000.
+- `payment_mandate`: the open Payment Mandate may hold only `payment.reference`, `payment.amount_range`,
+  `payment.allowed_payees`, `payment.budget` and `payment.agent_recurrence` (Decision 32 readings; `max_occurrences` must
+  be 1); `checkout.allowed_merchants` is matched on `id` against the closed Payment Mandate's payee, the merchant that was
+  paid (`constraint_merchant`), because the signed checkout does not name its merchant.
+- `consent_signature`: the consent's `terms` must rebuild, as the issuer does, into exactly the `mandate` the device signed
+  (`consent_terms_mismatch`), so the terms the page showed and the mandates cannot differ.
+- Any other constraint type, a member not understood, or two of one type fail (`constraint_unresolved`,
+  `constraint_duplicate`): an unknown constraint might restrict more, so it is never ignored.
+
+Seven forged vectors cover the cases (another item, a larger quantity, another merchant, an amount outside the range, more
+than one occurrence, an unknown constraint type, terms that differ from the mandates). Every earlier vector keeps its first
+failing step and code.
 
 ## 4. Confirmed PayPal facts
 

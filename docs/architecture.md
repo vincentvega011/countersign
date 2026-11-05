@@ -558,7 +558,7 @@ Contents:
 - the checkout's decision log entries with their Merkle root and inclusion proofs (the gate result is read from them);
 - the merchant and platform public keys.
 
-`GET /evidence/{capture_id}` serves it in dev and eval only (L46).
+`GET /evidence/{capture_id}` serves it in every mode, with one identical 404 for unknown and malformed ids (Decision 107, L46).
 
 **The offline verifier** is `countersign_verify` at the repo root, a standalone Python CLI that imports nothing of the service
 (its own JCS, ES256, SD-JWT, log and Merkle code). Steps with stable names, in the order of AP2's dispute procedure
@@ -566,7 +566,16 @@ Contents:
 `checkout_receipt`, `payment_mandate`, `payment_receipt`, then Countersign's own `consent_signature` (the device signed the
 terms both open mandates were issued from), `paypal_objects` (amounts, ids, items against the signed checkout),
 `paypal_custom_id` (the evidence reference recomputed), `gate_result`, `decision_log` and `trusted_keys`. Vectors for the
-browser verifier (P3.8) are in `tests/vectors/evidence/`; the verifier is mutation-checked by `scripts/mutate_verifier.py`.
+browser verifier are in `tests/vectors/evidence/`; the verifier is mutation-checked by `scripts/mutate_verifier.py`. JSON is
+parsed under one set of rules (Decision 106): integers within 2^53 - 1, floats never equal to integers, nesting at most 64, and
+any error inside a step fails that step with a stable code. Steps 1 and 4 also evaluate the open mandates' constraints (items, quantities,
+merchant, amount range, recurrence) and `consent_signature` rebuilds the mandates from the signed terms (Decision 110).
+
+**The browser verifier** is `web/ui/evidence/` (plain ES modules on WebCrypto, no dependency, no network), a line by line port
+with the same steps, order and codes; `tests/unit/test_verifier_agreement.py` holds the two to the same result on every
+vector and on mutated bundles (Decision 108). The page `/verify/` (`web/verify/`) takes a pasted, dropped or chosen bundle, or
+loads one by capture id, optionally pins both public keys, and lists the steps with fixed explanations, the first failure
+highlighted.
 
 ### 5.13 trusted_surface (device keys, consent, platform issuer)
 

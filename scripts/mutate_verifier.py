@@ -44,8 +44,8 @@ MUTANTS: list[tuple[str, str, str, str, str]] = [
     (
         "M04",
         "crypto.py",
-        "        if len(set(keys)) != len(keys):",
-        "        if False:",
+        "    if len(set(keys)) != len(keys):",
+        "    if False:",
         "duplicate JSON keys accepted",
     ),
     (
@@ -79,7 +79,7 @@ MUTANTS: list[tuple[str, str, str, str, str]] = [
     (
         "M09",
         "sdjwt.py",
-        "    if type(iat) is not int or type(exp) is not int or iat > exp:",
+        "    if not is_int(iat) or not is_int(exp) or iat > exp:",
         "    if False:",
         "closed after open expiry accepted",
     ),
@@ -121,8 +121,8 @@ MUTANTS: list[tuple[str, str, str, str, str]] = [
     (
         "M15",
         "steps.py",
-        '        raise Invalid(f"the {which} receipt reference is not the hash of the closed mandate")',
-        "        pass",
+        '    if claims.get("reference") != digest(mandate_link):',
+        "    if False:",
         "AP2 steps 3 and 5 reference comparison",
     ),
     (
@@ -142,21 +142,21 @@ MUTANTS: list[tuple[str, str, str, str, str]] = [
     (
         "M18",
         "steps.py",
-        '    if amount != {"amount": total, "currency": currency}:',
+        '    if not same(pcl.content.get("payment_amount"), {"amount": total, "currency": currency}):',
         "    if False:",
         "payment amount equals checkout total",
     ),
     (
         "M19",
         "steps.py",
-        '    if len(allowed) != 1 or payee not in allowed[0].get("allowed", []):',
+        '    if len(allowed) != 1 or not any(same(payee, p) for p in allowed[0].get("allowed", [])):',
         "    if False:",
         "payee must be allowed",
     ),
     (
         "M20",
         "steps.py",
-        '    if len(budget) != 1 or type(budget[0].get("max")) is not int or total > budget[0]["max"]:',
+        '    if len(budget) != 1 or not is_int(budget[0].get("max")) or total > budget[0]["max"]:',
         "    if False:",
         "total within the budget",
     ),
@@ -177,22 +177,22 @@ MUTANTS: list[tuple[str, str, str, str, str]] = [
     (
         "M23",
         "steps.py",
-        '    if signed.get("checkout") != checkout:',
+        '    if not same(signed.get("checkout"), checkout):',
         "    if False:",
         "signed terms equal the open Checkout Mandate",
     ),
     (
         "M24",
         "steps.py",
-        '    if signed.get("payment") != payment:',
+        '    if not same(signed.get("payment"), payment):',
         "    if False:",
         "signed terms equal the open Payment Mandate",
     ),
     (
         "M25",
         "steps.py",
-        '    if minor(obj.get("amount")) != (total, currency):\n        raise Invalid(f"a PayPal {what} amount',
-        '    if False:\n        raise Invalid(f"a PayPal {what} amount',
+        '    if minor(obj.get("amount")) != (total, currency):\n        raise Invalid("paypal_amount"',
+        '    if False:\n        raise Invalid("paypal_amount"',
         "PayPal amount equals the signed total",
     ),
     (
@@ -205,21 +205,21 @@ MUTANTS: list[tuple[str, str, str, str, str]] = [
     (
         "M27",
         "steps.py",
-        "    if found != {want}:",
+        "    if not all(isinstance(f, str) and f == want for f in found):",
         "    if False:",
         "custom_id is the recomputed reference",
     ),
     (
         "M28",
         "steps.py",
-        '        if steps.get(code) != ["pass"]:',
+        '        if not same(steps.get(code), ["pass"]):',
         "        if False:",
         "every gate step passed once",
     ),
     (
         "M29",
         "steps.py",
-        '    if captured.get("reference") != claims.get("reference"):',
+        '    if not same(captured.get("reference"), claims.get("reference")):',
         "    if False:",
         "gate.captured agrees with the receipt",
     ),
@@ -240,7 +240,7 @@ MUTANTS: list[tuple[str, str, str, str, str]] = [
     (
         "M32",
         "steps.py",
-        '    if log["size"] != len(entries) or len(proofs) != len(entries):',
+        '    if not same(log["size"], len(entries)) or len(proofs) != len(entries):',
         "    if False:",
         "log size and proof count",
     ),
@@ -254,7 +254,7 @@ MUTANTS: list[tuple[str, str, str, str, str]] = [
     (
         "M34",
         "steps.py",
-        '        if thumbprint(key) != thumbprint(b.raw["keys"].get(name)):',
+        '        if thumbprint(b.pinned[name]) != thumbprint(b.raw["keys"].get(name)):',
         "        if False:",
         "pinned keys equal the bundle keys",
     ),

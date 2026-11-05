@@ -174,6 +174,12 @@ def log_proof_truncated(b: Bundle) -> None:
     b["log"]["proofs"][3]["path"].pop()
 
 
+def log_proof_sibling_altered(b: Bundle) -> None:
+    """A proof of the right length whose first sibling is another hash: it reaches another root."""
+    path = b["log"]["proofs"][3]["path"]
+    path[0] = b64url(bytes(32 - 1) + b"\x01")
+
+
 def log_proof_dropped(b: Bundle) -> None:
     b["log"]["proofs"].pop()
 
@@ -238,6 +244,7 @@ TAMPERS: dict[str, tuple[Callable[[Bundle], None], str]] = {
     "log_middle_entry_dropped": (log_middle_entry_dropped, "decision_log"),
     "log_proof_truncated": (log_proof_truncated, "decision_log"),
     "log_proof_dropped": (log_proof_dropped, "decision_log"),
+    "log_proof_sibling_altered": (log_proof_sibling_altered, "decision_log"),
     "log_payload_altered": (log_payload_altered, "decision_log"),
     "log_root_altered": (log_root_altered, "decision_log"),
     "log_consistently_truncated": (log_consistently_truncated, "gate_result"),
@@ -250,6 +257,14 @@ TAMPERS: dict[str, tuple[Callable[[Bundle], None], str]] = {
 _ = jcs  # imported so a reader sees the canonical form the log section is checked against
 
 
+def _first_code(bundle: Bundle, valid: Bundle) -> str | None:
+    from countersign_verify import verify
+
+    pinned = {k: valid["keys"][k] for k in ("merchant", "platform")}
+    failed = [r for r in verify(copy.deepcopy(bundle), pinned) if not r.ok]
+    return failed[0].code if failed else None
+
+
 def write_vectors(valid: Bundle, directory: Any) -> None:
     """Write the valid bundle's pinned keys, every tampered bundle and `index.json` under `directory`."""
     tampered = directory / "tampered"
@@ -259,14 +274,20 @@ def write_vectors(valid: Bundle, directory: Any) -> None:
         bundle = copy.deepcopy(valid)
         tamper(bundle)
         (tampered / f"{name}.json").write_text(json.dumps(bundle, indent=1, sort_keys=True) + "\n")
-        index.append({"file": f"tampered/{name}.json", "first_failure": step})
+        index.append({"file": f"tampered/{name}.json", "first_failure": step,
+                      "code": _first_code(bundle, valid)})  # fmt: skip
     for key in ("merchant", "platform"):
         (directory / f"{key}.key.json").write_text(
             json.dumps(valid["keys"][key], indent=1, sort_keys=True) + "\n"
         )
+    from tests.evidence_strict import write_strict_vectors
+
+    strict = write_strict_vectors(valid, directory)
+    previous = directory / "index.json"
+    forged = json.loads(previous.read_text()).get("forged", []) if previous.exists() else []
     (directory / "index.json").write_text(
         json.dumps(
             {"valid": "valid.json", "pinned": ["merchant.key.json", "platform.key.json"],
-             "tampered": index}, indent=1, sort_keys=True,
+             "tampered": index, "strict": strict, "forged": forged}, indent=1, sort_keys=True,
         ) + "\n"
     )  # fmt: skip

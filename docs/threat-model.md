@@ -159,7 +159,8 @@ closed, including a log failure), INV-12 (log before answer).
 The agent is an untrusted client of the service; the verifier trusts nothing of the service. Code:
 `agents/shopper/`, `src/countersign/evidence/`, `countersign_verify/`; tests `tests/integration/test_shopper*.py`,
 `tests/unit/test_shopper_*.py`, `tests/integration/test_evidence_bundle.py`, `tests/unit/test_verify_evidence.py`,
-`tests/unit/test_evidence_observer.py` ([PROTOCOL.md](PROTOCOL.md) Decisions 98 to 105).
+`tests/unit/test_evidence_observer.py`, the browser verifier `web/ui/evidence/` and its page `web/verify/`
+([PROTOCOL.md](PROTOCOL.md) Decisions 98 to 109).
 
 | Attack | Actor | Defense | Test |
 | --- | --- | --- | --- |
@@ -174,13 +175,22 @@ The agent is an untrusted client of the service; the verifier trusts nothing of 
 | PayPal personal data reaches the store or a fixture | bug, new PayPal member | allowlist at every depth; an observer failure never fails a read; committed vectors are synthetic and scanned | `test_evidence_observer.py`, the vector scan |
 | A bundle shown as proof that is only self-consistent | any | `trusted_keys` fails unless the merchant and platform keys are pinned by the reader | `test_without_pinned_keys_only_the_pinning_step_fails` |
 | Truncating the log in a bundle | merchant insider | size, proofs and root are recomputed; a required entry missing fails the gate step | `log_*` tampers |
+| A bundle for goods, a quantity, a merchant or an amount the customer did not allow, with every signature valid | malicious agent with a runtime gap, forger | both verifiers evaluate every open mandate constraint and rebuild the mandates from the signed terms (Decision 110) | the seven constraint `CASES`, `forged/` vectors |
+| An operator mints a whole customer approval | rogue platform operator | not defended by the verifier (L54); the page shows the device key fingerprint to compare with the phone | none |
+| A bundle the browser verifier passes and the CLI fails, or the reverse | forger | one port, the same codes, compared on every vector and 400 mutations | `test_verifier_agreement.py` |
+| Number or type ambiguity (`1.0` or `true` for `1`, `2^53 + 1`, `1e400`, a duplicate key, deep nesting) | forger | strict parsing and type-exact comparison in both verifiers; any error fails the step | `json_rules.json`, `strict/` vectors |
+| Bundle content shown as markup on `/verify/` | forger | every text is set with `textContent`; fixed templates; CSP with no inline script | `verify-page.test.mjs` |
+| Probing `/evidence/` for which ids exist or are well formed | anyone | no listing; one identical answer for unknown, malformed and deeper paths; logged | `test_unknown_and_malformed_ids_get_the_same_answer` |
+| A served bundle holds personal data | bug, new PayPal member | member allowlist; a test scans served bundles for emails and payer or buyer details | `test_a_served_bundle_holds_no_email_and_no_payer_or_buyer_details` |
+| The customer's private key is on the server | design drift | WebCrypto non-extractable key; the gate test scans the database, logs, environment and live objects | `test_p3_gate.py` |
 
 Invariants: INV-1 (the agent and the verifier decide nothing for the service; no model input to any allow), INV-8 (strict
 JSON, JCS, canonical base64url), INV-9 (integer minor units in every comparison), INV-12 (the bundle is built from rows written
 before the answer).
 
 - **Not defended.** The log root is not anchored, so a forger with the code can rebuild a shorter log (L48). The verifier does
-  not compare PayPal timestamps or earlier statuses (L45). The endpoint has no login (L46). A bundle for a Human Present
+  not compare PayPal timestamps or earlier statuses (L45). Anyone with a capture id can read its bundle (L46), and the
+  verifier page is only as trustworthy as the server sending it (L52). A bundle for a Human Present
   purchase does not exist (L50). The agent trusts the merchant keys the service publishes: it detects a forged response, not a
   merchant that is itself the attacker.
 

@@ -1361,8 +1361,8 @@
    "violations": []
   }
  ],
- "generated_at": "2026-11-04T13:09:54Z",
- "report": "20261104T130954Z/report.json",
+ "generated_at": "2026-11-05T06:34:11Z",
+ "report": "20261105T063411Z/report.json",
  "suite": "attacks",
  "summary": {
   "baseline": {

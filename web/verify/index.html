@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Countersign: verify evidence</title>
+    <link rel="stylesheet" href="../ui/fonts.css" />
+    <link rel="stylesheet" href="../ui/tokens.css" />
+    <link rel="stylesheet" href="../ui/components.css" />
+    <link rel="stylesheet" href="verify.css" />
+  </head>
+  <body class="cs-scope">
+    <div class="vf">
+      <header class="vf__head">
+        <span class="vf__brand">Countersign</span>
+        <span class="vf__where">Evidence verifier</span>
+      </header>
+      <main class="vf__main">
+        <h1 class="vf__title">Verify an evidence bundle</h1>
+        <p class="vf__lead cs-muted">
+          Checks a dispute evidence bundle for one PayPal capture, step by step,
+          in this browser. The bundle and the keys you give never leave this
+          page.
+        </p>
+        <div class="vf__inputs">
+          <section class="cs-card vf-panel" aria-labelledby="bundle-title">
+            <h2 class="vf-panel__title" id="bundle-title">Bundle</h2>
+            <label class="vf-label" for="bundle-text"
+              >Paste the bundle JSON</label
+            >
+            <textarea
+              id="bundle-text"
+              class="vf-text"
+              rows="6"
+              spellcheck="false"
+              autocomplete="off"
+              data-testid="bundle-text"
+            ></textarea>
+            <div class="vf-drop" id="drop" data-testid="drop">
+              <span>Or drop a bundle file here, or</span>
+              <button
+                type="button"
+                class="cs-btn cs-btn--secondary"
+                id="choose"
+                data-testid="choose"
+              >
+                Choose file
+              </button>
+              <input
+                id="bundle-file"
+                type="file"
+                accept="application/json,.json"
+                hidden
+              />
+            </div>
+            <label class="vf-label" for="capture-id"
+              >Or load a stored bundle by PayPal capture id</label
+            >
+            <div class="vf-row">
+              <input
+                id="capture-id"
+                class="vf-input"
+                type="text"
+                spellcheck="false"
+                autocomplete="off"
+                data-testid="capture-id"
+              />
+              <button
+                type="button"
+                class="cs-btn cs-btn--secondary"
+                id="load"
+                data-testid="load"
+              >
+                Load
+              </button>
+            </div>
+          </section>
+          <section class="cs-card vf-panel" aria-labelledby="keys-title">
+            <h2 class="vf-panel__title" id="keys-title">Keys to trust</h2>
+            <p class="vf-note cs-muted">
+              Optional. Paste the merchant's and the platform provider's public
+              keys as you know them from elsewhere. Without them the keys are
+              read from the bundle itself.
+            </p>
+            <label class="vf-label" for="merchant-key"
+              >Merchant public key (JWK)</label
+            >
+            <textarea
+              id="merchant-key"
+              class="vf-text vf-text--key"
+              rows="3"
+              spellcheck="false"
+              autocomplete="off"
+              data-testid="merchant-key"
+            ></textarea>
+            <label class="vf-label" for="platform-key"
+              >Platform public key (JWK)</label
+            >
+            <textarea
+              id="platform-key"
+              class="vf-text vf-text--key"
+              rows="3"
+              spellcheck="false"
+              autocomplete="off"
+              data-testid="platform-key"
+            ></textarea>
+          </section>
+        </div>
+        <div class="vf-actions">
+          <button
+            type="button"
+            class="cs-btn cs-btn--primary"
+            id="verify"
+            data-testid="verify"
+          >
+            Verify
+          </button>
+        </div>
+        <div id="result" aria-live="polite"></div>
+      </main>
+      <footer class="vf__foot cs-muted">
+        Every check runs in this browser from fixed code. Nothing on this page
+        is written by a model.
+      </footer>
+    </div>
+    <noscript>
+      <p class="vf__noscript">This page needs JavaScript to check a bundle.</p>
+    </noscript>
+    <script type="module" src="verify.js"></script>
+  </body>
+</html>

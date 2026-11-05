@@ -447,12 +447,20 @@ device key is revoked. `in_flight` and `used` are read from the payment tables, 
 PayPal timestamps (`create_time`, `expiration_time`, `update_time`), the status of earlier reads of an object (an order is
 CREATED, then APPROVED, then COMPLETED; only the last read of each kind is judged), the item category, `reference_id` and the
 payee's identity (only that it is the same on every read) are not compared; a change there is not detected. The currency is
-USD with two decimals only.
+USD with two decimals only. Constraint types other than `checkout.line_items`, `checkout.allowed_merchants`,
+`payment.reference`, `payment.amount_range`, `payment.allowed_payees`, `payment.budget` and `payment.agent_recurrence` are
+not evaluated: a bundle that carries one fails (Decision 110).
 
 ### L46. The evidence endpoint has no login
 
-`GET /evidence/{capture_id}` is served only when `APP_ENV` is dev or eval ([PROTOCOL.md](PROTOCOL.md) Decision 104); the bundle
-names a customer id and PayPal object ids. It is not served in demo or production until the dashboard (P4) adds a merchant login.
+`GET /evidence/{capture_id}` is served in every mode, demo included ([PROTOCOL.md](PROTOCOL.md) Decision 107). **Protected:**
+nothing personal is in a bundle (PayPal objects pass a member allowlist; no payer, email, name, address, shipping or links; a
+test scans served bundles); there is no listing; unknown and malformed ids get one identical answer; answers are not cached;
+every fetch is logged. **Not protected:** anyone who knows a PayPal capture id can read its bundle, which names a random
+customer id (`cus_...`), the PayPal order, authorization and capture ids, the product, the amount and the public keys. Capture
+ids are PayPal's, not secrets. Bundles can be linked to each other: the same customer id, device key and agent key
+appear in every bundle of one customer, so anyone holding two capture ids can tell they are one customer. There is no rate limit on the endpoint yet (P5.1). A merchant login (P4) is still the way to
+limit who reads bundles.
 
 ### L47. Rejection receipts are signed but not transported
 
@@ -482,6 +490,34 @@ mandate signed by the platform from a purchase consent) is not assembled or veri
 
 The agent reads `GET /catalog` of this one store; the choice is made among results that fit the ceiling for the quantity. It
 buys one line, one item, quantity 1 to 9, from one consent (L41).
+
+### L52. The verifier page is only as trustworthy as the server that sends it
+
+`/verify/` runs entirely in the browser and makes no request while verifying, but its code comes from the same server that
+holds the bundles. A server that wanted to could send a page that says "passed". A reader who does not trust the merchant
+should run `countersign_verify` (or a saved copy of the page) and pin keys learned elsewhere; the page says plainly when keys are
+not pinned. The pinned keys are only as good as where the reader got them.
+
+### L53. What the two verifiers' agreement covers
+
+The Python and browser verifiers are compared on 91 committed vectors and 400 mutated bundles (Decision 108), not proven
+equal. Inputs the vectors do not reach (for example other orders of dictionary keys inside a malformed bundle) are covered only
+by the line by line port and the shared table of JSON rules.
+
+### L54. The customer's approval is only as trustworthy as the platform key
+
+The verifiers pin the merchant and platform keys. The customer's device key and the agent's key are not pinned: they come
+from the bundle, vouched for by the platform's signature. Countersign holds both the merchant and the platform keys, so an
+operator who wanted to could mint a device key, a consent, mandates and an agent key that verify with both keys pinned. The
+page says so and shows the device key fingerprint, which a customer can compare with the one their phone showed at setup; a
+customer-held record of that fingerprint is the only independent check today.
+
+### L55. A Human Present offer is not tied to the checkout's customer
+
+Any enrolled customer (enrolment is anonymous, L35) can open a Human Present offer for any checkout that is ready, and the
+mandates issued name that customer. So the agent that made a checkout could approve it as a throwaway customer of its own.
+PayPal payer approval still stands in the way, and INV-3 holds formally (a valid mandate exists). Not confirmed whether the
+principal lock stops it. Planned: tie an offer to the customer of the checkout's principal (carry-forward in PROGRESS).
 
 ### L39 (note)
 

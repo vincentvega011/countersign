@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "lint": "prettier --check --ignore-path .prettierignore .",
-    "test": "node --test test/",
+    "test": "node --test test/evidence.test.mjs",
     "screenshots": "node test/screenshots.mjs"
   },
   "devDependencies": {

@@ -22,10 +22,15 @@ const state = (page, name) =>
 
 const browser = await chromium.launch();
 try {
+  // PHONE_VIDEO_DIR (optional): record this context, for the owner's reference only (never committed).
+  const video = process.env.PHONE_VIDEO_DIR;
   const context = await browser.newContext({
     viewport: { width: 375, height: 800 },
     hasTouch: true,
     timezoneId: "UTC",
+    ...(video
+      ? { recordVideo: { dir: video, size: { width: 375, height: 800 } } }
+      : {}),
   });
   const setup = await context.newPage();
   await setup.goto(`${origin}/approve/`);
@@ -36,7 +41,9 @@ try {
   await state(intent, "intent");
   await intent.getByRole("button", { name: "Approve" }).click();
   await state(intent, "intent_approved");
+  if (video) await intent.waitForTimeout(1500);
   console.log("approved");
+  await context.close();
 } catch (error) {
   console.error(`phone consent failed: ${error.message}`);
   process.exitCode = 1;

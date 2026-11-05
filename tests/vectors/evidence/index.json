@@ -1,122 +1,460 @@
 {
+ "forged": [
+  {
+   "code": "closed_extra_disclosure",
+   "file": "forged/a_disclosure_nothing_refers_to.json",
+   "first_failure": "checkout_mandate"
+  },
+  {
+   "code": "payment_payee",
+   "file": "forged/a_payee_the_customer_did_not_allow.json",
+   "first_failure": "payment_mandate"
+  },
+  {
+   "code": "receipt_not_success",
+   "file": "forged/an_error_receipt.json",
+   "first_failure": "checkout_receipt"
+  },
+  {
+   "code": "constraint_unresolved",
+   "file": "forged/an_open_mandate_has_a_constraint_the_verifier_does_not_know.json",
+   "first_failure": "checkout_mandate"
+  },
+  {
+   "code": "paypal_authorization_status",
+   "file": "forged/authorization_not_captured.json",
+   "first_failure": "paypal_objects"
+  },
+  {
+   "code": "paypal_capture_status",
+   "file": "forged/capture_not_final.json",
+   "first_failure": "paypal_objects"
+  },
+  {
+   "code": "gate_captured_mismatch",
+   "file": "forged/captured_entry_amount.json",
+   "first_failure": "gate_result"
+  },
+  {
+   "code": "gate_receipt_mismatch",
+   "file": "forged/captured_entry_disagrees_with_the_receipt.json",
+   "first_failure": "gate_result"
+  },
+  {
+   "code": "closed_hash_member",
+   "file": "forged/checkout_hash_not_the_hash_of_the_checkout_jwt.json",
+   "first_failure": "checkout_mandate"
+  },
+  {
+   "code": "jws_alg",
+   "file": "forged/checkout_header_es384.json",
+   "first_failure": "checkout_jwt_hash"
+  },
+  {
+   "code": "receipt_other_checkout",
+   "file": "forged/checkout_receipt_for_another_checkout.json",
+   "first_failure": "checkout_receipt"
+  },
+  {
+   "code": "receipt_reference",
+   "file": "forged/checkout_receipt_for_another_mandate.json",
+   "first_failure": "checkout_receipt"
+  },
+  {
+   "code": "jws_typ",
+   "file": "forged/checkout_receipt_of_the_wrong_typ.json",
+   "first_failure": "checkout_receipt"
+  },
+  {
+   "code": null,
+   "file": "forged/clean.json",
+   "first_failure": null
+  },
+  {
+   "code": "closed_after_expiry",
+   "file": "forged/closed_after_the_open_mandate_expired.json",
+   "first_failure": "checkout_mandate"
+  },
+  {
+   "code": "consent_device",
+   "file": "forged/consent_names_another_device_key.json",
+   "first_failure": "consent_signature"
+  },
+  {
+   "code": "consent_checkout",
+   "file": "forged/consent_signed_terms_differ_from_the_checkout_mandate.json",
+   "first_failure": "consent_signature"
+  },
+  {
+   "code": "consent_payment",
+   "file": "forged/consent_signed_terms_differ_from_the_payment_mandate.json",
+   "first_failure": "consent_signature"
+  },
+  {
+   "code": "gate_step",
+   "file": "forged/gate_step_skipped.json",
+   "first_failure": "gate_result"
+  },
+  {
+   "code": "gate_step",
+   "file": "forged/gate_step_twice.json",
+   "first_failure": "gate_result"
+  },
+  {
+   "code": "closed_audience",
+   "file": "forged/key_binding_audience.json",
+   "first_failure": "checkout_mandate"
+  },
+  {
+   "code": "closed_sd_hash",
+   "file": "forged/key_binding_for_another_open_mandate.json",
+   "first_failure": "checkout_mandate"
+  },
+  {
+   "code": "jws_typ",
+   "file": "forged/key_binding_of_the_wrong_typ.json",
+   "first_failure": "checkout_mandate"
+  },
+  {
+   "code": "paypal_nested_id",
+   "file": "forged/nested_capture_of_another_id.json",
+   "first_failure": "paypal_objects"
+  },
+  {
+   "code": "checkout_chain_not_extending",
+   "file": "forged/open_mandate_not_extended.json",
+   "first_failure": "checkout_mandate"
+  },
+  {
+   "code": "paypal_intent",
+   "file": "forged/order_is_not_an_authorization.json",
+   "first_failure": "paypal_objects"
+  },
+  {
+   "code": "paypal_item_total",
+   "file": "forged/order_item_total.json",
+   "first_failure": "paypal_objects"
+  },
+  {
+   "code": "paypal_payee_changed",
+   "file": "forged/order_payee_changes_between_reads.json",
+   "first_failure": "paypal_objects"
+  },
+  {
+   "code": "payment_amount",
+   "file": "forged/payment_amount_is_not_the_total.json",
+   "first_failure": "payment_mandate"
+  },
+  {
+   "code": "payment_other_checkout",
+   "file": "forged/payment_named_another_checkout.json",
+   "first_failure": "payment_mandate"
+  },
+  {
+   "code": "receipt_other_capture",
+   "file": "forged/payment_receipt_for_another_capture.json",
+   "first_failure": "payment_receipt"
+  },
+  {
+   "code": "receipt_reference",
+   "file": "forged/payment_receipt_reference.json",
+   "first_failure": "payment_receipt"
+  },
+  {
+   "code": "payment_not_bound",
+   "file": "forged/payment_reference_to_another_checkout_mandate.json",
+   "first_failure": "payment_mandate"
+  },
+  {
+   "code": "constraint_amount_range",
+   "file": "forged/the_amount_is_outside_the_allowed_range.json",
+   "first_failure": "payment_mandate"
+  },
+  {
+   "code": "constraint_line_items",
+   "file": "forged/the_checkout_buys_an_item_the_customer_did_not_allow.json",
+   "first_failure": "checkout_mandate"
+  },
+  {
+   "code": "constraint_line_items",
+   "file": "forged/the_checkout_buys_more_than_the_allowed_quantity.json",
+   "first_failure": "checkout_mandate"
+  },
+  {
+   "code": "constraint_unresolved",
+   "file": "forged/the_mandate_allows_more_than_one_payment.json",
+   "first_failure": "payment_mandate"
+  },
+  {
+   "code": "constraint_merchant",
+   "file": "forged/the_merchant_paid_is_not_an_allowed_merchant.json",
+   "first_failure": "payment_mandate"
+  },
+  {
+   "code": "consent_terms_mismatch",
+   "file": "forged/the_terms_shown_differ_from_the_signed_mandates.json",
+   "first_failure": "consent_signature"
+  },
+  {
+   "code": "payment_budget",
+   "file": "forged/total_over_the_approved_budget.json",
+   "first_failure": "payment_mandate"
+  }
+ ],
  "pinned": [
   "merchant.key.json",
   "platform.key.json"
  ],
+ "strict": [
+  {
+   "code": "json_unsafe_integer",
+   "file": "strict/big_float.json",
+   "first_failure": "bundle_structure"
+  },
+  {
+   "code": "json_unsafe_integer",
+   "file": "strict/big_integer.json",
+   "first_failure": "bundle_structure"
+  },
+  {
+   "code": null,
+   "file": "strict/deep_at_the_limit.json",
+   "first_failure": null
+  },
+  {
+   "code": "json_excess_precision",
+   "file": "strict/excess_precision.json",
+   "first_failure": "bundle_structure"
+  },
+  {
+   "code": "paypal_amount_malformed",
+   "file": "strict/exponent_amount.json",
+   "first_failure": "paypal_objects"
+  },
+  {
+   "code": "log_truncated",
+   "file": "strict/float_for_log_size.json",
+   "first_failure": "decision_log"
+  },
+  {
+   "code": "proof_shape",
+   "file": "strict/float_for_proof_version.json",
+   "first_failure": "decision_log"
+  },
+  {
+   "code": "bundle_version",
+   "file": "strict/float_for_version.json",
+   "first_failure": "bundle_structure"
+  },
+  {
+   "code": "log_entry_number",
+   "file": "strict/float_seq.json",
+   "first_failure": "decision_log"
+  },
+  {
+   "code": "log_entry_number",
+   "file": "strict/float_ts.json",
+   "first_failure": "decision_log"
+  },
+  {
+   "code": null,
+   "file": "strict/harmless_float.json",
+   "first_failure": null
+  },
+  {
+   "code": "paypal_amount_malformed",
+   "file": "strict/infinity_amount.json",
+   "first_failure": "paypal_objects"
+  },
+  {
+   "code": "json_non_finite",
+   "file": "strict/infinity_literal.json",
+   "first_failure": "bundle_structure"
+  },
+  {
+   "code": "json_lone_surrogate",
+   "file": "strict/lone_surrogate.json",
+   "first_failure": "bundle_structure"
+  },
+  {
+   "code": "log_entry_number",
+   "file": "strict/negative_seq.json",
+   "first_failure": "decision_log"
+  },
+  {
+   "code": "log_entry_number",
+   "file": "strict/negative_ts.json",
+   "first_failure": "decision_log"
+  },
+  {
+   "code": "json_non_finite",
+   "file": "strict/overflowing_float.json",
+   "first_failure": "bundle_structure"
+  },
+  {
+   "code": "json_too_deep",
+   "file": "strict/too_deep.json",
+   "first_failure": "bundle_structure"
+  },
+  {
+   "code": "proof_shape",
+   "file": "strict/true_for_proof_version.json",
+   "first_failure": "decision_log"
+  },
+  {
+   "code": "bundle_version",
+   "file": "strict/true_for_version.json",
+   "first_failure": "bundle_structure"
+  }
+ ],
  "tampered": [
   {
+   "code": "checkout_id_mismatch",
    "file": "tampered/bundle_checkout_id.json",
    "first_failure": "checkout_jwt_hash"
   },
   {
+   "code": "checkout_jwt_not_disclosed",
    "file": "tampered/checkout_amount_raised.json",
    "first_failure": "checkout_mandate"
   },
   {
+   "code": "checkout_jwt_not_disclosed",
    "file": "tampered/checkout_jwt_signature.json",
    "first_failure": "checkout_mandate"
   },
   {
+   "code": "jws_typ",
    "file": "tampered/checkout_receipt_reference.json",
    "first_failure": "checkout_receipt"
   },
   {
+   "code": "signature_invalid",
    "file": "tampered/checkout_receipt_signature.json",
    "first_failure": "checkout_receipt"
   },
   {
+   "code": "signature_invalid",
    "file": "tampered/closed_checkout_key_binding.json",
    "first_failure": "checkout_mandate"
   },
   {
+   "code": "consent_signature",
    "file": "tampered/consent_key_swapped.json",
    "first_failure": "consent_signature"
   },
   {
+   "code": "consent_signature",
    "file": "tampered/consent_record_altered.json",
    "first_failure": "consent_signature"
   },
   {
+   "code": "consent_members",
    "file": "tampered/consent_removed.json",
    "first_failure": "consent_signature"
   },
   {
+   "code": "consent_signature",
    "file": "tampered/consent_signature_altered.json",
    "first_failure": "consent_signature"
   },
   {
+   "code": "bundle_members",
    "file": "tampered/extra_member.json",
    "first_failure": "bundle_structure"
   },
   {
+   "code": "gate_step",
    "file": "tampered/gate_step_missing.json",
    "first_failure": "gate_result"
   },
   {
+   "code": "gate_not_captured",
    "file": "tampered/log_consistently_truncated.json",
    "first_failure": "gate_result"
   },
   {
+   "code": "gate_not_captured",
    "file": "tampered/log_last_entry_dropped.json",
    "first_failure": "gate_result"
   },
   {
+   "code": "log_truncated",
    "file": "tampered/log_middle_entry_dropped.json",
    "first_failure": "decision_log"
   },
   {
+   "code": "log_entry_hash",
    "file": "tampered/log_payload_altered.json",
    "first_failure": "decision_log"
   },
   {
+   "code": "log_truncated",
    "file": "tampered/log_proof_dropped.json",
    "first_failure": "decision_log"
   },
   {
+   "code": "proof_root",
+   "file": "tampered/log_proof_sibling_altered.json",
+   "first_failure": "decision_log"
+  },
+  {
+   "code": "proof_path_length",
    "file": "tampered/log_proof_truncated.json",
    "first_failure": "decision_log"
   },
   {
+   "code": "log_root",
    "file": "tampered/log_root_altered.json",
    "first_failure": "decision_log"
   },
   {
+   "code": "not_captured",
    "file": "tampered/not_captured.json",
    "first_failure": "bundle_structure"
   },
   {
+   "code": "signature_invalid",
    "file": "tampered/open_checkout_signature.json",
    "first_failure": "checkout_mandate"
   },
   {
+   "code": "signature_invalid",
    "file": "tampered/payment_closed_signature.json",
    "first_failure": "payment_mandate"
   },
   {
+   "code": "receipt_other_capture",
    "file": "tampered/payment_receipt_capture.json",
    "first_failure": "payment_receipt"
   },
   {
+   "code": "paypal_amount",
    "file": "tampered/paypal_capture_amount.json",
    "first_failure": "paypal_objects"
   },
   {
+   "code": "custom_id_mismatch",
    "file": "tampered/paypal_custom_id.json",
    "first_failure": "paypal_custom_id"
   },
   {
+   "code": "paypal_invoice",
    "file": "tampered/paypal_invoice.json",
    "first_failure": "paypal_objects"
   },
   {
+   "code": "paypal_item",
    "file": "tampered/paypal_item_name.json",
    "first_failure": "paypal_objects"
   },
   {
+   "code": "paypal_capture_status",
    "file": "tampered/paypal_status.json",
    "first_failure": "paypal_objects"
   },
   {
+   "code": "keys_differ",
    "file": "tampered/platform_key_swapped.json",
    "first_failure": "trusted_keys"
   }

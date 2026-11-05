@@ -1,0 +1,1123 @@
+{
+ "authorization_id": "AUTH2",
+ "capture_id": "CAP3",
+ "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+ "checkout_jwt": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImVrejhUWG4xek1wSDFzeC1UbEpWZE5QckY4V1RtRXNRRWdqNHZ0SjMxd0UifQ.eyJjdXJyZW5jeSI6IlVTRCIsImV4cGlyZXNfYXQiOiIyMDI3LTAxLTE1VDE0OjAwOjAwWiIsImlkIjoiY2hrX0ptTnZRQTFTemFLX1hQdjRMeDFFTVEiLCJsaW5lX2l0ZW1zIjpbeyJpZCI6ImxpXzEiLCJpdGVtIjp7ImlkIjoiaHAtb3N0cmFuZGVyLXRyYWlsLXNwb3J0LWVhcmJ1ZHMiLCJwcmljZSI6NDUwMCwidGl0bGUiOiJPc3RyYW5kZXIgVHJhaWwgU3BvcnQgRWFyYnVkcyJ9LCJxdWFudGl0eSI6MSwidG90YWxzIjpbeyJhbW91bnQiOjQ1MDAsInR5cGUiOiJzdWJ0b3RhbCJ9LHsiYW1vdW50Ijo0NTAwLCJ0eXBlIjoidG90YWwifV19XSwibGlua3MiOltdLCJzdGF0dXMiOiJyZWFkeV9mb3JfY29tcGxldGUiLCJ0b3RhbHMiOlt7ImFtb3VudCI6NDUwMCwidHlwZSI6InN1YnRvdGFsIn0seyJhbW91bnQiOjQ1MDAsInR5cGUiOiJ0b3RhbCJ9XSwidWNwIjp7ImNhcGFiaWxpdGllcyI6eyJkZXYudWNwLnNob3BwaW5nLmNoZWNrb3V0IjpbeyJ2ZXJzaW9uIjoiMjAyNi0wOC0yNSJ9XX0sInBheW1lbnRfaGFuZGxlcnMiOnsiZGV2LmNvdW50ZXJzaWduLnBheW1lbnQuYXAyX3BheW1lbnRfbWFuZGF0ZSI6W3siY29uZmlnIjp7ImNyZWRlbnRpYWxfdHlwZSI6ImFwMl9wYXltZW50X21hbmRhdGUifSwiaWQiOiJjb3VudGVyc2lnbl9hcDJfcGF5bWVudF9tYW5kYXRlIiwidmVyc2lvbiI6IjIwMjYtMDgtMjUifV19LCJzdGF0dXMiOiJzdWNjZXNzIiwidmVyc2lvbiI6IjIwMjYtMDgtMjUifX0.YnYxK12pBR8hNdJvaUOmz-AykEil9meFn3Y7A0_txeDmzBRpcNrv5A-c5_LA4KQ8lOY3H_NUck49vxKR5LDwIw",
+ "consent": {
+  "customer_id": "cus_9f3emkNjLshsXOV8JOGGoQ",
+  "device_jwk": {
+   "crv": "P-256",
+   "kty": "EC",
+   "x": "1LovcrthsIq8kcAHl57ZXykgJyaD1zchmur3jyaDoXg",
+   "y": "S0juoJo0ZqYxJ5k59SVX0JftrerrN0JjWa-nTdwDRpI"
+  },
+  "record": "{\"challenge\":\"isKh07MM48PG8-O10Q2naSo8m8p42XnzE_7TR1ng4l8\",\"challenge_id\":\"kch_9cDc4zPG3Re_4S9OiygSZg\",\"customer_id\":\"cus_9f3emkNjLshsXOV8JOGGoQ\",\"device_thumbprint\":\"qr2UzCHwmdsPTztGOUbUOiIunvQVMq85yN8rT5MMmJI\",\"expires_at\":1800000300,\"issued_at\":1800000000,\"mandate\":{\"checkout\":{\"constraints\":[{\"items\":[{\"acceptable_items\":[{\"id\":\"hp-ostrander-trail-sport-earbuds\",\"title\":\"Ostrander Trail Sport Earbuds\"}],\"id\":\"line_1\",\"quantity\":1}],\"type\":\"checkout.line_items\"},{\"allowed\":[{\"id\":\"m-demo\",\"name\":\"Demo Store\",\"website\":\"https://surface.example.test\"}],\"type\":\"checkout.allowed_merchants\"}],\"exp\":1800604800,\"vct\":\"mandate.checkout.open.1\"},\"payment\":{\"constraints\":[{\"currency\":\"USD\",\"max\":8000,\"min\":1,\"type\":\"payment.amount_range\"},{\"allowed\":[{\"id\":\"m-demo\",\"name\":\"Demo Store\",\"website\":\"https://surface.example.test\"}],\"type\":\"payment.allowed_payees\"},{\"currency\":\"USD\",\"max\":8000,\"type\":\"payment.budget\"},{\"frequency\":\"ON_DEMAND\",\"max_occurrences\":1,\"type\":\"payment.agent_recurrence\"}],\"exp\":1800604800,\"vct\":\"mandate.payment.open.1\"}},\"origin\":\"https://surface.example.test\",\"purpose\":\"countersign.consent.open-mandates.v1\",\"terms\":{\"agent_thumbprint\":\"FIQJXQK06epSD-dBOU6-5qUPyYiB4CjLh2_WQqulfOw\",\"ceiling_minor\":8000,\"currency\":\"USD\",\"items\":[{\"id\":\"hp-ostrander-trail-sport-earbuds\",\"quantity\":1,\"title\":\"Ostrander Trail Sport Earbuds\"}],\"mandate_expires_at\":1800604800,\"merchant\":{\"id\":\"m-demo\",\"name\":\"Demo Store\",\"website\":\"https://surface.example.test\"}},\"v\":1}",
+  "signature": "94CKtkKrbjjcZQa5itPzd0WPcIT01frFe8mSs7IvkRY5-gPos01Mo_Nlqlv7aBKroc3_WlYgBatxUk-tMjkJ0g"
+ },
+ "gate": {
+  "custom_id": "cs1.pMKPEvXTct8cJIhIG_NwB8vAeygzEy2WHoBjpZCReiE",
+  "state": "captured"
+ },
+ "keys": {
+  "merchant": {
+   "alg": "ES256",
+   "crv": "P-256",
+   "kid": "ekz8TXn1zMpH1sx-TlJVdNPrF8WTmEsQEgj4vtJ31wE",
+   "kty": "EC",
+   "use": "sig",
+   "x": "PY4L1zFPvC1SszvgcVA4NDFwzwkAIyALa1ThzIifZuA",
+   "y": "2p6Aoj1_3h0_UD04s_aECP1MimnA1Y2KtTnvA3v6ofg"
+  },
+  "platform": {
+   "crv": "P-256",
+   "kty": "EC",
+   "x": "Mgm4RTyUrukZSIgNYbrO8vhciKyZAIQkh_aE93W7dqg",
+   "y": "EV6rUfqKgbx-avrRbN-fZ8LkrcbomA1ZWsU0eWn3_9k"
+  }
+ },
+ "kind": "countersign.evidence",
+ "log": {
+  "entries": [
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "BL8iLbaH-ZcKgA7W6CHbxIXvqtH_frI-K4_yoXubm9k",
+    "kind": "lock.recorded",
+    "payload": "{\"agent_known\":true,\"customer_known\":true,\"policy_version\":0}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "PBe9nEWYtjRC5Vk4M9xc2cDL5rhyOyZEtQxDIp0C8LM",
+    "seq": 5,
+    "ts_us": 1e20
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "2JQGsmE2Tro4Tx-hVT9_-6arYLTuUt8znHWdtJngczs",
+    "kind": "lock.decision",
+    "payload": "{\"agent_known\":true,\"allowed\":true,\"customer_known\":true,\"locked\":true,\"operation\":\"create\",\"policy_hash\":\"HUMDu-n3YC6JW0p8sqJbWg4q7Lc4rYIFeJaQgvkxxD4\",\"policy_version\":0,\"reason\":\"allowed:ap2_negotiated\",\"recorded\":true,\"required\":true}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "BL8iLbaH-ZcKgA7W6CHbxIXvqtH_frI-K4_yoXubm9k",
+    "seq": 6,
+    "ts_us": 1800000000000012
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "aDTZQ5e5oDQJUL_ylEGXy4gZCnls1tdig4Lu-MmsYGw",
+    "kind": "checkout.created",
+    "payload": "{\"lines\":[[\"li_1\",\"hp-ostrander-trail-sport-earbuds\",1]],\"status\":\"ready_for_complete\",\"terms_hash\":\"6e514f661a2cd75cedb21186d54afab2af9956ae347ebf6780a007d2f9f80014\",\"version\":1}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "2JQGsmE2Tro4Tx-hVT9_-6arYLTuUt8znHWdtJngczs",
+    "seq": 7,
+    "ts_us": 1800000000000014
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "FjFCA9s0jkW6UZXv1OiYwIWBuOHw3jc49Hq-awMbOyw",
+    "kind": "checkout.complete_started",
+    "payload": "{\"status\":\"complete_in_progress\",\"terms_hash\":\"6e514f661a2cd75cedb21186d54afab2af9956ae347ebf6780a007d2f9f80014\",\"version\":2}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "aDTZQ5e5oDQJUL_ylEGXy4gZCnls1tdig4Lu-MmsYGw",
+    "seq": 8,
+    "ts_us": 1800000000000017
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "DBiPQ-lt0O_gwtWWQdTh6SkdUliv6e1nY7SHsluZrj4",
+    "kind": "merchant.checkout_mandate.accepted",
+    "payload": "{\"checkout_hash\":\"ouTqpQAMpQMKKVsVQMWSi5Mz1x9600NJ-Ao0FGQJEko\",\"mandate_identity\":\"qBK-X9ZrvhYRginjXKj3_w8gQPP9-9X1xu6R0nYaKSM\",\"mode\":\"autonomous\",\"reference\":\"qKFPZ7nVR7DTRHxtrpa9WXH_laqAUVpfkkoeIsqQRKg\",\"result\":\"accepted\"}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "FjFCA9s0jkW6UZXv1OiYwIWBuOHw3jc49Hq-awMbOyw",
+    "seq": 9,
+    "ts_us": 1800000000000019
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "VF7xu9LFvPOnRYRdZ1WsGjluHFQ-_b51ca4xAcwEeLU",
+    "kind": "lock.decision",
+    "payload": "{\"agent_known\":true,\"allowed\":true,\"customer_known\":true,\"locked\":true,\"operation\":\"complete\",\"policy_hash\":\"HUMDu-n3YC6JW0p8sqJbWg4q7Lc4rYIFeJaQgvkxxD4\",\"policy_version\":0,\"reason\":\"allowed:mandate_valid\",\"recorded\":false,\"required\":true}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "DBiPQ-lt0O_gwtWWQdTh6SkdUliv6e1nY7SHsluZrj4",
+    "seq": 10,
+    "ts_us": 1800000000000020
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "udSS-8UI6WdxFVd_lg2mnipYg6ZypTbCCW3kzlIJS4w",
+    "kind": "cp.reserved",
+    "payload": "{\"amount_minor\":4500,\"currency\":\"USD\",\"mandate_digest\":\"jeTYJYDKjahSvmBvWt6T0kP63aq8yAFsU5g8xJWILHs\",\"mode\":\"redirect\",\"reference\":\"pcGeoe5fjDO-X-HaLcEQ8FrQCAZGBgnJpB2iMBa4y0M\",\"spent_captured\":0,\"spent_in_flight\":0}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "VF7xu9LFvPOnRYRdZ1WsGjluHFQ-_b51ca4xAcwEeLU",
+    "seq": 11,
+    "ts_us": 1800000000000025
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "TTdFqzl0n2tE-s9_CSXg0Oy8ZQne4Sup-BRE_KbQsVo",
+    "kind": "cp.paypal.create_order.started",
+    "payload": "{}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "udSS-8UI6WdxFVd_lg2mnipYg6ZypTbCCW3kzlIJS4w",
+    "seq": 12,
+    "ts_us": 1800000000000026
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "TuJrfXzNq8-lSNL24ZII6r8vAzW92omubq-OVzy529E",
+    "kind": "cp.paypal.create_order.finished",
+    "payload": "{}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "TTdFqzl0n2tE-s9_CSXg0Oy8ZQne4Sup-BRE_KbQsVo",
+    "seq": 13,
+    "ts_us": 1800000000000027
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "YMtrDKfSbJsy9cpRrCdJNqEVjcLGgYm86djPmpSmFpE",
+    "kind": "cp.order_created",
+    "payload": "{\"mode\":\"redirect\",\"order_id\":\"ORDER1\"}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "TuJrfXzNq8-lSNL24ZII6r8vAzW92omubq-OVzy529E",
+    "seq": 14,
+    "ts_us": 1800000000000029
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "GPotT1kSI89DeoyHXMpKV5AbuUespk8H5TqW0TuW1O8",
+    "kind": "checkout.payer_approval_required",
+    "payload": "{\"status\":\"complete_in_progress\",\"terms_hash\":\"6e514f661a2cd75cedb21186d54afab2af9956ae347ebf6780a007d2f9f80014\",\"version\":2}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "YMtrDKfSbJsy9cpRrCdJNqEVjcLGgYm86djPmpSmFpE",
+    "seq": 15,
+    "ts_us": 1800000000000031
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "QRHXvLmK4DU6e30lCVVznwvEBuJWHRX1BwC2a1J5-XI",
+    "kind": "cp.paypal.get_order.started",
+    "payload": "{}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "GPotT1kSI89DeoyHXMpKV5AbuUespk8H5TqW0TuW1O8",
+    "seq": 16,
+    "ts_us": 1800000000000034
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "vjo-CCqTJZ1x4Lg0kSIDTk_4A3YNOU5SOhHEA5Ne6RU",
+    "kind": "cp.paypal.get_order.finished",
+    "payload": "{}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "QRHXvLmK4DU6e30lCVVznwvEBuJWHRX1BwC2a1J5-XI",
+    "seq": 17,
+    "ts_us": 1800000000000036
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "So36c1q60c46uKn3wIzAOecAT3HF35QZZHvlv6pg-dw",
+    "kind": "cp.paypal.authorize.started",
+    "payload": "{}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "vjo-CCqTJZ1x4Lg0kSIDTk_4A3YNOU5SOhHEA5Ne6RU",
+    "seq": 18,
+    "ts_us": 1800000000000037
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "MERURDEAUpQe0dp2poHZG9j7BQCN2d3HIhPosS70em4",
+    "kind": "cp.paypal.authorize.finished",
+    "payload": "{}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "So36c1q60c46uKn3wIzAOecAT3HF35QZZHvlv6pg-dw",
+    "seq": 19,
+    "ts_us": 1800000000000038
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "3Iu7lrP2ooZvBQMKJyiRXZUW3FhQPpgFMkN9TFtrL1I",
+    "kind": "cp.paypal.get_order.started",
+    "payload": "{}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "MERURDEAUpQe0dp2poHZG9j7BQCN2d3HIhPosS70em4",
+    "seq": 20,
+    "ts_us": 1800000000000039
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "p2dZmD51aLM2SuKEoxYAv25OYaK6R7B6f8b7VYY3vUE",
+    "kind": "cp.paypal.get_order.finished",
+    "payload": "{}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "3Iu7lrP2ooZvBQMKJyiRXZUW3FhQPpgFMkN9TFtrL1I",
+    "seq": 21,
+    "ts_us": 1800000000000041
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "oB9Mfp_ICaHXzxFXKemSc64TwUqb_CBQQx9W5d2sCAU",
+    "kind": "cp.paypal.get_authorization.started",
+    "payload": "{}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "p2dZmD51aLM2SuKEoxYAv25OYaK6R7B6f8b7VYY3vUE",
+    "seq": 22,
+    "ts_us": 1800000000000043
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "URxd5HbNADlQrWNBZh1JwZJPiEDbjUCS3NPbWNqOK6I",
+    "kind": "cp.paypal.get_authorization.finished",
+    "payload": "{}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "oB9Mfp_ICaHXzxFXKemSc64TwUqb_CBQQx9W5d2sCAU",
+    "seq": 23,
+    "ts_us": 1800000000000045
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "cGUZZz4BZ3tFG_t7hJXyLAstkrARkXjDVewwfAaEy-I",
+    "kind": "cp.authorized",
+    "payload": "{\"amount\":\"USD:4500\",\"authorization_id\":\"AUTH2\",\"custom_id\":\"cs1.pMKPEvXTct8cJIhIG_NwB8vAeygzEy2WHoBjpZCReiE\",\"mode\":\"redirect\",\"order_id\":\"ORDER1\",\"reference\":\"\"}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "URxd5HbNADlQrWNBZh1JwZJPiEDbjUCS3NPbWNqOK6I",
+    "seq": 24,
+    "ts_us": 1800000000000047
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "YFun8W0JUzPuJ9GqX4I1jeOrWuSyM5qKUUmZ_Do-75c",
+    "kind": "gate.paypal.get_order.started",
+    "payload": "{}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "cGUZZz4BZ3tFG_t7hJXyLAstkrARkXjDVewwfAaEy-I",
+    "seq": 25,
+    "ts_us": 1800000000000049
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "qp0ik6F3ndbBGmUH59GMhEr8Q7OufX8lRUJ7Sv1B0ek",
+    "kind": "gate.paypal.get_order.finished",
+    "payload": "{}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "YFun8W0JUzPuJ9GqX4I1jeOrWuSyM5qKUUmZ_Do-75c",
+    "seq": 26,
+    "ts_us": 1800000000000051
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "wyBPPM6GsaDdgQwRq0rVjd1Xj_0NsHisiqDE9F01Wz8",
+    "kind": "gate.paypal.get_authorization.started",
+    "payload": "{}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "qp0ik6F3ndbBGmUH59GMhEr8Q7OufX8lRUJ7Sv1B0ek",
+    "seq": 27,
+    "ts_us": 1800000000000052
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "FIb-XZJolgWpXD-cf56u5OZrqXS7eAc4sxPTYHq_ubc",
+    "kind": "gate.paypal.get_authorization.finished",
+    "payload": "{}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "wyBPPM6GsaDdgQwRq0rVjd1Xj_0NsHisiqDE9F01Wz8",
+    "seq": 28,
+    "ts_us": 1800000000000054
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "m_f8_1mpMoFP_WOk1QB-zwdxafIGqSA3jsv1CYKt-1w",
+    "kind": "gate.step",
+    "payload": "{\"code\":\"G-FETCH\",\"outcome\":\"pass\"}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "FIb-XZJolgWpXD-cf56u5OZrqXS7eAc4sxPTYHq_ubc",
+    "seq": 29,
+    "ts_us": 1800000000000055
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "GISsKUaCf96WLAoNfe6iCUxjdrS0A58OsACN9u0-Ilg",
+    "kind": "gate.step",
+    "payload": "{\"code\":\"G-STATUS\",\"outcome\":\"pass\"}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "m_f8_1mpMoFP_WOk1QB-zwdxafIGqSA3jsv1CYKt-1w",
+    "seq": 30,
+    "ts_us": 1800000000000056
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "WV4TAZQT1iykzxQO4lT1ofANkkGMZA7GouD0kj8m18Q",
+    "kind": "gate.step",
+    "payload": "{\"code\":\"G-REVERSE\",\"outcome\":\"pass\"}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "GISsKUaCf96WLAoNfe6iCUxjdrS0A58OsACN9u0-Ilg",
+    "seq": 31,
+    "ts_us": 1800000000000057
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "39mFSOXTYFNO21elz_GA9qK7aoCN9CSCWZFXwLu2gbY",
+    "kind": "gate.step",
+    "payload": "{\"code\":\"G-TERMS\",\"outcome\":\"pass\"}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "WV4TAZQT1iykzxQO4lT1ofANkkGMZA7GouD0kj8m18Q",
+    "seq": 32,
+    "ts_us": 1800000000000058
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "0HjJwr4elQn2Fu2eQJzCGdXSo_3qiNhHfxDGGodb_No",
+    "kind": "gate.step",
+    "payload": "{\"code\":\"G-AMOUNT\",\"outcome\":\"pass\"}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "39mFSOXTYFNO21elz_GA9qK7aoCN9CSCWZFXwLu2gbY",
+    "seq": 33,
+    "ts_us": 1800000000000059
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "ZGJCZd4JXQcpt81qG6LRxvsR5UqYfmQp6e6oEPvkjsQ",
+    "kind": "gate.step",
+    "payload": "{\"code\":\"G-MANDATE\",\"outcome\":\"pass\"}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "0HjJwr4elQn2Fu2eQJzCGdXSo_3qiNhHfxDGGodb_No",
+    "seq": 34,
+    "ts_us": 1800000000000060
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "RVSllmQKYdyKeQlAcvtGDtAQcFInP3tA3c1bc5PWAps",
+    "kind": "gate.step",
+    "payload": "{\"code\":\"G-BUDGET\",\"outcome\":\"pass\"}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "ZGJCZd4JXQcpt81qG6LRxvsR5UqYfmQp6e6oEPvkjsQ",
+    "seq": 35,
+    "ts_us": 1800000000000062
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "UYIQqukUvoOXAQ1tiVV17gOwafnPXT452O-IP8nu4aU",
+    "kind": "lock.decision",
+    "payload": "{\"agent_known\":true,\"allowed\":true,\"customer_known\":true,\"locked\":true,\"operation\":\"capture\",\"policy_hash\":\"HUMDu-n3YC6JW0p8sqJbWg4q7Lc4rYIFeJaQgvkxxD4\",\"policy_version\":0,\"reason\":\"allowed:mandate_valid\",\"recorded\":false,\"required\":true}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "RVSllmQKYdyKeQlAcvtGDtAQcFInP3tA3c1bc5PWAps",
+    "seq": 36,
+    "ts_us": 1800000000000063
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "4EJqhPCZEJJOiIC9OOc0zqlyrjMceUo5j6HdKodPyiU",
+    "kind": "gate.step",
+    "payload": "{\"code\":\"G-LOCK\",\"outcome\":\"pass\"}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "UYIQqukUvoOXAQ1tiVV17gOwafnPXT452O-IP8nu4aU",
+    "seq": 37,
+    "ts_us": 1800000000000064
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "TNYFYUTyIBo7S1UEkBXkP8GsNMv-gRSe67G0ucY1vt8",
+    "kind": "gate.step",
+    "payload": "{\"code\":\"G-CHECKOUT\",\"outcome\":\"pass\"}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "4EJqhPCZEJJOiIC9OOc0zqlyrjMceUo5j6HdKodPyiU",
+    "seq": 38,
+    "ts_us": 1800000000000067
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "fqS5RiUuIDw5oE23_Ncz3BwzT_QWGR6198k7q5kurnY",
+    "kind": "gate.paypal.capture.started",
+    "payload": "{}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "TNYFYUTyIBo7S1UEkBXkP8GsNMv-gRSe67G0ucY1vt8",
+    "seq": 39,
+    "ts_us": 1800000000000068
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "rWo0EdHNP9uK9dnmsB77_uTVrNvs4W3kKKu_xXmEfwg",
+    "kind": "gate.paypal.capture.finished",
+    "payload": "{}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "fqS5RiUuIDw5oE23_Ncz3BwzT_QWGR6198k7q5kurnY",
+    "seq": 40,
+    "ts_us": 1800000000000070
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "RXRP9q5lsHNdwazXKQDUvAKlkw62guEKPAIXuj8e4Lk",
+    "kind": "gate.paypal.get_capture.started",
+    "payload": "{}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "rWo0EdHNP9uK9dnmsB77_uTVrNvs4W3kKKu_xXmEfwg",
+    "seq": 41,
+    "ts_us": 1800000000000071
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "VJp7t44_lfNYfdvlVMxe-ThBO6zALbfU4MOAPGK1tdc",
+    "kind": "gate.paypal.get_capture.finished",
+    "payload": "{}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "RXRP9q5lsHNdwazXKQDUvAKlkw62guEKPAIXuj8e4Lk",
+    "seq": 42,
+    "ts_us": 1800000000000073
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "6LptZLFq-ZgWoWTkcILBtMPGKdmNg-2BKT0rUk7sNMw",
+    "kind": "gate.paypal.get_authorization.started",
+    "payload": "{}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "VJp7t44_lfNYfdvlVMxe-ThBO6zALbfU4MOAPGK1tdc",
+    "seq": 43,
+    "ts_us": 1800000000000074
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "8uG8tsXz2tDGS7-0Sh5H82U-KvB8Q6XHmCHQc-XRoq4",
+    "kind": "gate.paypal.get_authorization.finished",
+    "payload": "{}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "6LptZLFq-ZgWoWTkcILBtMPGKdmNg-2BKT0rUk7sNMw",
+    "seq": 44,
+    "ts_us": 1800000000000076
+   },
+   {
+    "checkout_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "entry_hash": "tvjAloYzYOHy1Xj4zI-7W7w1gopWTGxGf-KPFWH1fAs",
+    "kind": "gate.captured",
+    "payload": "{\"amount\":\"USD:4500\",\"authorization_id\":\"AUTH2\",\"capture_id\":\"CAP3\",\"order_id\":\"ORDER1\",\"reference\":\"pcGeoe5fjDO-X-HaLcEQ8FrQCAZGBgnJpB2iMBa4y0M\"}",
+    "policy_hash": "4xElCHnH-vVE7N-Y1XIqNxPF1FQcp43u_4xqwUBG1Ug",
+    "prev_hash": "8uG8tsXz2tDGS7-0Sh5H82U-KvB8Q6XHmCHQc-XRoq4",
+    "seq": 45,
+    "ts_us": 1800000000000081
+   }
+  ],
+  "proofs": [
+   {
+    "index": 0,
+    "path": [
+     "U837FIix2cuyd34VFO0-Fy5JNIvg8gl5dovuXEQCYl0",
+     "FytdlK9FnmMvKG1pgVXFvNhljIGhaMaunqoUFXtg7HY",
+     "IbKtqiZsLxnrZUmix8bxZUgBAyro3yuIpji6RqEfe-w",
+     "NjLiDtFOsZBE3HcdH9ZXRlAbXcfV9a7G1hXomJXPcm0",
+     "f2pU3F2aJciZoq32-5DMMJn9a9qjrUMjr6T_FjkhFVc",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 1,
+    "path": [
+     "M5j58OHvHt8CUj315CEEO4RtesxQJgGdWv4cTWTKn0M",
+     "FytdlK9FnmMvKG1pgVXFvNhljIGhaMaunqoUFXtg7HY",
+     "IbKtqiZsLxnrZUmix8bxZUgBAyro3yuIpji6RqEfe-w",
+     "NjLiDtFOsZBE3HcdH9ZXRlAbXcfV9a7G1hXomJXPcm0",
+     "f2pU3F2aJciZoq32-5DMMJn9a9qjrUMjr6T_FjkhFVc",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 2,
+    "path": [
+     "rvc0fi8AE5M3ZoTK0ODFFuc7qVkLt6hDqYaJrCcQIEU",
+     "WmZtAUEmklF8-gmumtepjEQ1To8seiAOjrLVxew5hM0",
+     "IbKtqiZsLxnrZUmix8bxZUgBAyro3yuIpji6RqEfe-w",
+     "NjLiDtFOsZBE3HcdH9ZXRlAbXcfV9a7G1hXomJXPcm0",
+     "f2pU3F2aJciZoq32-5DMMJn9a9qjrUMjr6T_FjkhFVc",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 3,
+    "path": [
+     "MVEBqKswwnwn_gdhutMDTo-1K539x1AFcRApniaiL1c",
+     "WmZtAUEmklF8-gmumtepjEQ1To8seiAOjrLVxew5hM0",
+     "IbKtqiZsLxnrZUmix8bxZUgBAyro3yuIpji6RqEfe-w",
+     "NjLiDtFOsZBE3HcdH9ZXRlAbXcfV9a7G1hXomJXPcm0",
+     "f2pU3F2aJciZoq32-5DMMJn9a9qjrUMjr6T_FjkhFVc",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 4,
+    "path": [
+     "5e7e8ND0SNJ4dmoFQdlH4r22eHhUQYfjCvvBqAsWymo",
+     "jWor5Rd8WwC6kXPwSWwYcrtlzuCSr2UktjmDWqAIWZ4",
+     "i0jDa265bdt5jtnvk5C5bPtuBPkQt_L7pPul4KGLp9c",
+     "NjLiDtFOsZBE3HcdH9ZXRlAbXcfV9a7G1hXomJXPcm0",
+     "f2pU3F2aJciZoq32-5DMMJn9a9qjrUMjr6T_FjkhFVc",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 5,
+    "path": [
+     "Y5eZjM-H2RYDFACSP_JW_gWhsNX5uGvu0prq-X3vYyg",
+     "jWor5Rd8WwC6kXPwSWwYcrtlzuCSr2UktjmDWqAIWZ4",
+     "i0jDa265bdt5jtnvk5C5bPtuBPkQt_L7pPul4KGLp9c",
+     "NjLiDtFOsZBE3HcdH9ZXRlAbXcfV9a7G1hXomJXPcm0",
+     "f2pU3F2aJciZoq32-5DMMJn9a9qjrUMjr6T_FjkhFVc",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 6,
+    "path": [
+     "CdBK7KZX060E5bAe-Q1vOQkq8GfDlPtaow9liQ403jk",
+     "MPllsH-8pUsWG5TpvTxzOBdZx_RoKu-UQq44i-eO1O4",
+     "i0jDa265bdt5jtnvk5C5bPtuBPkQt_L7pPul4KGLp9c",
+     "NjLiDtFOsZBE3HcdH9ZXRlAbXcfV9a7G1hXomJXPcm0",
+     "f2pU3F2aJciZoq32-5DMMJn9a9qjrUMjr6T_FjkhFVc",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 7,
+    "path": [
+     "f5wd9JYRo3jlkJLBu_Ibxj-cC0D6yUx5drbi8OQ3tJI",
+     "MPllsH-8pUsWG5TpvTxzOBdZx_RoKu-UQq44i-eO1O4",
+     "i0jDa265bdt5jtnvk5C5bPtuBPkQt_L7pPul4KGLp9c",
+     "NjLiDtFOsZBE3HcdH9ZXRlAbXcfV9a7G1hXomJXPcm0",
+     "f2pU3F2aJciZoq32-5DMMJn9a9qjrUMjr6T_FjkhFVc",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 8,
+    "path": [
+     "G8Lyc3PoxR4Sz8iryyTyfHJkBTpZFUsZYSvcXFXoXR0",
+     "q29URh4iNR3IDYMxJcd-dLQLkto6rVtC9xoAazTCQYA",
+     "BfWw_zvRxPEwvk8TBhjzOqsxrDytbpB9OQVmyWBuQAw",
+     "qOpQMN-y4MNkXuYS_mi1QfPmRcv8Wvcv9RUE9EslnlE",
+     "f2pU3F2aJciZoq32-5DMMJn9a9qjrUMjr6T_FjkhFVc",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 9,
+    "path": [
+     "LvAQQvIa33npnRW4gvnF4lRlT8HuzgZ9RKcmoNkUaXc",
+     "q29URh4iNR3IDYMxJcd-dLQLkto6rVtC9xoAazTCQYA",
+     "BfWw_zvRxPEwvk8TBhjzOqsxrDytbpB9OQVmyWBuQAw",
+     "qOpQMN-y4MNkXuYS_mi1QfPmRcv8Wvcv9RUE9EslnlE",
+     "f2pU3F2aJciZoq32-5DMMJn9a9qjrUMjr6T_FjkhFVc",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 10,
+    "path": [
+     "nBjjTrg8qDGaxa2JMG57xPHRK-RwIU1Fp9ippI7j834",
+     "lCGUJKnrz-07fKImpXykZkGxBBWHI8bIromImRYm8oU",
+     "BfWw_zvRxPEwvk8TBhjzOqsxrDytbpB9OQVmyWBuQAw",
+     "qOpQMN-y4MNkXuYS_mi1QfPmRcv8Wvcv9RUE9EslnlE",
+     "f2pU3F2aJciZoq32-5DMMJn9a9qjrUMjr6T_FjkhFVc",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 11,
+    "path": [
+     "3DyfA8nYuI7af5ce06PIuPprLhy18lSmxZ-m-sDg8pE",
+     "lCGUJKnrz-07fKImpXykZkGxBBWHI8bIromImRYm8oU",
+     "BfWw_zvRxPEwvk8TBhjzOqsxrDytbpB9OQVmyWBuQAw",
+     "qOpQMN-y4MNkXuYS_mi1QfPmRcv8Wvcv9RUE9EslnlE",
+     "f2pU3F2aJciZoq32-5DMMJn9a9qjrUMjr6T_FjkhFVc",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 12,
+    "path": [
+     "thsN8IVn82_FL27wXySgKJicjNK6qHGSY6p6FLJKgos",
+     "BwZoV49g-lGb2g5fUskuqls89de6qwM8PydwVzn248k",
+     "3qRh7RkCFcLi56PY0bYq7RxIHvRCyxcTUysCN0OxyoQ",
+     "qOpQMN-y4MNkXuYS_mi1QfPmRcv8Wvcv9RUE9EslnlE",
+     "f2pU3F2aJciZoq32-5DMMJn9a9qjrUMjr6T_FjkhFVc",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 13,
+    "path": [
+     "deWZZSuCwq2fD28tn-SL6TQVIHrua8p8m7Hz1p0K1cc",
+     "BwZoV49g-lGb2g5fUskuqls89de6qwM8PydwVzn248k",
+     "3qRh7RkCFcLi56PY0bYq7RxIHvRCyxcTUysCN0OxyoQ",
+     "qOpQMN-y4MNkXuYS_mi1QfPmRcv8Wvcv9RUE9EslnlE",
+     "f2pU3F2aJciZoq32-5DMMJn9a9qjrUMjr6T_FjkhFVc",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 14,
+    "path": [
+     "JXtlIDkiB_BlFKGsDS33DAs9ROngCW2UA3OQmPN2SrQ",
+     "HCNVdb1LchM89eSLBjb7ZP9SCq1cIZiapXboPt1khjE",
+     "3qRh7RkCFcLi56PY0bYq7RxIHvRCyxcTUysCN0OxyoQ",
+     "qOpQMN-y4MNkXuYS_mi1QfPmRcv8Wvcv9RUE9EslnlE",
+     "f2pU3F2aJciZoq32-5DMMJn9a9qjrUMjr6T_FjkhFVc",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 15,
+    "path": [
+     "Fv5fv_Y7dyRi99xuy4VH4WFM1_G3zWfIlwrxD1aHvMo",
+     "HCNVdb1LchM89eSLBjb7ZP9SCq1cIZiapXboPt1khjE",
+     "3qRh7RkCFcLi56PY0bYq7RxIHvRCyxcTUysCN0OxyoQ",
+     "qOpQMN-y4MNkXuYS_mi1QfPmRcv8Wvcv9RUE9EslnlE",
+     "f2pU3F2aJciZoq32-5DMMJn9a9qjrUMjr6T_FjkhFVc",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 16,
+    "path": [
+     "21Vnw8Dbm5SZBhABK9omvlqfhWVpKMbdQ_z7EwO34Ms",
+     "o1N_M-ASVOQclR4MoH4mK8uItcMPc93EozjjBA54zJk",
+     "YPPr4D4UZ6r3KglKG_QN9I3nUHpgAHSR2-ZUra9czC0",
+     "eSUuTF-NDZ-BBUEG2GLWiqI9-PD9FDXOCZahZOOqGkA",
+     "l6hDdabXldTGQy3HU6NOuGfLB40cSIXBW8KN3WC1zLI",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 17,
+    "path": [
+     "o8Hcmd85wYnIZKMkK54sVmspn_Aasg22oiTAhctzaDg",
+     "o1N_M-ASVOQclR4MoH4mK8uItcMPc93EozjjBA54zJk",
+     "YPPr4D4UZ6r3KglKG_QN9I3nUHpgAHSR2-ZUra9czC0",
+     "eSUuTF-NDZ-BBUEG2GLWiqI9-PD9FDXOCZahZOOqGkA",
+     "l6hDdabXldTGQy3HU6NOuGfLB40cSIXBW8KN3WC1zLI",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 18,
+    "path": [
+     "KpZQvg0Fgc6PG2znuL-NayYKvtBrOJEKOujITizGYKE",
+     "USm-983yPUHM3rklgE-hI9SKwikt_K-cG8ncwHQ93k4",
+     "YPPr4D4UZ6r3KglKG_QN9I3nUHpgAHSR2-ZUra9czC0",
+     "eSUuTF-NDZ-BBUEG2GLWiqI9-PD9FDXOCZahZOOqGkA",
+     "l6hDdabXldTGQy3HU6NOuGfLB40cSIXBW8KN3WC1zLI",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 19,
+    "path": [
+     "6hWd7R-NEsRbV9tA6Kuzuc_dl45_2ZbAyDv_4ggChYA",
+     "USm-983yPUHM3rklgE-hI9SKwikt_K-cG8ncwHQ93k4",
+     "YPPr4D4UZ6r3KglKG_QN9I3nUHpgAHSR2-ZUra9czC0",
+     "eSUuTF-NDZ-BBUEG2GLWiqI9-PD9FDXOCZahZOOqGkA",
+     "l6hDdabXldTGQy3HU6NOuGfLB40cSIXBW8KN3WC1zLI",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 20,
+    "path": [
+     "OLL3LKjumXGtt5uAgS6n4Qo01CRi6BecxaTHHKxxRu0",
+     "dCoSgaeoYFPM74HNreKEKNmQ5dKFrDXfaq672GqcsAY",
+     "Cfj0Bu7keW1vJQitUNkEQ7TfkvqHpJAx9S3JJzhP82Q",
+     "eSUuTF-NDZ-BBUEG2GLWiqI9-PD9FDXOCZahZOOqGkA",
+     "l6hDdabXldTGQy3HU6NOuGfLB40cSIXBW8KN3WC1zLI",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 21,
+    "path": [
+     "93JOaavclt9E0MnLomaKLXDbDcDDMeGqqmH4cqAaIT4",
+     "dCoSgaeoYFPM74HNreKEKNmQ5dKFrDXfaq672GqcsAY",
+     "Cfj0Bu7keW1vJQitUNkEQ7TfkvqHpJAx9S3JJzhP82Q",
+     "eSUuTF-NDZ-BBUEG2GLWiqI9-PD9FDXOCZahZOOqGkA",
+     "l6hDdabXldTGQy3HU6NOuGfLB40cSIXBW8KN3WC1zLI",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 22,
+    "path": [
+     "QQ5hfxDJtYJt9bq0d3qaHjamF7pVqR_Xbun0wHIKkM4",
+     "snfmVCcPOd_pEAqdIZhODUMhwXzbVN4VLOhFUjrMLzI",
+     "Cfj0Bu7keW1vJQitUNkEQ7TfkvqHpJAx9S3JJzhP82Q",
+     "eSUuTF-NDZ-BBUEG2GLWiqI9-PD9FDXOCZahZOOqGkA",
+     "l6hDdabXldTGQy3HU6NOuGfLB40cSIXBW8KN3WC1zLI",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 23,
+    "path": [
+     "DeEEUHowI_VYg7igOGK4Cotydn_9bBIyTgG6a0u5xyo",
+     "snfmVCcPOd_pEAqdIZhODUMhwXzbVN4VLOhFUjrMLzI",
+     "Cfj0Bu7keW1vJQitUNkEQ7TfkvqHpJAx9S3JJzhP82Q",
+     "eSUuTF-NDZ-BBUEG2GLWiqI9-PD9FDXOCZahZOOqGkA",
+     "l6hDdabXldTGQy3HU6NOuGfLB40cSIXBW8KN3WC1zLI",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 24,
+    "path": [
+     "FziYvdhKyj-io4nth1LIwz6PMdEERnsWdTH38eq3J-w",
+     "lsH6e8XuTSFyljPndW0z4MPDlRvY_BHzzwjan_lbdRI",
+     "KO9CYztQd7yKHRMRAGfZdtYZOFPJgT7Bh9yhd7FJAuE",
+     "LZ3bzNQqg8eNXs6poF84PGqDQNaeNI_3G5MoFTR1AmY",
+     "l6hDdabXldTGQy3HU6NOuGfLB40cSIXBW8KN3WC1zLI",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 25,
+    "path": [
+     "X8LGWwfD68P5apykks5WDII5ZAYo97ObqbsZkcdKJWU",
+     "lsH6e8XuTSFyljPndW0z4MPDlRvY_BHzzwjan_lbdRI",
+     "KO9CYztQd7yKHRMRAGfZdtYZOFPJgT7Bh9yhd7FJAuE",
+     "LZ3bzNQqg8eNXs6poF84PGqDQNaeNI_3G5MoFTR1AmY",
+     "l6hDdabXldTGQy3HU6NOuGfLB40cSIXBW8KN3WC1zLI",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 26,
+    "path": [
+     "ZvVP8YJ3bbLQZMVqrRKX0jAipZ15GjIpeoW3-mx69NA",
+     "5V7WKBoBk-O889T4CMkX05qQC6E4OVM-9TbEgLkz4L8",
+     "KO9CYztQd7yKHRMRAGfZdtYZOFPJgT7Bh9yhd7FJAuE",
+     "LZ3bzNQqg8eNXs6poF84PGqDQNaeNI_3G5MoFTR1AmY",
+     "l6hDdabXldTGQy3HU6NOuGfLB40cSIXBW8KN3WC1zLI",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 27,
+    "path": [
+     "aybp2thBnSqkwAScndcyCNoxl3Y7zbLV-HoLOzoCnFY",
+     "5V7WKBoBk-O889T4CMkX05qQC6E4OVM-9TbEgLkz4L8",
+     "KO9CYztQd7yKHRMRAGfZdtYZOFPJgT7Bh9yhd7FJAuE",
+     "LZ3bzNQqg8eNXs6poF84PGqDQNaeNI_3G5MoFTR1AmY",
+     "l6hDdabXldTGQy3HU6NOuGfLB40cSIXBW8KN3WC1zLI",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 28,
+    "path": [
+     "iA8DB9rBd99PBt168v4mJxwFrEJzJ6PYgJyhiai0dSM",
+     "AgstSGJbeP5lY30Ft2xmiwi_CFbZmh-KqcYAoLi1-0U",
+     "DHj7vxAZBe_bGZxedC1fdTwrvAVbLz9n_g3xLS8RCLc",
+     "LZ3bzNQqg8eNXs6poF84PGqDQNaeNI_3G5MoFTR1AmY",
+     "l6hDdabXldTGQy3HU6NOuGfLB40cSIXBW8KN3WC1zLI",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 29,
+    "path": [
+     "6U9z5qN87GXH_Ucaz1Sj0qysVjLDZ77RG3cOlJGdrrA",
+     "AgstSGJbeP5lY30Ft2xmiwi_CFbZmh-KqcYAoLi1-0U",
+     "DHj7vxAZBe_bGZxedC1fdTwrvAVbLz9n_g3xLS8RCLc",
+     "LZ3bzNQqg8eNXs6poF84PGqDQNaeNI_3G5MoFTR1AmY",
+     "l6hDdabXldTGQy3HU6NOuGfLB40cSIXBW8KN3WC1zLI",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 30,
+    "path": [
+     "p_4UDqTzvU25n0x851FRkiZs1Fuq3H-BVTZxKfjhBI4",
+     "MnbDooSnWvyo1tkF5uf6T-nOx0kUXPvhV7ROPvuTx6Y",
+     "DHj7vxAZBe_bGZxedC1fdTwrvAVbLz9n_g3xLS8RCLc",
+     "LZ3bzNQqg8eNXs6poF84PGqDQNaeNI_3G5MoFTR1AmY",
+     "l6hDdabXldTGQy3HU6NOuGfLB40cSIXBW8KN3WC1zLI",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 31,
+    "path": [
+     "_2AQ5mTMQtBGl4Cg0p-tTtS5nqu55J3CbQNcY09kVqo",
+     "MnbDooSnWvyo1tkF5uf6T-nOx0kUXPvhV7ROPvuTx6Y",
+     "DHj7vxAZBe_bGZxedC1fdTwrvAVbLz9n_g3xLS8RCLc",
+     "LZ3bzNQqg8eNXs6poF84PGqDQNaeNI_3G5MoFTR1AmY",
+     "l6hDdabXldTGQy3HU6NOuGfLB40cSIXBW8KN3WC1zLI",
+     "w-HsMyVBGKl6IYp5BzmoyfHfxAwolXOxAdKjZxVbMnI"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 32,
+    "path": [
+     "D7yljGlOzYWqZRbU3QiUYtEg_oLNtsQf3bho3jrYjp4",
+     "YDqU8SwgYpF9Er5LY2F239RcghI4OwOaamiVmpcodN8",
+     "PHFxEzJ4rjpfftzEutxP0_sXYZ6mS00syN8AQUpX6uY",
+     "7tF03Gs_5xn3fvFN6DEphXQYM1dki55iyf2p9vf09_E",
+     "RQ-Gf-3Bams1uHna70TekBxyCrMS9HNIzw8U5tigUEE"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 33,
+    "path": [
+     "a_b2FNQAz9EDmfNKyf0zpPCBEfu16XgTMysYHbIy8bw",
+     "YDqU8SwgYpF9Er5LY2F239RcghI4OwOaamiVmpcodN8",
+     "PHFxEzJ4rjpfftzEutxP0_sXYZ6mS00syN8AQUpX6uY",
+     "7tF03Gs_5xn3fvFN6DEphXQYM1dki55iyf2p9vf09_E",
+     "RQ-Gf-3Bams1uHna70TekBxyCrMS9HNIzw8U5tigUEE"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 34,
+    "path": [
+     "wnEUk3um67xTLa1qPOcxforFbQTqfkPVHnTQNKwY_xs",
+     "WdNM8kEpbQBxUQA7ZGMBd6rlyrgmMeaou9aAPidsA1g",
+     "PHFxEzJ4rjpfftzEutxP0_sXYZ6mS00syN8AQUpX6uY",
+     "7tF03Gs_5xn3fvFN6DEphXQYM1dki55iyf2p9vf09_E",
+     "RQ-Gf-3Bams1uHna70TekBxyCrMS9HNIzw8U5tigUEE"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 35,
+    "path": [
+     "fykMYQKd3NGg5IltkjSIr6H39xb5ifFcbSCpmFVQzyM",
+     "WdNM8kEpbQBxUQA7ZGMBd6rlyrgmMeaou9aAPidsA1g",
+     "PHFxEzJ4rjpfftzEutxP0_sXYZ6mS00syN8AQUpX6uY",
+     "7tF03Gs_5xn3fvFN6DEphXQYM1dki55iyf2p9vf09_E",
+     "RQ-Gf-3Bams1uHna70TekBxyCrMS9HNIzw8U5tigUEE"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 36,
+    "path": [
+     "VU19VPe7SB4-0NsMwHk4zQy5IauZpmTsMTSoCUgTYHE",
+     "N01afMq9kpDVpxzTe3eoJPFNMPrkFvQkF4jt69_2Wis",
+     "l-q4cuI21XCdFEtBq-vFWZTgWGQwIn-pFkNT9pz4MR4",
+     "7tF03Gs_5xn3fvFN6DEphXQYM1dki55iyf2p9vf09_E",
+     "RQ-Gf-3Bams1uHna70TekBxyCrMS9HNIzw8U5tigUEE"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 37,
+    "path": [
+     "RXqpH5CDjfSD59R2rmbfTjP-7JeeuMQzUhhRIiZZImw",
+     "N01afMq9kpDVpxzTe3eoJPFNMPrkFvQkF4jt69_2Wis",
+     "l-q4cuI21XCdFEtBq-vFWZTgWGQwIn-pFkNT9pz4MR4",
+     "7tF03Gs_5xn3fvFN6DEphXQYM1dki55iyf2p9vf09_E",
+     "RQ-Gf-3Bams1uHna70TekBxyCrMS9HNIzw8U5tigUEE"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 38,
+    "path": [
+     "F1Y4jzySv-xEIzFbhVJLLltn4vRdqquGtM2SdakdfXA",
+     "TC-sRaDV39pZ81D2ZzFtX-h3si133JgabcgBm_CEBAM",
+     "l-q4cuI21XCdFEtBq-vFWZTgWGQwIn-pFkNT9pz4MR4",
+     "7tF03Gs_5xn3fvFN6DEphXQYM1dki55iyf2p9vf09_E",
+     "RQ-Gf-3Bams1uHna70TekBxyCrMS9HNIzw8U5tigUEE"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 39,
+    "path": [
+     "bGCc_FG5X5ifJh4STVOzJzQIPcIUamyY_nfuugvQDKA",
+     "TC-sRaDV39pZ81D2ZzFtX-h3si133JgabcgBm_CEBAM",
+     "l-q4cuI21XCdFEtBq-vFWZTgWGQwIn-pFkNT9pz4MR4",
+     "7tF03Gs_5xn3fvFN6DEphXQYM1dki55iyf2p9vf09_E",
+     "RQ-Gf-3Bams1uHna70TekBxyCrMS9HNIzw8U5tigUEE"
+    ],
+    "size": 41,
+    "v": 1
+   },
+   {
+    "index": 40,
+    "path": [
+     "zu_MEbxf4UTVIcfLEaLd0fpA6Iwha5-njofcVtp6ejM",
+     "RQ-Gf-3Bams1uHna70TekBxyCrMS9HNIzw8U5tigUEE"
+    ],
+    "size": 41,
+    "v": 1
+   }
+  ],
+  "root": "WUlCZ9ZOcaFL6EIDgh4L4O_FlXD3yZmLipwVxlgOuSg",
+  "size": 41
+ },
+ "mandates": {
+  "checkout_closed": "eyJhbGciOiJFUzI1NiIsInR5cCI6ImRjK3NkLWp3dCIsImtpZCI6IkUwVzFqQUNFdWd6cG9DVDVDZEdZT3cxQXdWR2tiS0hKanJDRFN4eE5DaVUifQ.eyJpc3MiOiJodHRwczovL21lcmNoYW50LmV4YW1wbGUiLCJzdWIiOiJjdXNfOWYzZW1rTmpMc2hzWE9WOEpPR0dvUSIsImlhdCI6MTgwMDAwMDAwMCwiZGVsZWdhdGVfcGF5bG9hZCI6W3siLi4uIjoiQkhIdklPbUROeEhodDh6T2FzN2lnUGgtTF9MbERPMzREM3BiaW1EQ2trSSJ9XSwiX3NkX2FsZyI6InNoYS0yNTYifQ.FyhfapwswcIpS7AR6SABAKY2LSSnIZR-XQ65L9gmfWhf8YfuHhYRjFwxaEg57wvKNJoWWWqa55pkX-yRQuAiCA~WyJ6d1RVUEZxeDhJcGNveTlJbFQ2M2JnIix7InZjdCI6Im1hbmRhdGUuY2hlY2tvdXQub3Blbi4xIiwiZXhwIjoxODAwNjA0ODAwLCJjb25zdHJhaW50cyI6W3sidHlwZSI6ImNoZWNrb3V0LmxpbmVfaXRlbXMiLCJpdGVtcyI6W3siaWQiOiJsaW5lXzEiLCJhY2NlcHRhYmxlX2l0ZW1zIjpbeyJpZCI6ImhwLW9zdHJhbmRlci10cmFpbC1zcG9ydC1lYXJidWRzIiwidGl0bGUiOiJPc3RyYW5kZXIgVHJhaWwgU3BvcnQgRWFyYnVkcyJ9XSwicXVhbnRpdHkiOjF9XX0seyJ0eXBlIjoiY2hlY2tvdXQuYWxsb3dlZF9tZXJjaGFudHMiLCJhbGxvd2VkIjpbeyJpZCI6Im0tZGVtbyIsIm5hbWUiOiJEZW1vIFN0b3JlIiwid2Vic2l0ZSI6Imh0dHBzOi8vc3VyZmFjZS5leGFtcGxlLnRlc3QifV19XSwiY25mIjp7Imp3ayI6eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2IiwieCI6IkthclljcVAxQk50RTJ4N0JGUkVYT0Q2d3liN1FwbjNzN0ZDTHNYMjE3YUEiLCJ5IjoiWHFfTTRhR2xuY0hfR3lWZDJwdlZXbDV2QVMyU2VQV1VnTWFnUTQ2M3ZRcyJ9fSwiaWF0IjoxODAwMDAwMDAwfV0~~eyJhbGciOiJFUzI1NiIsInR5cCI6ImtiK3NkLWp3dCJ9.eyJkZWxlZ2F0ZV9wYXlsb2FkIjpbeyIuLi4iOiJIRV9MVzlMOHM1Y19nY01YZTFzb1FmSUlZcExVSmJPSTNtUGxja25pZnE0In1dLCJpYXQiOjE4MDAwMDAwMDAsImF1ZCI6Im1lcmNoYW50Iiwibm9uY2UiOiJXX1M5S055U0dOTEhVZ1k3S08wNlhnIiwiX3NkX2FsZyI6InNoYS0yNTYiLCJzZF9oYXNoIjoiSWNLS3RFWDd6a1o2cUxMS2dCck9wT0o3Sy1ja2hPVm9xbzlNYWZSNmEwdyJ9.hI6kwPzLHpn7u9Th6w5nzRw8HUyj_D4V3CZGHkPCdX89V4yjxAff0dR1HUhDPjvuyTY8aFxyGkttJq9V8eph1g~WyJubi1pbTVTeDB4bWsycElka2pJVWlBIiwiY2hlY2tvdXRfand0IiwiZXlKaGJHY2lPaUpGVXpJMU5pSXNJbXRwWkNJNkltVnJlamhVV0c0eGVrMXdTREZ6ZUMxVWJFcFdaRTVRY2tZNFYxUnRSWE5SUldkcU5IWjBTak14ZDBVaWZRLmV5SmpkWEp5Wlc1amVTSTZJbFZUUkNJc0ltVjRjR2x5WlhOZllYUWlPaUl5TURJM0xUQXhMVEUxVkRFME9qQXdPakF3V2lJc0ltbGtJam9pWTJoclgwcHRUblpSUVRGVGVtRkxYMWhRZGpSTWVERkZUVkVpTENKc2FXNWxYMmwwWlcxeklqcGJleUpwWkNJNklteHBYekVpTENKcGRHVnRJanA3SW1sa0lqb2lhSEF0YjNOMGNtRnVaR1Z5TFhSeVlXbHNMWE53YjNKMExXVmhjbUoxWkhNaUxDSndjbWxqWlNJNk5EVXdNQ3dpZEdsMGJHVWlPaUpQYzNSeVlXNWtaWElnVkhKaGFXd2dVM0J2Y25RZ1JXRnlZblZrY3lKOUxDSnhkV0Z1ZEdsMGVTSTZNU3dpZEc5MFlXeHpJanBiZXlKaGJXOTFiblFpT2pRMU1EQXNJblI1Y0dVaU9pSnpkV0owYjNSaGJDSjlMSHNpWVcxdmRXNTBJam8wTlRBd0xDSjBlWEJsSWpvaWRHOTBZV3dpZlYxOVhTd2liR2x1YTNNaU9sdGRMQ0p6ZEdGMGRYTWlPaUp5WldGa2VWOW1iM0pmWTI5dGNHeGxkR1VpTENKMGIzUmhiSE1pT2x0N0ltRnRiM1Z1ZENJNk5EVXdNQ3dpZEhsd1pTSTZJbk4xWW5SdmRHRnNJbjBzZXlKaGJXOTFiblFpT2pRMU1EQXNJblI1Y0dVaU9pSjBiM1JoYkNKOVhTd2lkV053SWpwN0ltTmhjR0ZpYVd4cGRHbGxjeUk2ZXlKa1pYWXVkV053TG5Ob2IzQndhVzVuTG1Ob1pXTnJiM1YwSWpwYmV5SjJaWEp6YVc5dUlqb2lNakF5Tmkwd09DMHlOU0o5WFgwc0luQmhlVzFsYm5SZmFHRnVaR3hsY25NaU9uc2laR1YyTG1OdmRXNTBaWEp6YVdkdUxuQmhlVzFsYm5RdVlYQXlYM0JoZVcxbGJuUmZiV0Z1WkdGMFpTSTZXM3NpWTI5dVptbG5JanA3SW1OeVpXUmxiblJwWVd4ZmRIbHdaU0k2SW1Gd01sOXdZWGx0Wlc1MFgyMWhibVJoZEdVaWZTd2lhV1FpT2lKamIzVnVkR1Z5YzJsbmJsOWhjREpmY0dGNWJXVnVkRjl0WVc1a1lYUmxJaXdpZG1WeWMybHZiaUk2SWpJd01qWXRNRGd0TWpVaWZWMTlMQ0p6ZEdGMGRYTWlPaUp6ZFdOalpYTnpJaXdpZG1WeWMybHZiaUk2SWpJd01qWXRNRGd0TWpVaWZYMC5Zbll4SzEycEJSOGhOZEp2YVVPbXotQXlrRWlsOW1lRm4zWTdBMF90eGVEbXpCUnBjTnJ2NUEtYzVfTEE0S1E4bE9ZM0hfTlVjazQ5dnhLUjVMRHdJdyJd~WyJ2MVdpR0xYVlpLQ2xqX19TRndzLW93Iix7InZjdCI6Im1hbmRhdGUuY2hlY2tvdXQuMSIsIl9zZCI6WyJ1UjNkUzF0NWh1RzhDdjVXelAxalRxU1VZUnRGMjZHZWVKNmNlXzB2Ni1jIl0sImNoZWNrb3V0X2hhc2giOiJvdVRxcFFBTXBRTUtLVnNWUU1XU2k1TXoxeDk2MDBOSi1BbzBGR1FKRWtvIn1d~",
+  "checkout_open": "eyJhbGciOiJFUzI1NiIsInR5cCI6ImRjK3NkLWp3dCIsImtpZCI6IkUwVzFqQUNFdWd6cG9DVDVDZEdZT3cxQXdWR2tiS0hKanJDRFN4eE5DaVUifQ.eyJpc3MiOiJodHRwczovL21lcmNoYW50LmV4YW1wbGUiLCJzdWIiOiJjdXNfOWYzZW1rTmpMc2hzWE9WOEpPR0dvUSIsImlhdCI6MTgwMDAwMDAwMCwiZGVsZWdhdGVfcGF5bG9hZCI6W3siLi4uIjoiQkhIdklPbUROeEhodDh6T2FzN2lnUGgtTF9MbERPMzREM3BiaW1EQ2trSSJ9XSwiX3NkX2FsZyI6InNoYS0yNTYifQ.FyhfapwswcIpS7AR6SABAKY2LSSnIZR-XQ65L9gmfWhf8YfuHhYRjFwxaEg57wvKNJoWWWqa55pkX-yRQuAiCA~WyJ6d1RVUEZxeDhJcGNveTlJbFQ2M2JnIix7InZjdCI6Im1hbmRhdGUuY2hlY2tvdXQub3Blbi4xIiwiZXhwIjoxODAwNjA0ODAwLCJjb25zdHJhaW50cyI6W3sidHlwZSI6ImNoZWNrb3V0LmxpbmVfaXRlbXMiLCJpdGVtcyI6W3siaWQiOiJsaW5lXzEiLCJhY2NlcHRhYmxlX2l0ZW1zIjpbeyJpZCI6ImhwLW9zdHJhbmRlci10cmFpbC1zcG9ydC1lYXJidWRzIiwidGl0bGUiOiJPc3RyYW5kZXIgVHJhaWwgU3BvcnQgRWFyYnVkcyJ9XSwicXVhbnRpdHkiOjF9XX0seyJ0eXBlIjoiY2hlY2tvdXQuYWxsb3dlZF9tZXJjaGFudHMiLCJhbGxvd2VkIjpbeyJpZCI6Im0tZGVtbyIsIm5hbWUiOiJEZW1vIFN0b3JlIiwid2Vic2l0ZSI6Imh0dHBzOi8vc3VyZmFjZS5leGFtcGxlLnRlc3QifV19XSwiY25mIjp7Imp3ayI6eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2IiwieCI6IkthclljcVAxQk50RTJ4N0JGUkVYT0Q2d3liN1FwbjNzN0ZDTHNYMjE3YUEiLCJ5IjoiWHFfTTRhR2xuY0hfR3lWZDJwdlZXbDV2QVMyU2VQV1VnTWFnUTQ2M3ZRcyJ9fSwiaWF0IjoxODAwMDAwMDAwfV0~",
+  "payment_closed": "eyJhbGciOiJFUzI1NiIsInR5cCI6ImRjK3NkLWp3dCIsImtpZCI6IkUwVzFqQUNFdWd6cG9DVDVDZEdZT3cxQXdWR2tiS0hKanJDRFN4eE5DaVUifQ.eyJpc3MiOiJodHRwczovL21lcmNoYW50LmV4YW1wbGUiLCJzdWIiOiJjdXNfOWYzZW1rTmpMc2hzWE9WOEpPR0dvUSIsImlhdCI6MTgwMDAwMDAwMCwiZGVsZWdhdGVfcGF5bG9hZCI6W3siLi4uIjoiemEyNHYzY205cnEzRjdUWjNTdGtuRW1UR001UWZDUWJCTEVnaWFudmRQZyJ9XSwiX3NkX2FsZyI6InNoYS0yNTYifQ._KfJOKzpqLGEfSLWszHyqxLJvTSVsosF6SI41AYAXGUQ96W_ZdOAxp4aDgFuXjFsQxk-bqVHyCBpyDUF_rnfLg~WyJobkg0TUJZOVpFY1QwblRvMGZtNlJ3Iix7InZjdCI6Im1hbmRhdGUucGF5bWVudC5vcGVuLjEiLCJleHAiOjE4MDA2MDQ4MDAsImNvbnN0cmFpbnRzIjpbeyJ0eXBlIjoicGF5bWVudC5yZWZlcmVuY2UiLCJjb25kaXRpb25hbF90cmFuc2FjdGlvbl9pZCI6IkljS0t0RVg3emtaNnFMTEtnQnJPcE9KN0stY2toT1ZvcW85TWFmUjZhMHcifSx7InR5cGUiOiJwYXltZW50LmFtb3VudF9yYW5nZSIsImN1cnJlbmN5IjoiVVNEIiwibWluIjoxLCJtYXgiOjgwMDB9LHsidHlwZSI6InBheW1lbnQuYWxsb3dlZF9wYXllZXMiLCJhbGxvd2VkIjpbeyJpZCI6Im0tZGVtbyIsIm5hbWUiOiJEZW1vIFN0b3JlIiwid2Vic2l0ZSI6Imh0dHBzOi8vc3VyZmFjZS5leGFtcGxlLnRlc3QifV19LHsidHlwZSI6InBheW1lbnQuYnVkZ2V0IiwibWF4Ijo4MDAwLCJjdXJyZW5jeSI6IlVTRCJ9LHsidHlwZSI6InBheW1lbnQuYWdlbnRfcmVjdXJyZW5jZSIsImZyZXF1ZW5jeSI6Ik9OX0RFTUFORCIsIm1heF9vY2N1cnJlbmNlcyI6MX1dLCJjbmYiOnsiandrIjp7Imt0eSI6IkVDIiwiY3J2IjoiUC0yNTYiLCJ4IjoiS2FyWWNxUDFCTnRFMng3QkZSRVhPRDZ3eWI3UXBuM3M3RkNMc1gyMTdhQSIsInkiOiJYcV9NNGFHbG5jSF9HeVZkMnB2VldsNXZBUzJTZVBXVWdNYWdRNDYzdlFzIn19LCJpYXQiOjE4MDAwMDAwMDB9XQ~~eyJhbGciOiJFUzI1NiIsInR5cCI6ImtiK3NkLWp3dCJ9.eyJkZWxlZ2F0ZV9wYXlsb2FkIjpbeyIuLi4iOiJnUDl0NlhPOWpYSnQtaHJvY05UVXVSTU1EekVpOExvS2N4WHZlVVVEMURjIn1dLCJpYXQiOjE4MDAwMDAwMDAsImF1ZCI6ImNyZWRlbnRpYWwtcHJvdmlkZXIiLCJub25jZSI6IlNoVVpOZnRKcDNJc0ZVUUtpM1RuQWciLCJfc2RfYWxnIjoic2hhLTI1NiIsInNkX2hhc2giOiJ4NG42ZzhyYmpHS1BoSmJqWVo3dGE1Uk5DZUVJbEVSNlNJc1V1ZjdoTlJZIn0.aQKZVjmiAEeGuyhZ_DD0qk5N0kImXsRnQzJn5KHS4SP5Cl5cPOFsp3eEZpGjXbdLsBH8_8FizeGRNTzFYA_YSg~WyJ1dGl5a2xNbEZpb2Ntdmo3cGdLVU5RIiwiY2hlY2tvdXRfand0IiwiZXlKaGJHY2lPaUpGVXpJMU5pSXNJbXRwWkNJNkltVnJlamhVV0c0eGVrMXdTREZ6ZUMxVWJFcFdaRTVRY2tZNFYxUnRSWE5SUldkcU5IWjBTak14ZDBVaWZRLmV5SmpkWEp5Wlc1amVTSTZJbFZUUkNJc0ltVjRjR2x5WlhOZllYUWlPaUl5TURJM0xUQXhMVEUxVkRFME9qQXdPakF3V2lJc0ltbGtJam9pWTJoclgwcHRUblpSUVRGVGVtRkxYMWhRZGpSTWVERkZUVkVpTENKc2FXNWxYMmwwWlcxeklqcGJleUpwWkNJNklteHBYekVpTENKcGRHVnRJanA3SW1sa0lqb2lhSEF0YjNOMGNtRnVaR1Z5TFhSeVlXbHNMWE53YjNKMExXVmhjbUoxWkhNaUxDSndjbWxqWlNJNk5EVXdNQ3dpZEdsMGJHVWlPaUpQYzNSeVlXNWtaWElnVkhKaGFXd2dVM0J2Y25RZ1JXRnlZblZrY3lKOUxDSnhkV0Z1ZEdsMGVTSTZNU3dpZEc5MFlXeHpJanBiZXlKaGJXOTFiblFpT2pRMU1EQXNJblI1Y0dVaU9pSnpkV0owYjNSaGJDSjlMSHNpWVcxdmRXNTBJam8wTlRBd0xDSjBlWEJsSWpvaWRHOTBZV3dpZlYxOVhTd2liR2x1YTNNaU9sdGRMQ0p6ZEdGMGRYTWlPaUp5WldGa2VWOW1iM0pmWTI5dGNHeGxkR1VpTENKMGIzUmhiSE1pT2x0N0ltRnRiM1Z1ZENJNk5EVXdNQ3dpZEhsd1pTSTZJbk4xWW5SdmRHRnNJbjBzZXlKaGJXOTFiblFpT2pRMU1EQXNJblI1Y0dVaU9pSjBiM1JoYkNKOVhTd2lkV053SWpwN0ltTmhjR0ZpYVd4cGRHbGxjeUk2ZXlKa1pYWXVkV053TG5Ob2IzQndhVzVuTG1Ob1pXTnJiM1YwSWpwYmV5SjJaWEp6YVc5dUlqb2lNakF5Tmkwd09DMHlOU0o5WFgwc0luQmhlVzFsYm5SZmFHRnVaR3hsY25NaU9uc2laR1YyTG1OdmRXNTBaWEp6YVdkdUxuQmhlVzFsYm5RdVlYQXlYM0JoZVcxbGJuUmZiV0Z1WkdGMFpTSTZXM3NpWTI5dVptbG5JanA3SW1OeVpXUmxiblJwWVd4ZmRIbHdaU0k2SW1Gd01sOXdZWGx0Wlc1MFgyMWhibVJoZEdVaWZTd2lhV1FpT2lKamIzVnVkR1Z5YzJsbmJsOWhjREpmY0dGNWJXVnVkRjl0WVc1a1lYUmxJaXdpZG1WeWMybHZiaUk2SWpJd01qWXRNRGd0TWpVaWZWMTlMQ0p6ZEdGMGRYTWlPaUp6ZFdOalpYTnpJaXdpZG1WeWMybHZiaUk2SWpJd01qWXRNRGd0TWpVaWZYMC5Zbll4SzEycEJSOGhOZEp2YVVPbXotQXlrRWlsOW1lRm4zWTdBMF90eGVEbXpCUnBjTnJ2NUEtYzVfTEE0S1E4bE9ZM0hfTlVjazQ5dnhLUjVMRHdJdyJd~WyJEQjh5YU1XUTBkUkQ4a3haVDgxcDNnIix7InZjdCI6Im1hbmRhdGUucGF5bWVudC4xIiwiX3NkIjpbInI5VjJJNTF6dG9uVzI2UFQyZTd6Y0ZMSjc3Z2puQUhTZDlELXpVYlpnbWsiXSwidHJhbnNhY3Rpb25faWQiOiJvdVRxcFFBTXBRTUtLVnNWUU1XU2k1TXoxeDk2MDBOSi1BbzBGR1FKRWtvIiwicGF5ZWUiOnsiaWQiOiJtLWRlbW8iLCJuYW1lIjoiRGVtbyBTdG9yZSIsIndlYnNpdGUiOiJodHRwczovL3N1cmZhY2UuZXhhbXBsZS50ZXN0In0sInBheW1lbnRfYW1vdW50Ijp7ImFtb3VudCI6NDUwMCwiY3VycmVuY3kiOiJVU0QifSwicGF5bWVudF9pbnN0cnVtZW50Ijp7ImlkIjoicGF5cGFsLXNhbmRib3gtd2FsbGV0IiwidHlwZSI6InBheXBhbCJ9fV0~",
+  "payment_open": "eyJhbGciOiJFUzI1NiIsInR5cCI6ImRjK3NkLWp3dCIsImtpZCI6IkUwVzFqQUNFdWd6cG9DVDVDZEdZT3cxQXdWR2tiS0hKanJDRFN4eE5DaVUifQ.eyJpc3MiOiJodHRwczovL21lcmNoYW50LmV4YW1wbGUiLCJzdWIiOiJjdXNfOWYzZW1rTmpMc2hzWE9WOEpPR0dvUSIsImlhdCI6MTgwMDAwMDAwMCwiZGVsZWdhdGVfcGF5bG9hZCI6W3siLi4uIjoiemEyNHYzY205cnEzRjdUWjNTdGtuRW1UR001UWZDUWJCTEVnaWFudmRQZyJ9XSwiX3NkX2FsZyI6InNoYS0yNTYifQ._KfJOKzpqLGEfSLWszHyqxLJvTSVsosF6SI41AYAXGUQ96W_ZdOAxp4aDgFuXjFsQxk-bqVHyCBpyDUF_rnfLg~WyJobkg0TUJZOVpFY1QwblRvMGZtNlJ3Iix7InZjdCI6Im1hbmRhdGUucGF5bWVudC5vcGVuLjEiLCJleHAiOjE4MDA2MDQ4MDAsImNvbnN0cmFpbnRzIjpbeyJ0eXBlIjoicGF5bWVudC5yZWZlcmVuY2UiLCJjb25kaXRpb25hbF90cmFuc2FjdGlvbl9pZCI6IkljS0t0RVg3emtaNnFMTEtnQnJPcE9KN0stY2toT1ZvcW85TWFmUjZhMHcifSx7InR5cGUiOiJwYXltZW50LmFtb3VudF9yYW5nZSIsImN1cnJlbmN5IjoiVVNEIiwibWluIjoxLCJtYXgiOjgwMDB9LHsidHlwZSI6InBheW1lbnQuYWxsb3dlZF9wYXllZXMiLCJhbGxvd2VkIjpbeyJpZCI6Im0tZGVtbyIsIm5hbWUiOiJEZW1vIFN0b3JlIiwid2Vic2l0ZSI6Imh0dHBzOi8vc3VyZmFjZS5leGFtcGxlLnRlc3QifV19LHsidHlwZSI6InBheW1lbnQuYnVkZ2V0IiwibWF4Ijo4MDAwLCJjdXJyZW5jeSI6IlVTRCJ9LHsidHlwZSI6InBheW1lbnQuYWdlbnRfcmVjdXJyZW5jZSIsImZyZXF1ZW5jeSI6Ik9OX0RFTUFORCIsIm1heF9vY2N1cnJlbmNlcyI6MX1dLCJjbmYiOnsiandrIjp7Imt0eSI6IkVDIiwiY3J2IjoiUC0yNTYiLCJ4IjoiS2FyWWNxUDFCTnRFMng3QkZSRVhPRDZ3eWI3UXBuM3M3RkNMc1gyMTdhQSIsInkiOiJYcV9NNGFHbG5jSF9HeVZkMnB2VldsNXZBUzJTZVBXVWdNYWdRNDYzdlFzIn19LCJpYXQiOjE4MDAwMDAwMDB9XQ~"
+ },
+ "order_id": "ORDER1",
+ "paypal": {
+  "authorization": [
+   {
+    "amount": {
+     "currency_code": "USD",
+     "value": "45.00"
+    },
+    "create_time": "2026-10-30T10:00:00Z",
+    "custom_id": "cs1.pMKPEvXTct8cJIhIG_NwB8vAeygzEy2WHoBjpZCReiE",
+    "expiration_time": "2026-11-28T10:00:00Z",
+    "id": "AUTH2",
+    "invoice_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "status": "CREATED"
+   },
+   {
+    "amount": {
+     "currency_code": "USD",
+     "value": "45.00"
+    },
+    "create_time": "2026-10-30T10:00:00Z",
+    "custom_id": "cs1.pMKPEvXTct8cJIhIG_NwB8vAeygzEy2WHoBjpZCReiE",
+    "expiration_time": "2026-11-28T10:00:00Z",
+    "id": "AUTH2",
+    "invoice_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "status": "CAPTURED"
+   }
+  ],
+  "capture": [
+   {
+    "amount": {
+     "currency_code": "USD",
+     "value": "45.00"
+    },
+    "custom_id": "cs1.pMKPEvXTct8cJIhIG_NwB8vAeygzEy2WHoBjpZCReiE",
+    "final_capture": true,
+    "id": "CAP3",
+    "invoice_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+    "status": "COMPLETED"
+   }
+  ],
+  "order": [
+   {
+    "id": "ORDER1",
+    "intent": "AUTHORIZE",
+    "purchase_units": [
+     {
+      "amount": {
+       "breakdown": {
+        "item_total": {
+         "currency_code": "USD",
+         "value": "45.00"
+        }
+       },
+       "currency_code": "USD",
+       "value": "45.00"
+      },
+      "custom_id": "cs1.pMKPEvXTct8cJIhIG_NwB8vAeygzEy2WHoBjpZCReiE",
+      "invoice_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+      "items": [
+       {
+        "category": "DIGITAL_GOODS",
+        "name": "Ostrander Trail Sport Earbuds",
+        "quantity": "1",
+        "sku": "hp-ostrander-trail-sport-earbuds",
+        "unit_amount": {
+         "currency_code": "USD",
+         "value": "45.00"
+        }
+       }
+      ],
+      "payee": {
+       "merchant_id": "SIMMERCHANT1"
+      },
+      "reference_id": "default"
+     }
+    ],
+    "status": "APPROVED"
+   },
+   {
+    "id": "ORDER1",
+    "intent": "AUTHORIZE",
+    "purchase_units": [
+     {
+      "amount": {
+       "breakdown": {
+        "item_total": {
+         "currency_code": "USD",
+         "value": "45.00"
+        }
+       },
+       "currency_code": "USD",
+       "value": "45.00"
+      },
+      "custom_id": "cs1.pMKPEvXTct8cJIhIG_NwB8vAeygzEy2WHoBjpZCReiE",
+      "invoice_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+      "items": [
+       {
+        "category": "DIGITAL_GOODS",
+        "name": "Ostrander Trail Sport Earbuds",
+        "quantity": "1",
+        "sku": "hp-ostrander-trail-sport-earbuds",
+        "unit_amount": {
+         "currency_code": "USD",
+         "value": "45.00"
+        }
+       }
+      ],
+      "payee": {
+       "merchant_id": "SIMMERCHANT1"
+      },
+      "payments": {
+       "authorizations": [
+        {
+         "amount": {
+          "currency_code": "USD",
+          "value": "45.00"
+         },
+         "create_time": "2026-10-30T10:00:00Z",
+         "custom_id": "cs1.pMKPEvXTct8cJIhIG_NwB8vAeygzEy2WHoBjpZCReiE",
+         "expiration_time": "2026-11-28T10:00:00Z",
+         "id": "AUTH2",
+         "invoice_id": "chk_JmNvQA1SzaK_XPv4Lx1EMQ",
+         "status": "CREATED"
+        }
+       ]
+      },
+      "reference_id": "default"
+     }
+    ],
+    "status": "COMPLETED"
+   }
+  ]
+ },
+ "receipts": {
+  "checkout": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImVrejhUWG4xek1wSDFzeC1UbEpWZE5QckY4V1RtRXNRRWdqNHZ0SjMxd0UiLCJ0eXAiOiJjaGVja291dC1yZWNlaXB0K2p3dCJ9.eyJpYXQiOjE4MDAwMDAwMDAsImlzcyI6Imh0dHBzOi8vbWVyY2hhbnQuZXhhbXBsZSIsIm9yZGVyX2lkIjoiY2hrX0ptTnZRQTFTemFLX1hQdjRMeDFFTVEiLCJyZWZlcmVuY2UiOiJxS0ZQWjduVlI3RFRSSHh0cnBhOVdYSF9sYXFBVVZwZmtrb2VJc3FRUktnIiwic3RhdHVzIjoiU3VjY2VzcyJ9._rdO9-N1Ndha8AU_heVt_FrmEYvH3oAtD3GuLZj7Sz3EFqVb5uNmi6ypNmZOnnajfQmhAVA6NqNX8pjBmXxnYg",
+  "payment": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImVrejhUWG4xek1wSDFzeC1UbEpWZE5QckY4V1RtRXNRRWdqNHZ0SjMxd0UiLCJ0eXAiOiJwYXltZW50LXJlY2VpcHQrand0In0.eyJpYXQiOjE4MDAwMDAwMDAsImlzcyI6Imh0dHBzOi8vbWVyY2hhbnQuZXhhbXBsZSIsIm5ldHdvcmtfY29uZmlybWF0aW9uX2lkIjoiQ0FQMyIsInBheW1lbnRfaWQiOiJjaGtfSm1OdlFBMVN6YUtfWFB2NEx4MUVNUSIsInBzcF9jb25maXJtYXRpb25faWQiOiJDQVAzIiwicmVmZXJlbmNlIjoicGNHZW9lNWZqRE8tWC1IYUxjRVE4RnJRQ0FaR0JnbkpwQjJpTUJhNHkwTSIsInN0YXR1cyI6IlN1Y2Nlc3MifQ.HWwyxnstvnJTIBVSA5bkQ-07kFtkuvLvB1silXVH8yWyHSNKsPDjkKJ7uIDB9F3sU4wl92UvOhYUZmDQQLjS4Q"
+ },
+ "v": 1
+}

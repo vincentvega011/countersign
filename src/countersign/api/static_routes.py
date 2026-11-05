@@ -1,4 +1,4 @@
-"""The Trusted Surface page and the shared UI files it needs, served in every mode.
+"""The Trusted Surface pages, the evidence verifier page and the shared UI files they need, in every mode.
 
 Security reasoning. This is a product page, unlike the component gallery (`/_ui`, dev and eval only,
 Decision 75), so it is served in demo too. Nothing here serves a directory: each URL is an entry in a
@@ -19,8 +19,11 @@ from fastapi.responses import FileResponse, Response
 WEB_DIR = Path(__file__).resolve().parents[3] / "web"
 APPROVE_DIR = WEB_DIR / "approve"
 UI_DIR = WEB_DIR / "ui"
+VERIFY_DIR = WEB_DIR / "verify"
+EVIDENCE_DIR = UI_DIR / "evidence"
 
 APPROVE_PATH = "/approve/"
+VERIFY_PATH = "/verify/"
 CSS, JS, HTML, WOFF2 = "text/css", "text/javascript", "text/html", "font/woff2"
 FONTS = (
     "instrument-sans-latin-wght-normal.woff2",
@@ -44,14 +47,31 @@ PAGE_FILES: dict[str, tuple[Path, str]] = {
     "/approve/activity.js": (APPROVE_DIR / "activity.js", JS),
     "/approve/activity-records.js": (APPROVE_DIR / "activity-records.js", JS),
 }
+# The evidence verifier page (Decision 108): every check runs in the browser, from the modules below.
+VERIFY_FILES: dict[str, tuple[Path, str]] = {
+    VERIFY_PATH: (VERIFY_DIR / "index.html", HTML),
+    "/verify/verify.css": (VERIFY_DIR / "verify.css", CSS),
+    "/verify/verify.js": (VERIFY_DIR / "verify.js", JS),
+    "/verify/verify-text.js": (VERIFY_DIR / "verify-text.js", JS),
+}
+EVIDENCE_MODULES = (
+    "json.js",
+    "crypto.js",
+    "sdjwt.js",
+    "log.js",
+    "constraints.js",
+    "steps.js",
+    "verify.js",
+)
 UI_FILES: dict[str, tuple[Path, str]] = {
     "/ui/tokens.css": (UI_DIR / "tokens.css", CSS),
     "/ui/components.css": (UI_DIR / "components.css", CSS),
     "/ui/fonts.css": (UI_DIR / "fonts.css", CSS),
     "/ui/ui.js": (UI_DIR / "ui.js", JS),
     **{f"/ui/fonts/{name}": (UI_DIR / "fonts" / name, WOFF2) for name in FONTS},
+    **{f"/ui/evidence/{name}": (EVIDENCE_DIR / name, JS) for name in EVIDENCE_MODULES},
 }
-SERVED: dict[str, tuple[Path, str]] = {**PAGE_FILES, **UI_FILES}
+SERVED: dict[str, tuple[Path, str]] = {**PAGE_FILES, **VERIFY_FILES, **UI_FILES}
 
 CSP = (
     "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; "

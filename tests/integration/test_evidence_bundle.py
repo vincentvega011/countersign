@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from collections.abc import Iterator
@@ -60,9 +61,79 @@ def test_a_capture_stores_a_bundle_keyed_by_the_capture_id(world: ShopperWorld) 
     assert bundle["log"]["size"] == len(kinds) == len(bundle["log"]["proofs"])
 
 
-def test_unknown_and_malformed_ids_have_fixed_answers(world: ShopperWorld) -> None:
-    assert world.http.get("/evidence/NOPE").json() == {"code": "evidence_unknown"}
-    assert world.http.get("/evidence/bad id!").status_code in (400, 404)
+def test_unknown_and_malformed_ids_get_the_same_answer(world: ShopperWorld) -> None:
+    """No oracle: an unknown id, a malformed one and a path below the route answer identically."""
+    answers = []
+    for path in ("/evidence/NOPE", "/evidence/bad id!", "/evidence/" + "A" * 65, "/evidence/a/b",
+                 "/evidence/%00", "/evidence/..%2f..%2fpyproject.toml"):  # fmt: skip
+        r = world.http.get(path)
+        answers.append((r.status_code, r.content, r.headers["cache-control"],
+                        r.headers["content-type"]))  # fmt: skip
+    assert answers[0] == (404, b'{"code":"evidence_unknown"}', "no-store", "application/json")
+    assert all(a == answers[0] for a in answers), answers
+
+
+EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+PERSONAL = re.compile(
+    r"(?i)^(payer|payer_id|buyer|email|email_address|name|given_name|surname|full_name|address|"
+    r"address_line_\d|admin_area_\d|postal_code|country_code|phone|shipping|birth_date|tax_info)$"
+)
+
+
+def personal_members(node: Any, where: str = "") -> list[str]:
+    found = []
+    if isinstance(node, dict):
+        for key, value in node.items():
+            # `name` is allowed only as a product title (order items) or the store's own name (the
+            # merchant and the allowed payees): never a person.
+            business = ".items[" in where or re.search(r"(\.merchant|\.allowed\[\d+\])$", where)
+            if PERSONAL.match(key) and not (key == "name" and business):
+                found.append(f"{where}.{key}")
+            found += personal_members(value, f"{where}.{key}")
+    elif isinstance(node, list):
+        for i, value in enumerate(node):
+            found += personal_members(value, f"{where}[{i}]")
+    elif isinstance(node, str):
+        if EMAIL.search(node):
+            found.append(f"{where}: email-shaped text")
+        if node.startswith("{"):
+            try:
+                found += personal_members(json.loads(node), f"{where}<json>")
+            except ValueError:
+                pass
+    return found
+
+
+def test_a_served_bundle_holds_no_email_and_no_payer_or_buyer_details(
+    world: ShopperWorld,
+) -> None:
+    """Decisions 103 and 107: what is served in every mode is sanitized sandbox data."""
+    result, bundle = bought(world)
+    raw = world.http.get(f"/evidence/{result.capture_id}").text
+    assert personal_members(bundle) == []
+    assert not EMAIL.search(raw)
+    assert personal_members({"payer": {"email_address": "a@b.example"}}) != []  # the scan works
+
+
+def test_the_service_never_emits_what_the_strict_verifier_refuses(world: ShopperWorld) -> None:
+    """Decision 106: the stored text parses under the verifier's rules with no float anywhere."""
+    from countersign_verify.crypto import Float, loads
+
+    result, _ = bought(world)
+    value = loads(world.http.get(f"/evidence/{result.capture_id}").content)
+    stack = [value]
+    while stack:
+        node = stack.pop()
+        assert not isinstance(node, Float)
+        if isinstance(node, dict):
+            stack.extend(node.values())
+        elif isinstance(node, list):
+            stack.extend(node)
+        elif isinstance(node, str) and node[:1] in "{[":
+            try:
+                stack.append(loads(node))
+            except Exception:  # noqa: BLE001, S112 (not every bracketed text is JSON)
+                continue
 
 
 def test_the_stored_bundle_never_changes(world: ShopperWorld, admin_engine: Engine) -> None:
@@ -112,11 +183,16 @@ def test_nothing_personal_is_stored_from_what_paypal_returned(
         assert word not in joined
 
 
-def test_the_endpoint_is_not_served_outside_dev_and_eval(
-    app_engine: Engine, admin_engine: Engine
+@pytest.mark.parametrize("env", ["demo", "prod", ""])
+def test_the_endpoint_is_served_in_every_mode(
+    app_engine: Engine, admin_engine: Engine, env: str
 ) -> None:
     from countersign.runtime import Mode, RuntimeSettings
 
     reset(admin_engine)
-    world = make_world(app_engine, RuntimeSettings(Mode.FULL, "demo"))
-    assert world.http.get("/evidence/CAP1").status_code == 404
+    with admin_engine.begin() as conn:
+        conn.execute(text("TRUNCATE paypal_observations, evidence_bundles CASCADE"))
+    world = make_world(app_engine, RuntimeSettings(Mode.FULL, env))
+    assert world.http.get("/evidence/CAP1").json() == {"code": "evidence_unknown"}
+    result, bundle = bought(world)
+    assert bundle["capture_id"] == result.capture_id

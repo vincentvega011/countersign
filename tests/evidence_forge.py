@@ -92,6 +92,9 @@ class Defects:
     budget: int = 8000
     kb_aud_checkout: str = "merchant"
     kb_aud_payment: str = "credential-provider"
+    kb_typ: str = "kb+sd-jwt"
+    # (terms, open checkout content, open payment content), edited before the device signs
+    contents_edit: Callable[[dict[str, Any], dict[str, Any], dict[str, Any]], None] | None = None
     kb_sd_hash: Callable[[str], str] | None = None
     closed_iat: int = NOW + 10
     open_exp: int = NOW + 3600
@@ -169,6 +172,8 @@ def build(d: Defects | None = None) -> dict[str, Any]:
             {"type": "payment.agent_recurrence", "frequency": "ON_DEMAND", "max_occurrences": 1},
         ],
     }
+    if d.contents_edit:
+        d.contents_edit(terms, checkout_content, payment_content)
     record = {
         "v": 1,
         "purpose": "countersign.consent.open-mandates.v1",
@@ -248,7 +253,7 @@ def build(d: Defects | None = None) -> dict[str, Any]:
             "_sd_alg": "sha-256",
             "sd_hash": d.kb_sd_hash(open_ser) if d.kb_sd_hash else digest(open_ser),
         }
-        kb = agent.jws({"alg": "ES256", "typ": "kb+sd-jwt"}, payload)
+        kb = agent.jws({"alg": "ES256", "typ": d.kb_typ}, payload)
         extra_parts = [disclosure("unreferenced")[0]] if d.extra_closed_disclosure else []
         return f"{open_ser}~{kb}~{cj_text}~{content_text}~" + "".join(p + "~" for p in extra_parts)
 

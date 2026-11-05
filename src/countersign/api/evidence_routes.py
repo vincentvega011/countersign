@@ -1,30 +1,40 @@
-"""`GET /evidence/{capture_id}`: the stored evidence bundle of a captured payment.
+"""`GET /evidence/{capture_id}`: the stored evidence bundle of a captured payment, in every mode.
 
-The bundle names a customer id and PayPal object ids, so it is a merchant document. Until the merchant
-dashboard has a login (P4) the route is served only where the shared UI is (`APP_ENV` dev or eval), never
-in demo or production (Decision 104, L46). A malformed id is a 400 and an unknown one a 404, both with a
-fixed code and no echo.
+Security reasoning (Decision 107, L46). A bundle holds sanitized sandbox data only: PayPal objects pass the
+member allowlist of `evidence.observer` (no payer, no email, no name, no address, no shipping, no links),
+and the customer is a random `cus_` id. It is served in every `APP_ENV` so the `/verify/` page can load
+one by capture id. There is no listing endpoint, so a caller must already know a capture id, and an
+unknown id and a malformed one get the same answer (status, body, headers), so the endpoint is no oracle
+for which ids are well formed. Every fetch writes one process log line (not a decision log entry: a read
+decides nothing). Answers are never cached.
 """
 
 from __future__ import annotations
 
 import re
 
+import structlog
 from fastapi import FastAPI, Response
 from fastapi.responses import JSONResponse
 
 from countersign.evidence import EvidenceService
 
 _CAPTURE_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
+_HEADERS = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
+log = structlog.get_logger("countersign.evidence")
 
 
 def install(app: FastAPI, service: EvidenceService) -> None:
-    @app.get("/evidence/{capture_id}")
+    @app.get("/evidence/{capture_id:path}")  # every path below, so none answers differently
     def evidence(capture_id: str) -> Response:
-        headers = {"Cache-Control": "no-store"}
-        if _CAPTURE_ID.fullmatch(capture_id) is None:
-            return JSONResponse({"code": "capture_id_invalid"}, 400, headers)
-        bundle = service.get(capture_id)
+        well_formed = _CAPTURE_ID.fullmatch(capture_id) is not None
+        bundle = service.get(capture_id) if well_formed else None
+        log.info(
+            "evidence_fetch",
+            capture_id=capture_id if well_formed else None,
+            well_formed=well_formed,
+            found=bundle is not None,
+        )
         if bundle is None:
-            return JSONResponse({"code": "evidence_unknown"}, 404, headers)
-        return Response(bundle, media_type="application/json", headers=headers)
+            return JSONResponse({"code": "evidence_unknown"}, 404, _HEADERS)
+        return Response(bundle, media_type="application/json", headers=_HEADERS)

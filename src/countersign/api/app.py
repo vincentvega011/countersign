@@ -109,7 +109,7 @@ def create_app(
 
     install_static(app)
     install_catalog(app, catalog or load_catalog())
-    if evidence is not None and runtime.app_env in UI_ENVS:
+    if evidence is not None:  # every mode: bundles are sanitized sandbox data (Decision 107)
         install_evidence(app, evidence)
     if trusted_surface is not None:
         install_trusted_surface(app, trusted_surface)

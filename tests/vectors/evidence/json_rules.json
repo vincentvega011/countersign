@@ -1,0 +1,320 @@
+{
+ "_about": "Strict JSON rules of Decisions 12 and 106. Both verifiers parse every case and must give this result (ok and kind, or the code).",
+ "max_depth": 64,
+ "cases": [
+  {
+   "text": "0.1",
+   "ok": true,
+   "kind": "float"
+  },
+  {
+   "text": "1.50",
+   "ok": true,
+   "kind": "float"
+  },
+  {
+   "text": "15e-1",
+   "ok": true,
+   "kind": "float"
+  },
+  {
+   "text": "0.30000000000000004",
+   "ok": true,
+   "kind": "float"
+  },
+  {
+   "text": "0.1000000000000000055",
+   "ok": false,
+   "code": "json_excess_precision"
+  },
+  {
+   "text": "333333333.33333329",
+   "ok": false,
+   "code": "json_excess_precision"
+  },
+  {
+   "text": "1e-400",
+   "ok": false,
+   "code": "json_excess_precision"
+  },
+  {
+   "text": "1e999",
+   "ok": false,
+   "code": "json_non_finite"
+  },
+  {
+   "text": "-1e999",
+   "ok": false,
+   "code": "json_non_finite"
+  },
+  {
+   "text": "9007199254740991",
+   "ok": true,
+   "kind": "int"
+  },
+  {
+   "text": "-9007199254740991",
+   "ok": true,
+   "kind": "int"
+  },
+  {
+   "text": "9007199254740992",
+   "ok": false,
+   "code": "json_unsafe_integer"
+  },
+  {
+   "text": "-9007199254740992",
+   "ok": false,
+   "code": "json_unsafe_integer"
+  },
+  {
+   "text": "12345678901234567890",
+   "ok": false,
+   "code": "json_unsafe_integer"
+  },
+  {
+   "text": "1e20",
+   "ok": false,
+   "code": "json_unsafe_integer"
+  },
+  {
+   "text": "9007199254740991.0",
+   "ok": true,
+   "kind": "float"
+  },
+  {
+   "text": "9007199254740992.0",
+   "ok": false,
+   "code": "json_unsafe_integer"
+  },
+  {
+   "text": "NaN",
+   "ok": false,
+   "code": "json_non_finite"
+  },
+  {
+   "text": "Infinity",
+   "ok": false,
+   "code": "json_non_finite"
+  },
+  {
+   "text": "-Infinity",
+   "ok": false,
+   "code": "json_non_finite"
+  },
+  {
+   "text": "{\"a\":1,\"a\":2}",
+   "ok": false,
+   "code": "json_duplicate_key"
+  },
+  {
+   "text": "{\"a\":1,\"\\u0061\":2}",
+   "ok": false,
+   "code": "json_duplicate_key"
+  },
+  {
+   "text": "{\"a\":1,\"a\":2,\"b\":1e999}",
+   "ok": false,
+   "code": "json_non_finite"
+  },
+  {
+   "text": "[{\"a\":1,\"a\":2},1e999]",
+   "ok": false,
+   "code": "json_duplicate_key"
+  },
+  {
+   "text": "\"\\ud800\"",
+   "ok": false,
+   "code": "json_lone_surrogate"
+  },
+  {
+   "text": "\"\\udc00x\"",
+   "ok": false,
+   "code": "json_lone_surrogate"
+  },
+  {
+   "text": "{\"\\ud800\":1}",
+   "ok": false,
+   "code": "json_lone_surrogate"
+  },
+  {
+   "text": "\"\\ud83d\\ude00\"",
+   "ok": true,
+   "kind": "str"
+  },
+  {
+   "text": "\"\u00e9\ud83d\ude00\"",
+   "ok": true,
+   "kind": "str"
+  },
+  {
+   "text": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]",
+   "ok": true,
+   "kind": "list"
+  },
+  {
+   "text": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]",
+   "ok": false,
+   "code": "json_too_deep"
+  },
+  {
+   "text": "[\"[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[\"]",
+   "ok": true,
+   "kind": "list"
+  },
+  {
+   "text": "{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":1}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}",
+   "ok": true,
+   "kind": "dict"
+  },
+  {
+   "text": "01",
+   "ok": false,
+   "code": "json_syntax"
+  },
+  {
+   "text": "1.",
+   "ok": false,
+   "code": "json_syntax"
+  },
+  {
+   "text": "-",
+   "ok": false,
+   "code": "json_syntax"
+  },
+  {
+   "text": ".5",
+   "ok": false,
+   "code": "json_syntax"
+  },
+  {
+   "text": "+1",
+   "ok": false,
+   "code": "json_syntax"
+  },
+  {
+   "text": "1e",
+   "ok": false,
+   "code": "json_syntax"
+  },
+  {
+   "text": "[1,]",
+   "ok": false,
+   "code": "json_syntax"
+  },
+  {
+   "text": "{\"a\":1,}",
+   "ok": false,
+   "code": "json_syntax"
+  },
+  {
+   "text": " 1 ",
+   "ok": true,
+   "kind": "int"
+  },
+  {
+   "text": "1 2",
+   "ok": false,
+   "code": "json_syntax"
+  },
+  {
+   "text": "-0",
+   "ok": true,
+   "kind": "int"
+  },
+  {
+   "text": "-0.0",
+   "ok": true,
+   "kind": "float"
+  },
+  {
+   "text": "0e0",
+   "ok": true,
+   "kind": "float"
+  },
+  {
+   "text": "true",
+   "ok": true,
+   "kind": "bool"
+  },
+  {
+   "text": "null",
+   "ok": true,
+   "kind": "NoneType"
+  },
+  {
+   "text": "\"\\x\"",
+   "ok": false,
+   "code": "json_syntax"
+  },
+  {
+   "text": "\"a\u0001\"",
+   "ok": false,
+   "code": "json_syntax"
+  },
+  {
+   "text": "\"tab\\t\"",
+   "ok": true,
+   "kind": "str"
+  },
+  {
+   "text": "\t[\n1\r]",
+   "ok": true,
+   "kind": "list"
+  },
+  {
+   "text": "1E2",
+   "ok": true,
+   "kind": "float"
+  },
+  {
+   "text": "1e+2",
+   "ok": true,
+   "kind": "float"
+  },
+  {
+   "text": "-1.5e-3",
+   "ok": true,
+   "kind": "float"
+  },
+  {
+   "text": "[]",
+   "ok": true,
+   "kind": "list"
+  },
+  {
+   "text": "{}",
+   "ok": true,
+   "kind": "dict"
+  },
+  {
+   "text": "",
+   "ok": false,
+   "code": "json_syntax"
+  },
+  {
+   "bytes_b64": "77u/MQ==",
+   "note": "bom",
+   "ok": false,
+   "code": "json_encoding"
+  },
+  {
+   "bytes_b64": "Iv8i",
+   "note": "bad_utf8",
+   "ok": false,
+   "code": "json_encoding"
+  },
+  {
+   "bytes_b64": "IsCvIg==",
+   "note": "overlong",
+   "ok": false,
+   "code": "json_encoding"
+  },
+  {
+   "bytes_b64": "Iu2ggCI=",
+   "note": "encoded_surrogate",
+   "ok": false,
+   "code": "json_encoding"
+  }
+ ]
+}

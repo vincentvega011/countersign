@@ -62,8 +62,23 @@ def test_fonts_are_local_woff2_with_their_licence_beside_them() -> None:
         assert "SIL Open Font License" in p.read_text()
 
 
+# The evidence verifier reads a bundle whose members and step names say `paypal` (fixed by the Python
+# CLI), and its page names PayPal as the platform the evidence comes from, as text only: no logo, no
+# brand colour (Decision 108). Every other page may not name it.
+NAMES_THE_PLATFORM = {WEB / "verify", WEB / "ui" / "evidence"}
+
+
 def test_no_third_party_mark_or_service_is_named_in_the_ui() -> None:
     for path in SOURCES:
         lowered = path.read_text().lower()
         for mark in MARKS:
+            if mark == "paypal" and path.parent in NAMES_THE_PLATFORM:
+                continue
             assert mark not in lowered, f"{mark!r} in {path}"
+
+
+def test_the_verifier_names_the_platform_in_text_only() -> None:
+    for folder in NAMES_THE_PLATFORM:
+        for path in folder.iterdir():
+            text = path.read_text().lower()
+            assert "logo" not in text and "<img" not in text and "<svg" not in text, path
