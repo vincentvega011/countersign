@@ -35,6 +35,7 @@ from sqlalchemy import Connection, Engine
 from countersign.canonical.models import Checkout
 from countersign.catalog.catalog import Catalog
 from countersign.checkout import store
+from countersign.checkout.binding import bind_at_create, label_source
 from countersign.checkout.cancel import cancel_refusal
 from countersign.checkout.state import (
     FINAL,
@@ -181,7 +182,9 @@ class UcpService:
         lock: LockPort | None = None,
         ttl_us: int = TTL_US,
         order_base_url: str = "http://localhost:8000/ucp/v1/checkout-sessions",
+        data_source: str = "simulator",
     ) -> None:
+        self._data_source = data_source
         self._order_base_url = order_base_url.rstrip("/")
         self._engine = engine
         self._completion = completion
@@ -200,12 +203,16 @@ class UcpService:
         return self._lock.principal_from_delegation(ctx.delegation)
 
     def _lock_denial(
-        self, op: Literal["create", "update"], checkout: Checkout, ctx: RequestContext | None
+        self,
+        op: Literal["create", "update"],
+        checkout: Checkout,
+        ctx: RequestContext | None,
+        principal: Principal | None = None,
     ) -> Message | None:
         """Ask the shared lock about a create or update. The adapter makes no decision of its own."""
         if self._lock is None:
             return None
-        principal = self._principal(ctx)
+        principal = principal if principal is not None else self._principal(ctx)
         total = next(t.amount for t in checkout.totals if t.type == "total")
         verdict = self._lock.decide(
             LockRequest(
@@ -350,7 +357,8 @@ class UcpService:
             # No resource is created: an error response, unrecoverable for this request.
             return Result(200, None, tuple({**e, "severity": "unrecoverable"} for e in errors))
         built = self._build(self._new_id(), lines)
-        denial = self._lock_denial("create", built, ctx)
+        principal = self._principal(ctx)
+        denial = self._lock_denial("create", built, ctx, principal)
         if denial is not None:
             return Result(200, None, ({**denial, "severity": "unrecoverable"},))
         now = self._clock()
@@ -366,7 +374,11 @@ class UcpService:
         )
         with self._engine.begin() as conn:
             store.insert_record(conn, record)
-            self._log(conn, "checkout.created", record, lines=_lines_of(record))
+            bound = bind_at_create(conn, record.id, principal, now)
+            label_source(conn, record.id, self._data_source, now)
+            self._log(
+                conn, "checkout.created", record, lines=_lines_of(record), customer_bound=bound
+            )
         return Result(201, record)
 
     @_with_order

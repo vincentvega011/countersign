@@ -10,7 +10,7 @@ A phase starts only when the previous gate has passed.
 | P1    | Canonical core, UCP checkout and profile, `merchant_authorization`, PayPal client, decision log                                        | A UCP checkout is signed and verified by the independent Node verifier, and canonical terms round-trip through a real sandbox order                | Passed |
 | P2    | Mandates, Merchant and Credential Provider roles, constraints, capture gate, principal lock, ACP adapter, baseline mode, first attacks | Downgrade, order-changed-after-approval (nothing is authorized in full; authorized, then voided by the gate with `ABL_NO_PREAUTH_CHECK`) and replay attacks succeed in baseline and fail in full with nothing captured; concurrency tests pass | Passed      |
 | P3    | Trusted Surface with device keys and consent, shopping agent, evidence bundles and verifiers                                           | An autonomous purchase runs from phone approval to a captured sandbox order to a verified evidence bundle, with no server-held customer key        | Passed      |
-| P4    | Dashboard, assistant, hostile agent, full evaluation                                                                                   | The whole demo runs from the dashboard locally and the evaluation numbers are frozen                                                               | Next        |
+| P4    | Dashboard, assistant, hostile agent, full evaluation                                                                                   | The whole demo runs from the dashboard locally and the evaluation numbers are frozen                                                               | In progress (P4.1, P4.2 done) |
 | P5    | Deployment, design polish, documentation, fresh-clone test                                                                             | A stranger can use the hosted demo end to end and can run it locally from the README alone                                                         | Not started |
 | P6    | Video, submission text, final checks                                                                                                   | Everything is submitted with time to spare                                                                                                         | Not started |
 
@@ -237,6 +237,22 @@ recorded request ids again, so:
   the package out of every authorization module. **The provider and model are still open until P3.6**; no
   cassette is recorded yet (`scripts/record_llm_cassette.py` is for the owner to run). One commit covers P3.4 and P3.5.
 
+## P4 log
+
+- **P4.1 and P4.2 (2026-11-05): done.** L55 closed: a checkout is bound to one customer (create, first offer or
+  first verified complete); offers need the customer's device key; consent and complete check the binding
+  ([PROTOCOL.md](PROTOCOL.md) Decision 111). New attack case `agent_self_approval`: blocked in full and in baseline
+  (does not separate). Binding mutation check: 9 mutants, 8 killed, 1 equivalent. What remains is L56.
+- Merchant dashboard on **AG Studio** (Decisions 112 to 117): Vite and React app at `/dashboard/`, token theme in
+  light and dark, read-only API and event stream, source labels on every row, Onboarding status, and the Orders view
+  (KPI tiles, two charts, the custom Authorization funnel widget, orders grid, quick filter, grouping, CSV export,
+  live updates). `make dashboard-build`, `make dashboard-seed`.
+- **What the trial provides** (tested, [ENV.md](ENV.md) section 3.6): row grouping, pivoting, set-style list
+  filter, Studio charts, CSV export, totals row, cross filtering, edit and view mode, custom widgets. Not provided:
+  master and detail, the raw grid API. Key tier STUDIO-PRO-AI, expiry 20 December 2026.
+- **Next:** P4.3 order detail and evidence views; P4.4 protection activity and policy; P4.5 Ask Countersign (Studio
+  agent framework); then the adversary LLM mode and the full evaluation.
+
 ## P3 gate (run 2026-11-05): passed
 
 Gate evidence (`tests/integration/test_p3_gate.py`, Decision 109):
@@ -327,7 +343,8 @@ Findings from the P1 review that belong to P2 and are not optional there:
 - **P5.1:** create the PayPal webhook, record its id, and confirm live delivery and `verify-webhook-signature` against a real notification (ENV section 11).
 
 - **Later:** the page for revoking a key and adding a second device (L36, L38).
-- **P4:** tie a Human Present offer to the customer of the checkout's principal, and check whether the principal lock already stops it (L55, review finding 4).
+- **Later:** bind enrolment to a platform or merchant login, which closes L56 (an agent as its own customer) and L35.
+- **P4.3+:** a merchant login for the dashboard (L57); order detail as its own view (no master and detail in Studio).
 - **P4:** let the reader pin or recognise the customer's device key fingerprint on `/verify/` beyond showing it (L54).
 - **P5.1:** rate limit `GET /evidence/{capture_id}` (L46).
 - **Later:** anchor the decision log root so the log steps prove more than consistency (L48).
@@ -340,7 +357,7 @@ Findings from the P1 review that belong to P2 and are not optional there:
 | Vaulting verified in the sandbox only                        | Fallback is a fresh payer approval per purchase ([LIMITATIONS.md](LIMITATIONS.md) L1)                                                         |
 | A `PayPal-Request-Id` above 108 characters returns HTTP 500  | The client enforces the limit ([LIMITATIONS.md](LIMITATIONS.md) L2)                                                                           |
 | The free Render Postgres expires 30 days after creation, inside the judging period | Create a fresh database on or after 16 Nov, re-seed, repoint ([ENV.md](ENV.md) section 4) |
-| AG Grid Enterprise features need a licence for the hosted demo; a 30 day trial would lapse before 15 Dec | Build on Community first; ask about a hackathon licence ([ENV.md](ENV.md) section 3.5) |
+| The dashboard runs on an AG Studio trial key that expires 20 Dec 2026 (after judging); behaviour after expiry untested | Keep the hosted build on the key until judging ends; confirm the expiry with the owner ([ENV.md](ENV.md) section 3.6, [LIMITATIONS.md](LIMITATIONS.md) L58) |
 | SD-JWT chain handling is in-house, security-critical code    | Mutation tests and the TypeScript cross-check are mandatory before it is relied on ([ENV.md](ENV.md) section 1.5)                              |
 
 ## Definition of done

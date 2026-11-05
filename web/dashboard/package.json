@@ -1,5 +1,27 @@
 {
   "name": "@countersign/dashboard",
   "version": "0.0.0",
-  "private": true
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "prettier --check --ignore-path .prettierignore . && tsc --noEmit",
+    "test": "node --test --test-concurrency=1 test/*.test.mjs"
+  },
+  "dependencies": {
+    "ag-studio": "3.1.0",
+    "ag-studio-react": "3.1.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "playwright": "^1.64.1",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.7"
+  }
 }

@@ -44,6 +44,10 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - run: pnpm --filter @countersign/approve exec playwright install --with-deps chromium
+      # The dashboard tests serve the built dashboard (web/dashboard/dist). CI builds it WITHOUT the AG
+      # Studio licence key (it is never in the repository); Studio then shows its trial watermark and
+      # the tests skip only the licence assertion.
+      - run: pnpm --filter @countersign/dashboard run build
       - uses: astral-sh/setup-uv@v10.3.0
       - run: uv sync --locked
       - run: uv run ruff check .

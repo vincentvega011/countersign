@@ -323,10 +323,34 @@ Honorable Mention.
   demo without a key shows a watermark and console errors.
 - **Timing risk.** A 30 day trial started at the P4 or P5 build would lapse before the judging
   period ends on 15 Dec, and behavior after expiry was not verified. Use trial features in the
-  recorded video only if a long enough key exists.
+  recorded video only if a long enough key exists. *Superseded in P4.1: the dashboard is on AG Studio
+  with a 45 day trial key that runs to 20 Dec (section 3.6).*
 - **Manual checks for the maintainer:** (1) whether AG Grid offers hackathon participants an
   evaluation licence (ask AG Grid or the hackathon organisers); (2) the row pinning page for the
   totals row; (3) the integrated charts conflict above; (4) the EULA terms on trial expiry.
+
+### 3.6 AG Studio (P4.1, tested 2026-11-05)
+
+Read on the official Studio docs (quick start, custom widgets, AI agents, licence install, data, theming, modes and
+layout, state) and checked against the 3.1.0 type definitions. The dashboard uses `ag-studio-react` and `ag-studio`
+3.1.0 (licence: Commercial). The key goes to `AgStudioProvider licenseKey`; it is read from `AG_STUDIO_LICENSE_KEY`
+at build time ([PROTOCOL.md](PROTOCOL.md) Decision 112).
+
+- **The owner's key:** valid, trial, tier STUDIO-PRO-AI (the highest), expiry **20 December 2026** as read from the
+  key's own metadata through `AgStudioLicenseManager` (to be confirmed by the owner). Judging ends 15 December.
+- **With the key:** no console licence message, both watermark elements hidden. **Without it:** console errors "AG
+  Studio Core License / License Key Not Found", everything still works (the trial watermark element exists).
+- **Tested in our app with the trial (all worked):** Studio renders and loads our rows through its data source API;
+  our token theme in light and dark; a custom widget registered with `createWidgets`; cross filtering between the
+  funnel, the tiles, both charts and the grid; view and edit mode; row grouping (pivot grid row groups by agent and
+  customer); pivoting (status as pivot columns); a set-style value filter (Studio's list filter widget); Studio charts
+  (donut, bar); CSV export from the grid widget's toolbar; a grand total row; live row updates through
+  `applyTransaction`.
+- **Not provided through Studio:** master and detail (the grid widget's options expose only locale, block cache,
+  cell renderers and linked fields) and the raw AG Grid API; the grid toolbar offers CSV only (no Excel seen). Studio's
+  licence covers its own grid and chart widgets only; using AG Grid Enterprise directly in a custom widget would need
+  an AG Grid licence.
+- **Not tested yet:** the Studio agent framework (P4.5).
 
 ## 4. Render hosting
 

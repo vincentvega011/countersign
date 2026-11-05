@@ -113,7 +113,7 @@ when the issuer is built ([PROTOCOL.md](PROTOCOL.md) Decision 8).
                            |
                            v
         +-------------------------------------------------------------------------------+
-        | Merchant dashboard (React and AG Grid): orders, mandates, gate results,        |
+        | Merchant dashboard (React and AG Studio): orders, mandates, gate results,      |
         | evidence, protection activity, policy, assistant                               |
         +-------------------------------------------------------------------------------+
 ```
@@ -660,27 +660,29 @@ themes, shared tokens and components.
 
 ### 7.1 Merchant dashboard
 
-`web/dashboard`, desktop first, React, TypeScript and AG Grid.
+`web/dashboard` (`@countersign/dashboard`): Vite, React, TypeScript and **AG Studio** (`ag-studio-react` 3.1.0, the
+embedded analytics component with AG Grid and AG Charts inside), desktop first (1280 px; 768 px still works). Served
+at `/dashboard/` in every mode from the built files, fed only by the read-only API `/dashboard/api/v1/` and its event
+stream ([PROTOCOL.md](PROTOCOL.md) Decisions 112 to 117). No login yet ([LIMITATIONS.md](LIMITATIONS.md) L57).
 
-1. **Onboarding** in three steps: connect a PayPal sandbox REST app (credentials stored server
-   side), choose the protection mode (require AP2 for all agents, or above a threshold), publish the
-   UCP profile (shows the live `/.well-known/ucp` URL and a button to test with a sample agent).
-2. **Agent orders** (AG Grid): one row per checkout across protocols. Columns: time, customer,
-   agent, protocol, amount, mandate status, gate result, PayPal order id, capture id, evidence
-   status. Grouping by agent and customer, a pinned totals row, status renderers, quick filter and
-   CSV export. A row opens the detail view.
-3. **Order detail:** the signed checkout with its `merchant_authorization` status, the mandates with
-   decoded disclosures and the signature chain, and the live PayPal order fetched now with its
-   re-derived terms. Differences are highlighted. A gate step timeline and linked log entries with
-   inclusion proofs.
-4. **Evidence:** per capture, "Verify evidence" runs the verifier in the browser and shows each
-   dispute step. "Download bundle" exports the bundle file.
-5. **Protection activity** (grid and charts): blocked attempts by reason code, voided
-   authorizations, budget usage per open mandate, and baseline versus full results from the latest
-   evaluation.
-6. **Policy:** protection mode, unmandated cap, allowed categories, velocity limits. Changes are
-   versioned and hashed.
-7. **Ask Countersign** (the merchant assistant, [7.4](#74-merchant-assistant)).
+Built (P4.1, P4.2):
+
+- **Shell:** navigation (Orders, Protection, Evidence, Policy, Assistant, Onboarding; the middle four are placeholders),
+  light and dark theme toggle, and a label with the protection mode, `APP_ENV` and "sandbox demo, simulated and
+  recorded data is labelled".
+- **Onboarding** shows the real state of three steps: PayPal sandbox app configured (yes or no, no value), protection
+  mode, UCP profile URL with a "Test profile" check. Read only in demo; no credentials form anywhere.
+- **Agent orders** as a pre-composed Studio report over one `orders` table: KPI tiles (captured, orders, blocked,
+  unauthorized captures), orders by status, blocked attempts by reason code, the custom **Authorization funnel**
+  widget, and the orders grid (time, source, checkout, status, mandate, amount, items, agent key, customer, protocol,
+  gate, reason, capture id) with pill renderers, a totals row, CSV export, a quick filter, newest first. Everything
+  cross-filters. "Group by agent and customer" uses Studio's pivot grid. View mode for visitors, edit mode in dev.
+  New or changed checkouts arrive live through the stream. Every row carries its source: sandbox, recorded or
+  simulated (`make dashboard-seed` fills a dev database).
+
+Planned (P4.3 onward): order detail (Studio's grid widget has no master and detail, so a separate view: signed
+checkout, mandates, live PayPal order, gate timeline), evidence verify and download, protection activity, policy, and
+Ask Countersign (Studio's agent framework is available under the trial tier, [ENV.md](ENV.md) section 3.6).
 
 ### 7.2 Trusted Surface
 
@@ -822,7 +824,8 @@ PayPal sandbox:
 Other:
 
 - [x] Grid vendor license terms and which features are free versus paid
-      ([ENV.md](ENV.md) section 3). Open manual checks are listed there.
+      ([ENV.md](ENV.md) section 3). Since P4.1 the dashboard is on AG Studio under the owner's trial key
+      (STUDIO-PRO-AI, expires 20 December 2026, after judging); what the trial provides is in section 3.6.
 - [x] Hosting plan fit for the API, static sites and Postgres for the evaluation period
       ([ENV.md](ENV.md) section 4). The free Postgres expires inside the judging period; the
       fallback is written there.

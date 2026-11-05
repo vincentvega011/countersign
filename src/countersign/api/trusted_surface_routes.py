@@ -230,7 +230,9 @@ def install(app: FastAPI, service: TrustedSurface) -> None:
 
 PROPOSAL_MEMBERS = frozenset({"challenge_id", "agent_jwk", "proposal", "origin", "signature"})
 FETCH_MEMBERS = frozenset({"challenge_id", "origin", "signature"})
-OFFER_MEMBERS = frozenset({"checkout_id"})
+OFFER_MEMBERS = frozenset(
+    {"checkout_id", "challenge_id", "customer_id", "device_thumbprint", "origin", "signature"}
+)
 PURCHASE_MEMBERS = frozenset({"record", "signature"})
 SESSION_MEMBERS = frozenset(
     {"challenge_id", "customer_id", "device_thumbprint", "origin", "signature"}
@@ -330,7 +332,10 @@ def _install_lifecycle(app: FastAPI, service: TrustedSurface) -> None:
             body = _object(service, request, raw, purchase.LOG_KIND_REFUSED)
             if set(body) != OFFER_MEMBERS:
                 raise service.reject_request("malformed_request", purchase.LOG_KIND_REFUSED)
-            done = service.create_offer(body["checkout_id"])
+            done = service.create_offer(
+                **{k: body[k] for k in OFFER_MEMBERS},
+                origin_header=request.headers.get("origin"),
+            )
             return JSONResponse(
                 {
                     "offer_id": done.offer_id, "terms": done.terms,

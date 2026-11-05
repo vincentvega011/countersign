@@ -1,4 +1,4 @@
-.PHONY: dev-pair interop-mandates interop-ucp setup node-deps keys dev demo db test test-safety sandbox-smoke eval interop tamper-demo lint deploy
+.PHONY: dashboard-build dashboard-dev dashboard-seed dev-pair interop-mandates interop-ucp setup node-deps keys dev demo db test test-safety sandbox-smoke eval interop tamper-demo lint deploy
 
 setup: node-deps
 	uv sync
@@ -35,6 +35,21 @@ test-safety: db
 	uv run mypy src
 	uv run python scripts/safety_coverage.py
 	uv run pytest tests --ignore=tests/unit/test_catalog.py --ignore=tests/properties/test_catalog_properties.py --ignore=tests/unit/test_ci_workflow.py
+
+# The merchant dashboard (AG Studio). The licence key is read from AG_STUDIO_LICENSE_KEY (environment or
+# the gitignored .env) at build time; without it the build works and shows Studio's trial watermark.
+dashboard-build:
+	pnpm --filter @countersign/dashboard run build
+
+# Vite dev server on :5173, proxying the API to the app on :8000
+# (`uv run --env-file .env uvicorn countersign.main:create --factory`).
+dashboard-dev:
+	pnpm --filter @countersign/dashboard run dev
+
+# Simulated (labelled) and recorded rows in the DEV database; refuses unless APP_ENV=dev and the
+# database is local. ORDERS sets how many simulated orders to add.
+dashboard-seed: db
+	APP_ENV=dev uv run python scripts/dashboard_seed.py --orders $${ORDERS:-300}
 
 sandbox-smoke:
 	uv run python scripts/sandbox_smoke.py

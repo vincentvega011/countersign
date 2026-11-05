@@ -512,12 +512,40 @@ operator who wanted to could mint a device key, a consent, mandates and an agent
 page says so and shows the device key fingerprint, which a customer can compare with the one their phone showed at setup; a
 customer-held record of that fingerprint is the only independent check today.
 
-### L55. A Human Present offer is not tied to the checkout's customer
+### L55. A Human Present offer is not tied to the checkout's customer (RESOLVED in P4.1, narrowed to L56)
 
-Any enrolled customer (enrolment is anonymous, L35) can open a Human Present offer for any checkout that is ready, and the
-mandates issued name that customer. So the agent that made a checkout could approve it as a throwaway customer of its own.
-PayPal payer approval still stands in the way, and INV-3 holds formally (a valid mandate exists). Not confirmed whether the
-principal lock stops it. Planned: tie an offer to the customer of the checkout's principal (carry-forward in PROGRESS).
+A checkout now belongs to one customer, bound at create from the delegation, else by the first offer or the first
+verified complete ([PROTOCOL.md](PROTOCOL.md) Decision 111). Only that customer's device key can open or approve an
+offer for it (`checkout_customer_mismatch`), and a complete whose mandates name another customer is refused
+(`mandate_scope_mismatch`), on both the Human Present and the open mandate path. The principal lock alone did not stop
+it: a lock on (C, agent) does not match (T, agent) when both customers are known (Decision 48).
+
+### L56. An agent can still be a customer of its own
+
+Enrolment is anonymous (L35) and a proposal can be consented to by whoever holds its id (L42), so an agent can enrol a
+throwaway customer T, consent to its own proposal as T and buy as T on a checkout it creates for T (or with no
+delegation, which the first offer then binds to T). What it cannot do: approve a checkout that belongs to another
+customer, or spend another customer's mandate. Payment for T's purchase needs PayPal payer approval by whoever
+approves at PayPal: a Human Present mandate has no agent key, and the payer vault is off and keyed on the agent key
+only (L32); if the vault were turned on before L32 is fixed, T's mandates for agent A would reach a wallet vaulted by
+another customer for A. Closing L56 needs an enrolment bound to the platform's or merchant's own login (L35).
+
+### L57. The dashboard has no login
+
+`/dashboard/` and its read API (Decision 114) are served to anyone who can reach the server, in every mode. Protected:
+nothing writes; no secret, credential value, payer or buyer data, email, address or mandate text is in any answer (a
+test scans them); configuration is reported as yes or no. Not protected: anyone can read every checkout's random
+customer id, agent key thumbprint, items, amounts, states, reason codes and PayPal capture ids, and the event stream
+(ids only). This is the same exposure as an evidence bundle (L46), for every checkout at once. There is no rate limit
+(P5.1). A merchant login is the fix.
+
+### L58. The dashboard depends on a commercial component under a trial key
+
+AG Studio 3.1.0 is commercially licensed. The owner's trial key (tier STUDIO-PRO-AI per its own metadata) expires on
+20 December 2026, after the judging period (1 to 15 December). The key is compiled into the served bundle, as browser
+licence keys are, so anyone who loads the dashboard can read it. Without a key, or after expiry, Studio shows its
+watermark and console messages; behaviour after expiry was not tested. The bundle is about 6.7 MB of JavaScript (1.9
+MB compressed). Studio's grid widget exposes no master and detail; order detail needs its own view (P4.3).
 
 ### L39 (note)
 

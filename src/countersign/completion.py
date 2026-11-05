@@ -91,6 +91,14 @@ _LOCK_DENIED = m.error_message(
 )
 
 
+_CUSTOMER_MISMATCH = m.error_message(
+    "mandate_scope_mismatch",  # UCP AP2 code; the log names checkout_customer_mismatch
+    "The mandate names a customer other than the one this checkout belongs to.",
+    "unrecoverable",
+    "$.ap2.checkout_mandate",
+)
+
+
 class GateLockAdapter:
     """The gate's `LockPolicy`, answered by the shared lock (built at the composition root)."""
 
@@ -111,6 +119,10 @@ class GateLockAdapter:
         return LockDecision(verdict.allowed, verdict.reason)
 
 
+class CustomerBinding(Protocol):
+    def admits(self, checkout_id: str, customer_id: str | None, agent: str | None) -> bool: ...
+
+
 class EvidenceRecorder(Protocol):
     def record(self, checkout_id: str, receipts: dict[str, str]) -> bool: ...
 
@@ -124,7 +136,9 @@ class CompleteCoordinator:
         gate: CaptureStage | None = None,
         lock: PrincipalLock | None = None,
         evidence: EvidenceRecorder | None = None,
+        binding: CustomerBinding | None = None,
     ) -> None:
+        self._binding = binding
         self._evidence = evidence
         self._lock = lock
         self._merchant = merchant
@@ -154,6 +168,17 @@ class CompleteCoordinator:
             )
         )
         return not verdict.allowed
+
+    def _customer_admitted(self, checkout_id: str, named: Principal) -> bool:
+        """The chain's customer must be the checkout's customer (Decision 111). Errors refuse."""
+        if self._binding is None:
+            return True
+        try:
+            return bool(
+                self._binding.admits(checkout_id, named.customer_id, named.agent_thumbprint)
+            )
+        except Exception:  # noqa: BLE001 - INV-10: a check that cannot run refuses
+            return False
 
     def complete(
         self,
@@ -186,6 +211,9 @@ class CompleteCoordinator:
         if self._lock_denies(checkout, named, negotiated=True, mandate_valid=True):
             self._merchant_store.release(verdict.reservation)
             return CompletionOutcome("rejected", (_LOCK_DENIED,), consumed=True)
+        if not self._customer_admitted(checkout.id, named):
+            self._merchant_store.release(verdict.reservation)
+            return CompletionOutcome("rejected", (_CUSTOMER_MISMATCH,), consumed=True)
         try:
             result = self._cp.start(
                 payment_token=payment_token, checkout_mandate=mandate, current=checkout

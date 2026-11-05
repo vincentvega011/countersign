@@ -169,6 +169,10 @@ export const MESSAGES = Object.freeze({
     title: "This device key cannot approve",
     body: "The store does not accept this device key for this customer, or it was revoked. Nothing was issued.",
   },
+  purchase_not_yours: {
+    title: "This checkout belongs to another customer",
+    body: "Only the customer this checkout was made for can approve it. Nothing was issued.",
+  },
   purchase_used: {
     title: "This checkout was already approved",
     body: "An approval for this checkout already exists. Nothing new was issued.",
@@ -299,6 +303,8 @@ export const PURCHASE_REFUSALS = Object.freeze({
   offer_expired: "purchase_expired",
   offer_unknown: "purchase_unavailable",
   offer_used: "purchase_used",
+  checkout_customer_mismatch: "purchase_not_yours",
+  proof_invalid: "purchase_key",
   merchant_authorization_invalid: "purchase_unsigned",
   consent_signature_invalid: "purchase_mismatch",
   consent_claims_mismatch: "purchase_mismatch",

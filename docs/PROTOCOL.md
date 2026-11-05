@@ -3027,6 +3027,104 @@ Seven forged vectors cover the cases (another item, a larger quantity, another m
 than one occurrence, an unknown constraint type, terms that differ from the mandates). Every earlier vector keeps its first
 failing step and code.
 
+### Decision 111: A checkout belongs to one customer (closes L55, narrows it to L56)
+
+**Flagged for the owner.** `checkout_customers` (migration 0012, insert only, primary key = checkout id) binds a
+checkout to one customer id, once, never changed. Written (`checkout/binding.py`, `bind_or_match`: INSERT ... ON
+CONFLICT DO NOTHING, then read): at UCP or ACP create, in the checkout's own transaction, when the delegation names a
+customer (source `delegation`, the principal of Decisions 47 and 49); otherwise by the first Human Present offer
+(source `offer`); otherwise by the first complete whose chain verified (source `mandate`).
+
+- **Opening an offer needs the device key.** `POST /trusted-surface/purchases/offer` now takes
+  `{checkout_id, challenge_id, customer_id, device_thumbprint, origin, signature}`: the device key signs JCS of
+  `{v 1, purpose "countersign.purchase.offer.v1", challenge_id, challenge, customer_id, device_thumbprint,
+  checkout_id, origin}` over a single use challenge of purpose `purchase_offer`. Under the per-customer advisory lock,
+  then the checkout row lock (the order consent uses), the checkout is bound to that customer or must already be;
+  otherwise `checkout_customer_mismatch` (403), logged before the answer. The offer stores its customer
+  (`purchase_offers.customer_id`, NULL for older rows).
+- **Consent** re-checks, under the same two locks, that the offer was opened for the consenting customer and that the
+  checkout's binding names them. An offer row without a customer never issues.
+- **Complete** (`CompleteCoordinator`, after the Merchant accepted and the lock allowed): the verified chain's
+  customer must be (or now becomes) the checkout's customer; otherwise the Merchant reservation is released and the
+  answer is the UCP code `mandate_scope_mismatch` (the log entry `checkout.customer_refused` names
+  `checkout_customer_mismatch`). Any error refuses (INV-10). Wired at the composition root (`CompletionBinding`).
+- **Both modes.** The binding is part of the checkout record in full and baseline alike: a conventional store also
+  ties a cart to the customer it was made for. Attack case `agent_self_approval` (both paths: Human Present offer
+  and open mandate path): blocked in full and in baseline; it does not separate the modes.
+- **Mutation check** (`scripts/mutate_binding.py`): 9 mutants, 8 killed, 1 equivalent (the consent re-read of the
+  binding, explained in the script).
+- **What remains** is L56: an agent can still enrol a customer of its own and buy for that customer on a checkout it
+  creates for it.
+
+### Decision 112: The dashboard has a build step (exception to Decision 73)
+
+**Flagged for the owner.** `web/dashboard` is `@countersign/dashboard`: Vite 7, React 19, TypeScript, `ag-studio-react`
+and `ag-studio` 3.1.0 (commercial licence, used under the owner's trial key). Decision 73 still holds for the shared UI
+and the phone pages; the dashboard imports `web/ui/tokens.css`, `fonts.css` and `ui.js` (`formatAmount`,
+`groupFingerprint`) from there, so money is formatted by the same code. The licence key is read from
+`AG_STUDIO_LICENSE_KEY` (environment or the gitignored `.env`) by `vite.config.ts` and compiled into the bundle, as any
+browser licence key is; it is never committed. `.env.example` names it empty, `web/*/dist/` is ignored,
+`tests/unit/test_licence_key_not_committed.py` and a secret scan rule fail on the local key, a licence-shaped string
+or a non-empty assignment in tracked files. Without a key the build works and Studio logs "License Key Not Found";
+CI builds that way and the browser test skips only the licence assertion.
+
+### Decision 113: Serving `/dashboard/`, and the one CSP relaxation
+
+**Flagged for the owner.** Served in every `APP_ENV` (`api/dashboard_routes.py`) from an exact table built at start
+from the Vite manifest: `/dashboard/` (index.html) and each `assets/<name>-<hash>.<js|css|woff2|svg>` the manifest
+names, with a fixed media type. No directory, no path joined from the request, a manifest naming any other shape stops
+the start, no build answers 503 `dashboard_not_built`. CSP on `/dashboard/` only: `default-src 'none'; script-src
+'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none';
+form-action 'none'; frame-ancestors 'none'`. Relaxed: `style-src 'unsafe-inline'` (Studio and its grid set `style`
+attributes and inject `<style>` at run time; a nonce was tried and cannot cover style attributes) and `img-src data:`
+(Studio's inline icons). Scripts stay `'self'` only. The phone and verifier pages keep Decision 76.
+
+### Decision 114: The dashboard read API
+
+**Flagged for the owner.** `GET /dashboard/api/v1/{status, orders, summary, mandates, events, eval, stream}`, every
+body with `version: 1`, `Cache-Control: no-store`; no other method is routed (test). Rows are built from explicit
+member lists (`dashboard/read.py`). An order: `id, created_at, created_us, updated_us, agent` (key thumbprint),
+`customer_id, items` (fixed "n × title"), `amount_minor, currency, status, mandate, protocol, gate, refusal,
+capture_id, source, funnel_stage, captured_minor, blocked, reason, unauthorized`. `status` is the checkout status,
+`voided` for a voided attempt, `rejected` for a canceled checkout with a refused complete. **Unauthorized capture**: a
+capture with no verified mandate behind it (a captured attempt without stored mandates, or the baseline's unmandated
+capture). `status` reports booleans and labels only (PayPal configured yes or no, never a value). **Who may call:**
+anyone who can reach the server; there is no merchant login yet (L57). A test scans every answer for email-shaped
+text, payer, buyer, name, address, phone, token, secret and key members, JWT-shaped strings and PEM blocks.
+
+### Decision 115: The live stream
+
+`GET /dashboard/api/v1/stream` (Server-Sent Events): `hello` with the newest log seq, then every second the ids of
+checkouts named by newer log entries (`orders` events, ids only, at most 500), a keep-alive comment every 15 s, closed
+after 300 s (the browser reconnects) or when the client leaves. The page fetches those rows by id and applies them to
+Studio's data engine as one transaction (`applyTransaction`, the table has `primaryKeyField: id`).
+
+### Decision 116: Every row is labelled by where its data came from
+
+**Flagged for the owner.** `checkout_sources` (0012, insert only, a CHECK on the three labels) is written at create:
+`live_sandbox` only by the real process (`countersign.main`, the sandbox client), `simulator` by every test, eval and
+seed world (the `Wiring` default), `recorded` by the seed's replay of the gate cassette. A row without a label shows as
+`unlabelled`, never as a sandbox capture. The grid shows Source as its second column and the CSV export keeps it.
+`make dashboard-seed` (`scripts/dashboard_seed.py`, `APP_ENV=dev` and a local database only) makes simulated rows
+through the real app over the simulator (completed, refused for amount, expiry, forgery and customer, lock denials,
+waiting for payer approval, ACP refusals, open, and gate voids from an app with the pre-authorize check off) and
+replays the recorded gate cassette once (one recorded capture, one recorded void).
+
+### Decision 117: The Orders view on AG Studio
+
+**Flagged for the owner.** A pre-composed Studio report over one `orders` table: four value tiles (captured, orders,
+blocked, unauthorized captures, each an aggregate of a per-row field), a donut of orders by status, a bar chart of
+blocked attempts by reason (a widget filter `blocked = 1`), the custom **Authorization funnel** widget and the orders
+grid (status, mandate and source pill renderers, amounts through `formatAmount`, newest first, totals row, Studio's
+CSV export). The funnel is registered with `createWidgets` (`additionalTypes`, its own data mapping and form, default
+size, AI description); it reads the furthest step and a count through Studio's data API, so filters apply to it,
+and clicking a step cross-filters the page to the checkouts that stopped there. The quick filter is a page filter
+(`contains`) on a hidden lower-case search field. "Group by agent and customer" swaps the grid for Studio's pivot grid
+with those row groups. Theme: `studioTheme.withParams` in a light and a dark mode built at run time from the computed
+values of `tokens.css` (colours, fonts, chart palette), switched with `data-ag-theme-mode`. View mode for visitors;
+"Edit layout" (Studio's edit panels) only when `APP_ENV=dev`. Onboarding is read only in demo; in dev it points to
+the environment, and there is no credentials form.
+
 ## 4. Confirmed PayPal facts
 
 Observed in the PayPal sandbox with `scripts/sandbox_smoke.py` and `scripts/sandbox_confirm.py`

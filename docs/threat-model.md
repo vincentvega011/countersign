@@ -54,6 +54,7 @@ defense itself.
 | `webhook_spoof` | webhook_spoof | network attacker | INV-4, INV-7, INV-10 | `test_webhooks.py` |
 | `double_complete_retry` | double_complete_retry | malicious agent | INV-6, INV-11 | `test_complete_ownership.py`, `test_complete_stress.py` |
 | `cancel_during_completion` | cancel_during_completion | malicious agent | INV-4, INV-10, INV-12 | `test_cancel_during_completion.py` |
+| `agent_self_approval` | agent_self_approval | malicious agent | INV-3, INV-10, INV-12 | `test_purchase_consent.py` (binding), `test_completion_customer_check.py`; blocked in both modes |
 
 Notes on what the cases do and do not cover:
 
@@ -193,6 +194,21 @@ before the answer).
   verifier page is only as trustworthy as the server sending it (L52). A bundle for a Human Present
   purchase does not exist (L50). The agent trusts the merchant keys the service publishes: it detects a forged response, not a
   merchant that is itself the attacker.
+
+## The checkout's customer and the merchant dashboard (P4.1, P4.2)
+
+| Attack | Actor | Defense | Code |
+| --- | --- | --- | --- |
+| Approve the customer's checkout as a throwaway customer (Human Present offer) | malicious agent | the checkout is bound to one customer; opening an offer needs that customer's device key; consent re-checks under the customer and checkout locks (Decision 111) | `checkout_customer_mismatch` |
+| Complete the customer's checkout with mandates that name another customer (open mandate path) | malicious agent | the verified chain's customer must equal the binding | `mandate_scope_mismatch` |
+| Race offers from two customers for an unbound checkout | malicious agent | INSERT on the checkout id decides one winner | `checkout_customer_mismatch` |
+| Buy as a customer of its own on its own checkout | malicious agent | not prevented (L56); PayPal payer approval is still needed (no vault) | n/a |
+| Change credentials, mode or a payment from the dashboard | visitor | the dashboard API has no write route; onboarding is read only in demo (Decision 114) | 405 |
+| Read personal data or secrets from the dashboard | visitor | explicit member lists; a test scans every answer | n/a |
+| Read every checkout's ids, amounts and states | visitor | not prevented: no login (L57) | n/a |
+| Show a simulated row as a sandbox capture | bug, seed | the source label is written at create; `live_sandbox` only from the real process; unlabelled is never live (Decision 116) | n/a |
+| Load script from elsewhere into the dashboard | cross-site script | `script-src 'self'`; only styles are relaxed, on `/dashboard/` only (Decision 113) | n/a |
+| Commit the Studio licence key | maintainer | env only; tests and a secret scan rule on tracked files (Decision 112) | n/a |
 
 ## Review of the phase 2 implementation
 

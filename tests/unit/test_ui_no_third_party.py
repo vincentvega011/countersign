@@ -10,15 +10,24 @@ import pytest
 WEB = Path(__file__).resolve().parents[2] / "web"
 # `web/*/test/` holds dev tooling run by Node (the screenshot script names the loopback server); no
 # page loads it, so it is not a page resource.
+# The dashboard's build output (`dist`, gitignored, vendor code that is never fetched from elsewhere: the
+# browser test checks that no request leaves the origin) and local scratch files (`.artifacts`) are not
+# sources; the dashboard's own TypeScript is.
 SOURCES = sorted(
     p
     for p in WEB.rglob("*")
-    if p.suffix in {".html", ".css", ".js", ".mjs"}
+    if (
+        p.suffix in {".html", ".css", ".js", ".mjs"}
+        or (p.suffix in {".ts", ".tsx"} and (WEB / "dashboard" / "src") in p.parents)
+    )
     and "node_modules" not in p.parts
+    and "dist" not in p.parts
+    and ".artifacts" not in p.parts
     and "test" not in p.relative_to(WEB).parts
 )
 ABSOLUTE = re.compile(r"(?:https?:)?//[A-Za-z0-9\[]", re.IGNORECASE)
-SCHEMES = re.compile(r"\b(?:data|blob|ftp|ws|wss):", re.IGNORECASE)
+# A scheme is followed directly by its body; `data: rows` in a TypeScript object literal is not one.
+SCHEMES = re.compile(r"\b(?:data|blob|ftp|ws|wss):(?!\s)", re.IGNORECASE)
 IMPORT_REMOTE = re.compile(
     r"@import\s+(?:url\()?['\"]?(?!\.{0,2}/|[a-z0-9_-]+\.css)", re.IGNORECASE
 )
@@ -66,13 +75,15 @@ def test_fonts_are_local_woff2_with_their_licence_beside_them() -> None:
 # CLI), and its page names PayPal as the platform the evidence comes from, as text only: no logo, no
 # brand colour (Decision 108). Every other page may not name it.
 NAMES_THE_PLATFORM = {WEB / "verify", WEB / "ui" / "evidence"}
+# The merchant dashboard names PayPal as the platform its orders are paid on, in text only (Decision 117).
+DASHBOARD_SRC = WEB / "dashboard" / "src"
 
 
 def test_no_third_party_mark_or_service_is_named_in_the_ui() -> None:
     for path in SOURCES:
         lowered = path.read_text().lower()
         for mark in MARKS:
-            if mark == "paypal" and path.parent in NAMES_THE_PLATFORM:
+            if mark == "paypal" and path.parent in {*NAMES_THE_PLATFORM, DASHBOARD_SRC}:
                 continue
             assert mark not in lowered, f"{mark!r} in {path}"
 
@@ -82,3 +93,9 @@ def test_the_verifier_names_the_platform_in_text_only() -> None:
         for path in folder.iterdir():
             text = path.read_text().lower()
             assert "logo" not in text and "<img" not in text and "<svg" not in text, path
+
+
+def test_the_dashboard_names_the_platform_in_text_only() -> None:
+    for path in DASHBOARD_SRC.iterdir():
+        text = path.read_text().lower()
+        assert "logo" not in text and "<img" not in text and "brand colour" not in text, path

@@ -231,6 +231,25 @@ purchase_offers = Table(
     Column("checkout_hash", Text, nullable=False),
     Column("terms", Text, nullable=False),
     Column("created_us", BigInteger, nullable=False),
+    Column("customer_id", Text, nullable=True),
+)
+
+checkout_customers = Table(
+    "checkout_customers",
+    metadata,
+    Column("checkout_id", Text, primary_key=True),
+    Column("customer_id", Text, nullable=False),
+    Column("agent_thumbprint", Text, nullable=True),
+    Column("source", Text, nullable=False),
+    Column("created_us", BigInteger, nullable=False),
+)
+
+checkout_sources = Table(
+    "checkout_sources",
+    metadata,
+    Column("checkout_id", Text, primary_key=True),
+    Column("source", Text, nullable=False),
+    Column("created_us", BigInteger, nullable=False),
 )
 
 purchase_consents = Table(

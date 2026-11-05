@@ -34,6 +34,7 @@ from sqlalchemy import Connection, Engine
 from countersign.canonical.models import Checkout
 from countersign.catalog.catalog import Catalog
 from countersign.checkout import store
+from countersign.checkout.binding import bind_at_create, label_source
 from countersign.checkout.cancel import cancel_refusal
 from countersign.checkout.state import FINAL, Status, transition, updatable
 from countersign.ledger import store as ledger
@@ -144,7 +145,9 @@ class AcpService:
         new_id: Callable[[], str] = new_session_id,
         ttl_us: int = TTL_US,
         order_base_url: str = "http://localhost:8000/checkout_sessions",
+        data_source: str = "simulator",
     ) -> None:
+        self._data_source = data_source
         self._engine = engine
         self._catalog = catalog
         self._policy_hash = policy_hash
@@ -254,7 +257,9 @@ class AcpService:
         )  # fmt: skip
         with self._engine.begin() as conn:
             store.insert_record(conn, record)
-            self._log(conn, "acp.session_created", record.id,
+            bound = bind_at_create(conn, record.id, self._principal(ctx), now)
+            label_source(conn, record.id, self._data_source, now)
+            self._log(conn, "acp.session_created", record.id, customer_bound=bound,
                       lines=[[ln.id, ln.item.id, ln.quantity] for ln in checkout.line_items])  # fmt: skip
         return self._session(record, 201)
 

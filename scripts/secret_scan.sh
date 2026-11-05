@@ -32,6 +32,8 @@ rules=(
   'paypal-secret-assignment|i|paypal[A-Za-z0-9_]*secret[A-Za-z0-9_]*[[:space:]]*[:=][[:space:]]*["'"'"']?[A-Za-z0-9_-]{20,}'
   'paypal-secret-shaped-token||(^|[^A-Za-z0-9_-])E[A-Za-z0-9_-]{79}($|[^A-Za-z0-9_-])'
   'basic-auth-header|i|authorization:[[:space:]]*basic[[:space:]]+[A-Za-z0-9+/=]{40,}'
+  'ag-licence-key||\[v[0-9]+\]_\[[0-9A-Za-z]{2,8}\]_[A-Za-z0-9+/]{8,}={0,2}[0-9a-f]{32}'
+  'ag-licence-assignment||AG_STUDIO_LICENSE_KEY[[:space:]]*[:=][[:space:]]*["'"'"']?[^[:space:]"'"'"'#]'
 )
 
 status=0

@@ -32,9 +32,11 @@ from sqlalchemy import Engine
 from countersign.ablations import Ablations
 from countersign.api.app import create_app
 from countersign.canonical.jsonstrict import loads_strict
+from countersign.checkout.binding import CompletionBinding
 from countersign.completion import CaptureStage, CompleteCoordinator, GateLockAdapter
 from countersign.constraints import CheckoutConstraintEvaluator, PaymentConstraintEvaluator
 from countersign.cp import CpConfig, CredentialProvider, SpendLedger
+from countersign.dashboard import DashboardService
 from countersign.evidence import EvidenceService, PayPalObserver
 from countersign.gate import CaptureGate
 from countersign.gate.store import GateStore
@@ -69,6 +71,10 @@ class Wiring:
     clock: Callable[[], float] = time.time
     clock_us: Callable[[], int] | None = None
     paypal_now: Callable[[], datetime] | None = None
+    # Which PayPal checkouts are written against: `live_sandbox` only for the real sandbox client
+    # (`countersign.main`); every test, eval and seed world is `simulator` or `recorded`.
+    data_source: str = "simulator"
+    paypal_configured: bool = False
 
 
 def effective_ablations(settings: RuntimeSettings) -> Ablations:
@@ -149,7 +155,10 @@ def build_app(settings: RuntimeSettings, wiring: Wiring) -> FastAPI:
             platform_jwk=dict(wiring.platform_key.as_dict(private=False)),
             clock_us=clock_us, policy_hash=policy_hash(),
         )  # fmt: skip
-    coordinator = CompleteCoordinator(merchant, merchant_store, cp, stage, lock, evidence)
+    binding = CompletionBinding(engine, policy_hash=policy_hash(), clock_us=clock_us)
+    coordinator = CompleteCoordinator(
+        merchant, merchant_store, cp, stage, lock, evidence, binding=binding
+    )
 
     unmandated: UnmandatedCompletion | None = None
     if baseline:
@@ -178,7 +187,11 @@ def build_app(settings: RuntimeSettings, wiring: Wiring) -> FastAPI:
                 wiring.merchant_constraint_id, str(wiring.payee.get("name", "")), base
             ),
         ), evidence=evidence, unmandated=unmandated, json_loader=json_loader,
-        clock_us=clock_us,
+        clock_us=clock_us, data_source=wiring.data_source,
+        dashboard=DashboardService(
+            engine, settings, base, paypal_configured=wiring.paypal_configured,
+            data_source=wiring.data_source,
+        ),
     )  # fmt: skip
 
 

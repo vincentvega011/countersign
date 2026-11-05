@@ -107,6 +107,7 @@ CHALLENGE_PURPOSES = frozenset(
         "agent_proposal",
         "agent_fetch",
         "consent_checkout",
+        "purchase_offer",
         "activity_read",
         "revoke_open_mandate",
     }
@@ -162,6 +163,7 @@ _STATUS = {
     "offer_unknown": 404,
     "offer_expired": 410,
     "offer_used": 409,
+    "checkout_customer_mismatch": 403,
     "checkout_unknown": 404,
     "session_unknown": 401,
     "session_expired": 401,
@@ -896,8 +898,8 @@ class TrustedSurface:
     def fetch_mandates(self, **kw: Any) -> agent_channel.Fetched:
         return agent_channel.fetch_mandates(self, **kw)
 
-    def create_offer(self, checkout_id: object) -> purchase.Offer:
-        return purchase.create_offer(self, checkout_id)
+    def create_offer(self, **kw: Any) -> purchase.Offer:
+        return purchase.create_offer(self, **kw)
 
     def consent_purchase(self, **kw: Any) -> purchase.Purchased:
         return purchase.consent_purchase(self, **kw)

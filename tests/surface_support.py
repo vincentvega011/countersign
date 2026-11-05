@@ -438,6 +438,24 @@ def purchase_record_for(
     return record
 
 
+def offer_body(
+    device: Device, customer_id: str, checkout_id: str, issued: dict[str, Any],
+    *, origin: str = ORIGIN, sign_with: Device | None = None,
+) -> dict[str, Any]:  # fmt: skip
+    """A signed request to open a Human Present offer (Decision 111), written independently."""
+    record = {
+        "v": 1, "purpose": "countersign.purchase.offer.v1",
+        "challenge_id": issued["challenge_id"], "challenge": issued["nonce"],
+        "customer_id": customer_id, "device_thumbprint": device.thumbprint,
+        "checkout_id": checkout_id, "origin": origin,
+    }  # fmt: skip
+    return {
+        "checkout_id": checkout_id, "challenge_id": issued["challenge_id"],
+        "customer_id": customer_id, "device_thumbprint": device.thumbprint, "origin": origin,
+        "signature": (sign_with or device).sign(canonicalize(record)),
+    }  # fmt: skip
+
+
 def purchase_body(
     device: Device, record: dict[str, Any], *, sign_with: Device | None = None
 ) -> dict[str, Any]:

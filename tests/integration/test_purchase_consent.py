@@ -49,6 +49,7 @@ from tests.surface_support import (
     ORIGIN,
     Device,
     closed_twin,
+    offer_body,
     purchase_body,
     purchase_record_for,
 )
@@ -110,8 +111,15 @@ class Shop:
         self.checkout = make_checkout(checkout_id="chk_" + letter * 22)
         seed_checkout(engine, self.checkout, status=Status.READY_FOR_COMPLETE)
 
-    def offer(self, checkout_id: str | None = None) -> Any:
-        return self.client.post(OFFER, json={"checkout_id": checkout_id or self.checkout.id})
+    def offer(
+        self, checkout_id: str | None = None, *, device: Device | None = None,
+        cid: str | None = None,
+    ) -> Any:  # fmt: skip
+        issued = challenge_for(self.client, "purchase_offer")
+        body = offer_body(
+            device or self.device, cid or self.cid, checkout_id or self.checkout.id, issued
+        )
+        return self.client.post(OFFER, json=body)
 
     def issued(self) -> dict[str, Any]:
         return challenge_for(self.client, "consent_checkout")
@@ -479,3 +487,153 @@ def test_exactly_one_of_many_simultaneous_consents_on_one_offer_wins(
         results = list(pool.map(attempt, bodies))
     assert results.count("ok") == 1 and set(results) - {"ok"} == {"offer_used"}, results
     assert len(rows(admin_engine, "SELECT 1 FROM purchase_consents")) == 1
+
+
+# ------------------------------------------------------------------------------------ the checkout's customer (Decision 111)
+
+
+def _entries(admin: Engine, like: str) -> list[tuple[str, dict[str, Any]]]:
+    found = rows(
+        admin, "SELECT kind, payload FROM decision_log WHERE kind LIKE :k ORDER BY seq", k=like
+    )
+    return [(r.kind, json.loads(bytes(r.payload))) for r in found]
+
+
+def _refusals(admin: Engine, code_: str) -> list[Any]:
+    return [p for _, p in _entries(admin, "ts.purchase.refused") if p.get("code") == code_]
+
+
+def test_only_the_checkouts_customer_can_open_an_offer(
+    shop: Shop, client: TestClient, admin_engine: Engine
+) -> None:
+    assert shop.offer().status_code == 201  # the first offer binds the checkout to A
+    other, other_cid = customer(client)
+    r = shop.offer(device=other, cid=other_cid)
+    assert r.status_code == 403 and code(r) == "checkout_customer_mismatch"
+    assert "terms" not in r.text
+    assert (
+        len(_refusals(admin_engine, "checkout_customer_mismatch")) == 1
+    )  # logged before the answer
+    owners = rows(admin_engine, "SELECT customer_id, source FROM checkout_customers")
+    assert [(o.customer_id, o.source) for o in owners] == [(shop.cid, "offer")]
+    offers = rows(admin_engine, "SELECT customer_id FROM purchase_offers")
+    assert {o.customer_id for o in offers} == {shop.cid}
+    assert shop.offer().status_code == 201  # the right customer still can
+
+
+def test_a_checkout_bound_at_create_refuses_every_other_customer(
+    shop: Shop, client: TestClient, app_engine: Engine, admin_engine: Engine
+) -> None:
+    from countersign.checkout.binding import bind_at_create
+    from countersign.lock import Principal
+
+    with app_engine.begin() as conn:
+        assert bind_at_create(conn, shop.checkout.id, Principal(shop.cid, "agent-tp"), 1)
+    other, other_cid = customer(client)
+    r = shop.offer(device=other, cid=other_cid)
+    assert code(r) == "checkout_customer_mismatch"
+    assert shop.offer().status_code == 201
+    owners = rows(
+        admin_engine, "SELECT customer_id, agent_thumbprint, source FROM checkout_customers"
+    )
+    assert [tuple(o) for o in owners] == [(shop.cid, "agent-tp", "delegation")]
+
+
+def test_a_consent_by_another_customer_on_someone_elses_offer_is_refused(
+    shop: Shop, client: TestClient, admin_engine: Engine
+) -> None:
+    offer = shop.offer().json()
+    other, other_cid = customer(client)
+    r = shop.post(shop.body(offer, device=other, cid=other_cid))
+    assert r.status_code == 403 and code(r) == "checkout_customer_mismatch"
+    nothing_issued(admin_engine, r)
+    assert shop.post(shop.body(offer)).status_code == 201
+
+
+def test_the_offer_proof_is_checked(shop: Shop, client: TestClient) -> None:
+    other, _ = customer(client)
+    issued = challenge_for(client, "purchase_offer")
+    signed_by_other = offer_body(shop.device, shop.cid, shop.checkout.id, issued, sign_with=other)
+    assert code(client.post(OFFER, json=signed_by_other)) == "proof_invalid"
+    # Another customer's device key cannot speak for A.
+    issued = challenge_for(client, "purchase_offer")
+    claim = offer_body(other, shop.cid, shop.checkout.id, issued)
+    assert code(client.post(OFFER, json=claim)) == "device_key_customer_mismatch"
+    # A challenge of another purpose does not open an offer, and one challenge opens one offer.
+    wrong = offer_body(
+        shop.device, shop.cid, shop.checkout.id, challenge_for(client, "consent_checkout")
+    )
+    assert code(client.post(OFFER, json=wrong)) == "challenge_purpose_mismatch"
+    issued = challenge_for(client, "purchase_offer")
+    good = offer_body(shop.device, shop.cid, shop.checkout.id, issued)
+    assert client.post(OFFER, json=good).status_code == 201
+    assert code(client.post(OFFER, json=good)) == "challenge_used"
+    assert code(client.post(OFFER, json={"checkout_id": shop.checkout.id})) == "malformed_request"
+
+
+def test_exactly_one_customer_wins_racing_offers_for_an_unbound_checkout(
+    shop: Shop, client: TestClient, surface: TrustedSurface, admin_engine: Engine
+) -> None:
+    people = [customer(client) for _ in range(8)]
+    bodies = [
+        offer_body(d, cid, shop.checkout.id, challenge_for(client, "purchase_offer"))
+        for d, cid in people
+    ]
+    gate = threading.Barrier(len(bodies))
+
+    def attempt(body: dict[str, Any]) -> str:
+        gate.wait()
+        try:
+            surface.create_offer(**body)
+        except Refused as error:
+            return error.code
+        return body["customer_id"]
+
+    with ThreadPoolExecutor(len(bodies)) as pool:
+        results = list(pool.map(attempt, bodies))
+    winners = [r for r in results if r.startswith("cus_")]
+    assert len(winners) == 1 and results.count("checkout_customer_mismatch") == 7, results
+    owners = rows(admin_engine, "SELECT customer_id FROM checkout_customers")
+    assert [o.customer_id for o in owners] == winners
+    assert [
+        o.customer_id for o in rows(admin_engine, "SELECT customer_id FROM purchase_offers")
+    ] == winners
+
+
+def test_a_complete_whose_chain_names_another_customer_is_refused_and_logged(
+    shop: Shop, app_engine: Engine, admin_engine: Engine
+) -> None:
+    from countersign.checkout.binding import CompletionBinding
+
+    binding = CompletionBinding(app_engine, policy_hash=policy_hash(), clock_us=lambda: 5)
+    cid = shop.checkout.id
+    assert binding.admits(cid, None, "agent") is False  # no usable customer never matches
+    assert binding.admits(cid, shop.cid, "agent") is True  # the first verified chain binds
+    assert binding.admits(cid, shop.cid, "other-agent") is True  # the customer, not the agent
+    assert binding.admits(cid, "cus_" + "T" * 22, "agent") is False
+    kinds = [(k, p["code"]) for k, p in _entries(admin_engine, "checkout.customer_%")]
+    assert kinds == [
+        ("checkout.customer_refused", "checkout_customer_mismatch"),
+        ("checkout.customer_bound", "bound"),
+        ("checkout.customer_refused", "checkout_customer_mismatch"),
+    ]
+    owners = rows(admin_engine, "SELECT customer_id, source FROM checkout_customers")
+    assert [tuple(o) for o in owners] == [(shop.cid, "mandate")]
+
+
+def test_an_offer_row_without_a_customer_never_issues(shop: Shop, admin_engine: Engine) -> None:
+    """Offers stored before the binding existed carry no customer and are refused at consent."""
+    offer = shop.offer().json()
+    legacy = "off_" + "L" * 22
+    with admin_engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO purchase_offers (id, checkout_id, checkout_jwt, checkout_hash, terms, "
+                "created_us, customer_id) SELECT :n, checkout_id, checkout_jwt, checkout_hash, "
+                "terms, created_us, NULL FROM purchase_offers WHERE id = :o"
+            ),
+            {"n": legacy, "o": offer["offer_id"]},
+        )
+    r = shop.post(shop.body({**offer, "offer_id": legacy}))
+    assert r.status_code == 403 and code(r) == "checkout_customer_mismatch"
+    nothing_issued(admin_engine, r)

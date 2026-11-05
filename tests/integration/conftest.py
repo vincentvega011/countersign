@@ -133,7 +133,9 @@ def clean_log(admin_engine: Engine) -> None:
 def clean_checkouts(admin_engine: Engine) -> None:
     """Empty checkout and log tables for the test (the administrator may truncate)."""
     with admin_engine.begin() as conn:
-        conn.execute(text("TRUNCATE checkout_sessions, decision_log"))
+        conn.execute(
+            text("TRUNCATE checkout_sessions, checkout_customers, checkout_sources, decision_log")
+        )
 
 
 @pytest.fixture
@@ -145,7 +147,7 @@ def clean_payments(admin_engine: Engine) -> None:
                 "TRUNCATE reservations, spend_entries, open_payment_mandates, "
                 "payment_attempts, payer_vault, attempt_mandates, open_mandate_revocations, "
                 "lock_events, lock_policies, webhook_events, "
-                "checkout_sessions, decision_log CASCADE"
+                "checkout_sessions, checkout_customers, checkout_sources, decision_log CASCADE"
             )
         )
 

@@ -39,7 +39,7 @@ def running_app(app_engine: Engine, admin_engine: Engine) -> Iterator[str]:
             text(
                 "TRUNCATE consent_records, key_revocations, key_challenge_uses, key_challenges, "
                 "customer_keys, open_mandate_revocations, purchase_offers, activity_sessions, "
-                "checkout_sessions, decision_log CASCADE"
+                "checkout_sessions, checkout_customers, checkout_sources, decision_log CASCADE"
             )
         )
     sock = socket.socket()
@@ -74,14 +74,16 @@ def running_app(app_engine: Engine, admin_engine: Engine) -> Iterator[str]:
         sock.close()
 
 
-CHECKOUT_LETTERS = "ABCDEFGHIJ"
+# One fresh checkout per purchase test: a checkout belongs to the first customer who opens it
+# (Decision 111), and every test enrols its own customer.
+CHECKOUT_IDS = tuple(f"chk_{n:02d}" + "X" * 20 for n in range(40))
 
 
 def seed_checkouts(engine: Engine) -> list[dict[str, object]]:
     """Ready checkouts the Approve purchase tests open; described for Node in `APPROVE_CHECKOUTS`."""
     found: list[dict[str, object]] = []
-    for letter in CHECKOUT_LETTERS:
-        checkout = make_checkout(checkout_id="chk_" + letter * 22)
+    for checkout_id in CHECKOUT_IDS:
+        checkout = make_checkout(checkout_id=checkout_id)
         seed_checkout(engine, checkout, status=Status.READY_FOR_COMPLETE)
         line = checkout.line_items[0]
         found.append(

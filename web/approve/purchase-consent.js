@@ -10,6 +10,8 @@ import { expiryText } from "./consent.js";
 
 export const PURPOSE_CHECKOUT = "countersign.consent.checkout.v1";
 export const CHALLENGE_PURPOSE_CHECKOUT = "consent_checkout";
+export const PURPOSE_OFFER = "countersign.purchase.offer.v1";
+export const CHALLENGE_PURPOSE_OFFER = "purchase_offer";
 export const RECORD_VERSION = 1;
 export const RECORD_SECONDS = 300;
 export const MANDATE_SECONDS = 900;
@@ -141,6 +143,26 @@ export function buildPurchaseRecord({
     offer_id: offer.offer_id,
     terms: offer.terms,
     mandate: closedFor(offer.terms, offer.checkout_hash, challenge.issued_at),
+  };
+}
+
+// The request that opens an offer: proof that this device's customer is the one asking (Decision 111).
+export function buildOfferProof({
+  challenge,
+  customerId,
+  deviceThumbprint,
+  checkoutId,
+  origin,
+}) {
+  return {
+    v: RECORD_VERSION,
+    purpose: PURPOSE_OFFER,
+    challenge_id: challenge.challenge_id,
+    challenge: challenge.nonce,
+    customer_id: customerId,
+    device_thumbprint: deviceThumbprint,
+    checkout_id: checkoutId,
+    origin,
   };
 }
 

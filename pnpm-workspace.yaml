@@ -1,2 +1,14 @@
 packages:
   - "web/*"
+minimumReleaseAgeExclude:
+  - ag-charts-community@14.3.0
+  - ag-charts-core@14.3.0
+  - ag-charts-enterprise@14.3.0
+  - ag-charts-locale@14.3.0
+  - ag-charts-types@14.3.0
+  - ag-grid-community@36.3.0
+  - ag-grid-enterprise@36.3.0
+  - ag-grid-react@36.3.0
+  - ag-stack@36.3.0
+  - ag-studio-react@3.1.0
+  - ag-studio@3.1.0

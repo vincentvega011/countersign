@@ -15,6 +15,7 @@ from sqlalchemy import Engine, create_engine
 
 from countersign.api.acp_routes import install as install_acp
 from countersign.api.catalog_routes import install as install_catalog
+from countersign.api.dashboard_routes import install as install_dashboard
 from countersign.api.evidence_routes import install as install_evidence
 from countersign.api.static_routes import install as install_static
 from countersign.api.trusted_surface_routes import install as install_trusted_surface
@@ -22,6 +23,7 @@ from countersign.api.ucp_routes import install as install_ucp
 from countersign.api.webhook_routes import install as install_webhooks
 from countersign.canonical.jsonstrict import loads_strict
 from countersign.catalog.catalog import Catalog, load_catalog
+from countersign.dashboard import DashboardService
 from countersign.evidence import EvidenceService
 from countersign.lock import LockPort
 from countersign.merchant.keys import MerchantKey, load_merchant_key
@@ -56,6 +58,8 @@ def create_app(
     trusted_surface: TrustedSurface | None = None,
     evidence: EvidenceService | None = None,
     json_loader: JsonLoader = loads_strict,
+    data_source: str = "simulator",
+    dashboard: DashboardService | None = None,
 ) -> FastAPI:
     """Create the app. Without an explicit `key`, load `MERCHANT_KEY_PATH` or fail.
 
@@ -113,6 +117,9 @@ def create_app(
         install_evidence(app, evidence)
     if trusted_surface is not None:
         install_trusted_surface(app, trusted_surface)
+    if dashboard is not None:  # every mode: read only, nothing sensitive (Decision 114)
+        app.state.dashboard = dashboard
+        install_dashboard(app, dashboard)
 
     @app.get("/.well-known/ucp")
     def well_known_ucp() -> JSONResponse:
@@ -127,6 +134,7 @@ def create_app(
         completion=completion,
         lock=lock,
         order_base_url=f"{base.rstrip('/')}{REST_BASE_PATH}/checkout-sessions",
+        data_source=data_source,
     )
     app.state.ucp = service
     install_ucp(app, service, REST_BASE_PATH, key, json_loader)
@@ -143,6 +151,7 @@ def create_app(
             unmandated=unmandated,
             clock_us=clock_us or now_us,
             order_base_url=f"{base.rstrip('/')}/checkout_sessions",
+            data_source=data_source,
         )
         app.state.acp = acp
         install_acp(app, acp, json_loader)

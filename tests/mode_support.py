@@ -70,7 +70,7 @@ def reset(admin: Engine) -> None:
                 "TRUNCATE reservations, spend_entries, open_payment_mandates, "
                 "payment_attempts, payer_vault, attempt_mandates, open_mandate_revocations, "
                 "lock_events, lock_policies, webhook_events, "
-                "checkout_sessions, decision_log CASCADE"
+                "checkout_sessions, checkout_customers, checkout_sources, decision_log CASCADE"
             )
         )
 

@@ -70,6 +70,8 @@ def wiring_from_env(env: Mapping[str, str]) -> Wiring:
         paypal_payee_merchant_id=env.get("PAYPAL_MERCHANT_ID", ""),
         merchant_constraint_id=merchant_id,
         webhook_id=paypal_config.webhook_id or None,
+        data_source="simulator" if paypal_config.allow_non_sandbox else "live_sandbox",
+        paypal_configured=bool(paypal_config.client_id and paypal_config.client_secret),
     )
 
 

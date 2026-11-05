@@ -39,6 +39,8 @@ from countersign.canonical.hashing import b64url
 from countersign.canonical.jcs import JcsError, canonicalize
 from countersign.canonical.jsonstrict import StrictJsonError, loads_strict
 from countersign.canonical.models import Checkout
+from countersign.checkout.binding import MISMATCH as BINDING_MISMATCH
+from countersign.checkout.binding import bind_or_match, bound
 from countersign.checkout.state import Status
 from countersign.checkout.store import load as load_checkout
 from countersign.mandates import VCT_CHECKOUT, VCT_PAYMENT
@@ -61,6 +63,10 @@ if TYPE_CHECKING:
 
 PURPOSE_CHECKOUT = "countersign.consent.checkout.v1"
 CHALLENGE_PURPOSE_CHECKOUT = "consent_checkout"
+PURPOSE_OFFER = "countersign.purchase.offer.v1"
+CHALLENGE_PURPOSE_OFFER = "purchase_offer"
+CUSTOMER = re.compile(r"cus_[A-Za-z0-9_-]{22}")
+THUMBPRINT = re.compile(r"[A-Za-z0-9_-]{43}")
 OFFER_TTL_US = 10 * 60 * 1_000_000
 MANDATE_SECONDS = 900
 OFFER_ID = re.compile(r"off_[A-Za-z0-9_-]{22}")
@@ -163,25 +169,97 @@ def _verified_checkout(jwt: str, published: list[dict[str, Any]]) -> Checkout:
         raise ConsentRefused("merchant_authorization_invalid", "terms") from None
 
 
-def create_offer(ts: TrustedSurface, checkout_id: object) -> Offer:
-    """Sign the stored session, verify our own signature, store the JWT and return its terms."""
-    from countersign.trusted_surface.service import _Seen
+def offer_record(
+    *, challenge_id: str, nonce: str, customer_id: str, device_thumbprint: str,
+    checkout_id: str, origin: str,
+) -> bytes:  # fmt: skip
+    """The bytes a device key signs to open an offer (Decision 111)."""
+    try:
+        return canonicalize(
+            {
+                "v": 1, "purpose": PURPOSE_OFFER, "challenge_id": challenge_id,
+                "challenge": nonce, "customer_id": customer_id,
+                "device_thumbprint": device_thumbprint, "checkout_id": checkout_id,
+                "origin": origin,
+            }
+        )  # fmt: skip
+    except JcsError:
+        raise ConsentRefused("proof_invalid") from None
+
+
+def create_offer(
+    ts: TrustedSurface,
+    *,
+    checkout_id: object,
+    challenge_id: object,
+    customer_id: object,
+    device_thumbprint: object,
+    origin: object,
+    signature: object,
+    origin_header: str | None = None,
+) -> Offer:
+    """Open an offer for the checkout's own customer only (Decisions 90, 111).
+
+    The device key proves the customer over a single use challenge. Under the customer lock and then
+    the checkout row lock (the order consent uses too), the checkout is bound to that customer if it
+    is not bound yet; a checkout bound to another customer is `checkout_customer_mismatch`. Then the
+    session is signed, our own signature verified, and the offer stored with the customer it is for.
+    """
+    from countersign.trusted_surface.service import CHALLENGE_ID, _loads_jwk, _Seen
+
+    seen = _Seen(
+        challenge_id=challenge_id
+        if isinstance(challenge_id, str) and CHALLENGE_ID.fullmatch(challenge_id)
+        else None,
+        thumbprint=device_thumbprint
+        if isinstance(device_thumbprint, str) and THUMBPRINT.fullmatch(device_thumbprint)
+        else None,
+    )
 
     def work() -> Offer:
         key = ts.merchant_key
         if key is None:
             raise ts.refusal_for("signing_unavailable")
+        if not (
+            isinstance(customer_id, str) and CUSTOMER.fullmatch(customer_id)
+            and seen.thumbprint is not None and seen.challenge_id is not None
+            and isinstance(signature, str)
+        ):  # fmt: skip
+            raise ts.refusal_for("malformed_request")
         if not isinstance(checkout_id, str) or CHECKOUT_ID.fullmatch(checkout_id) is None:
             raise ts.refusal_for("checkout_unknown")
+        ts.check_origin(origin, origin_header)
         with ts.engine.begin() as conn:
             now_us = ts.now_us()
-            record = load_checkout(conn, checkout_id)
+            ts.lock_customer(conn, customer_id)
+            challenge = ts.challenge(conn, seen.challenge_id, CHALLENGE_PURPOSE_OFFER, now_us)
+            device = ts.key_by_thumbprint(conn, seen.thumbprint)
+            if device is None:
+                raise ts.refusal_for("device_key_unknown")
+            if device.customer_id != customer_id:
+                raise ts.refusal_for("device_key_customer_mismatch")
+            if device.rev is not None:
+                raise ts.refusal_for("device_key_revoked")
+            proof = offer_record(
+                challenge_id=seen.challenge_id, nonce=challenge.nonce, customer_id=customer_id,
+                device_thumbprint=seen.thumbprint, checkout_id=checkout_id, origin=ts.origin,
+            )  # fmt: skip
+            public = validate_public_jwk(_loads_jwk(device.jwk))
+            if not verify_signature(public.verifying_key(), proof, signature):
+                raise ts.refusal_for("proof_invalid")
+            record = load_checkout(conn, checkout_id, lock=True)
             if record is None:
                 raise ts.refusal_for("checkout_unknown")
             if record.status is not Status.READY_FOR_COMPLETE:
                 raise ts.refusal_for("checkout_not_ready")
             if now_us >= record.expires_us:
                 raise ts.refusal_for("checkout_expired")
+            ok, _ = bind_or_match(
+                conn, checkout_id, customer_id, agent_thumbprint=None, source="offer",
+                now_us=now_us,
+            )  # fmt: skip
+            if not ok:
+                raise ts.refusal_for(BINDING_MISMATCH)
             body = sign_checkout(
                 checkout_response(record.checkout, record.status, record.expires_us), key
             )
@@ -194,22 +272,24 @@ def create_offer(ts: TrustedSurface, checkout_id: object) -> Offer:
                 merchant=ts.merchant.as_dict(),
                 checkout_expires_at=record.expires_us // 1_000_000,
             )
+            ts.consume(conn, seen.challenge_id, device.thumbprint, now_us)
             offer_id = "off_" + secrets.token_urlsafe(16)
             conn.execute(
                 purchase_offers.insert().values(
                     id=offer_id, checkout_id=checkout_id, checkout_jwt=jwt,
                     checkout_hash=hash_checkout_jwt(jwt), terms=canonicalize(terms).decode(),
-                    created_us=now_us,
+                    created_us=now_us, customer_id=customer_id,
                 )
             )  # fmt: skip
             ts.append(
                 conn, LOG_KIND_OFFER, now_us,
-                {"offer_id": offer_id, "checkout_id": checkout_id,
+                {"offer_id": offer_id, "checkout_id": checkout_id, "customer_id": customer_id,
+                 "device_thumbprint": device.thumbprint, "challenge_id": seen.challenge_id,
                  "checkout_hash": hash_checkout_jwt(jwt)},
             )  # fmt: skip
             return Offer(offer_id, terms, hash_checkout_jwt(jwt), now_us + OFFER_TTL_US)
 
-    result: Offer = ts.guard(LOG_KIND_REFUSED, _Seen(), work)
+    result: Offer = ts.guard(LOG_KIND_REFUSED, seen, work)
     return result
 
 
@@ -298,6 +378,9 @@ def consent_purchase(
                 raise ts.refusal_for("offer_unknown")
             if now_us >= int(offer.created_us) + OFFER_TTL_US:
                 raise ts.refusal_for("offer_expired")
+            # The offer was opened for this customer, and the checkout belongs to them (Decision 111).
+            if offer.customer_id is None or offer.customer_id != raw["customer_id"]:
+                raise ts.refusal_for(BINDING_MISMATCH)
             if (
                 conn.execute(
                     select(purchase_consents.c.id).where(purchase_consents.c.offer_id == offer.id)
@@ -307,9 +390,12 @@ def consent_purchase(
                 raise ts.refusal_for("offer_used")
 
             # The checkout as it is NOW, and the signed one, must still be the same checkout.
-            current = load_checkout(conn, str(offer.checkout_id))
+            current = load_checkout(conn, str(offer.checkout_id), lock=True)
             if current is None:
                 raise ts.refusal_for("checkout_unknown")
+            owner = bound(conn, str(offer.checkout_id))
+            if owner is None or owner.customer_id != raw["customer_id"]:
+                raise ts.refusal_for(BINDING_MISMATCH)
             if current.status is not Status.READY_FOR_COMPLETE:
                 raise ConsentRefused("checkout_not_ready", f"status {current.status.value}"[:40])
             if now_us >= current.expires_us:
@@ -373,6 +459,7 @@ def consent_purchase(
 
 
 __all__ = [
-    "CHALLENGE_PURPOSE_CHECKOUT", "PURPOSE_CHECKOUT", "HashInputError", "MerchantKey",
+    "CHALLENGE_PURPOSE_CHECKOUT", "CHALLENGE_PURPOSE_OFFER", "PURPOSE_CHECKOUT", "PURPOSE_OFFER", "HashInputError", "MerchantKey",
     "Offer", "Purchased", "build_closed", "build_terms", "consent_purchase", "create_offer",
+    "offer_record",
 ]  # fmt: skip

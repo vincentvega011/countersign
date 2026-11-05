@@ -7,7 +7,9 @@ import { DeviceKeyError, postJson, signBytes } from "./device-key.js";
 import { LABELS, PURCHASE_REFUSALS } from "./messages.js";
 import {
   CHALLENGE_PURPOSE_CHECKOUT,
+  CHALLENGE_PURPOSE_OFFER,
   OfferError,
+  buildOfferProof,
   buildPurchaseRecord,
   checkOffer,
   checkoutIdFromHash,
@@ -117,9 +119,28 @@ async function start(device, checkoutId) {
   show("purchase_loading");
   let offer;
   try {
+    const challenge = await postJson("/trusted-surface/keys/challenge", {
+      purpose: CHALLENGE_PURPOSE_OFFER,
+    });
+    const proof = buildOfferProof({
+      challenge,
+      customerId: device.customerId,
+      deviceThumbprint: device.thumbprint,
+      checkoutId,
+      origin: location.origin,
+    });
+    const signature = await signBytes(
+      device.keyPair.privateKey,
+      purchaseBytes(proof),
+    );
     offer = checkOffer(
       await postJson("/trusted-surface/purchases/offer", {
         checkout_id: checkoutId,
+        challenge_id: challenge.challenge_id,
+        customer_id: device.customerId,
+        device_thumbprint: device.thumbprint,
+        origin: location.origin,
+        signature,
       }),
     );
   } catch (error) {
