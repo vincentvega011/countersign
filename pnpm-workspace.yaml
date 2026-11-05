@@ -12,3 +12,7 @@ minimumReleaseAgeExclude:
   - ag-stack@36.3.0
   - ag-studio-react@3.1.0
   - ag-studio@3.1.0
+# pnpm 12 refuses dependency build scripts unless approved here (strictDepBuilds). Only esbuild, which
+# Vite needs for its platform binary, is approved.
+allowBuilds:
+  esbuild: true
