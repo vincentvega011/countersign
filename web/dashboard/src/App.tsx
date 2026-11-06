@@ -3,8 +3,21 @@
 // dashboard read API; nothing in this app can change a credential, a mode or a payment.
 import { useCallback, useEffect, useState } from "react";
 import { AgStudioProvider } from "ag-studio-react";
-import { fetchOrders, fetchStatus, type Order, type Status } from "./api";
+import {
+  fetchEvents,
+  fetchEval,
+  fetchMandates,
+  fetchOrders,
+  fetchStatus,
+  type EvalCase,
+  type EventRow,
+  type MandateRow,
+  type Order,
+  type Status,
+} from "./api";
 import { OrdersStudio } from "./Studio";
+import { ProtectionStudio } from "./ProtectionStudio";
+import { EvidenceView } from "./Evidence";
 import { SOURCE_LABEL } from "./format";
 import { applyScheme, initialScheme, remember, type Scheme } from "./theme";
 
@@ -20,14 +33,24 @@ const VIEWS = [
 ] as const;
 type View = (typeof VIEWS)[number]["id"];
 
-const viewFromHash = (): View => {
-  const id = location.hash.replace(/^#\/?/, "");
-  return (VIEWS.find((v) => v.id === id)?.id ?? "orders") as View;
-};
+// "#/evidence/<checkout id>" opens the Evidence view on that order.
+const parts = () => location.hash.replace(/^#\/?/, "").split("/");
+const viewFromHash = (): View =>
+  (VIEWS.find((v) => v.id === parts()[0])?.id ?? "orders") as View;
+const evidenceFromHash = (): string | null =>
+  parts()[0] === "evidence" && parts()[1]
+    ? decodeURIComponent(parts()[1])
+    : null;
 
 export function App() {
   const [scheme, setScheme] = useState<Scheme>(initialScheme);
   const [view, setView] = useState<View>(viewFromHash);
+  const [evidenceId, setEvidenceId] = useState<string | null>(evidenceFromHash);
+  const [protection, setProtection] = useState<{
+    events: EventRow[];
+    mandates: MandateRow[];
+    cases: EvalCase[];
+  } | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -38,7 +61,10 @@ export function App() {
 
   useEffect(() => applyScheme(scheme), [scheme]);
   useEffect(() => {
-    const onHash = () => setView(viewFromHash());
+    const onHash = () => {
+      setView(viewFromHash());
+      setEvidenceId(evidenceFromHash());
+    };
     addEventListener("hashchange", onHash);
     return () => removeEventListener("hashchange", onHash);
   }, []);
@@ -50,6 +76,14 @@ export function App() {
       })
       .catch(() => setFailed(true));
   }, []);
+  useEffect(() => {
+    if (view !== "protection" || protection) return;
+    Promise.all([fetchEvents(), fetchMandates(), fetchEval()])
+      .then(([events, mandates, evaluation]) =>
+        setProtection({ events, mandates, cases: evaluation?.cases ?? [] }),
+      )
+      .catch(() => setFailed(true));
+  }, [view, protection]);
   const onLive = useCallback(
     (count: number) => setLive({ at: new Date(), count }),
     [],
@@ -178,7 +212,21 @@ export function App() {
             </section>
           )}
           {view === "onboarding" && <Onboarding status={status} />}
-          {view !== "orders" && view !== "onboarding" && (
+          {view === "evidence" && orders && (
+            <EvidenceView
+              key={evidenceId ?? "none"}
+              orders={orders}
+              initial={evidenceId}
+            />
+          )}
+          {view === "protection" && orders && protection && (
+            <section className="cs-protection" aria-label="Protection activity">
+              <div className="cs-studio" data-testid="protection-studio">
+                <ProtectionStudio orders={orders} {...protection} />
+              </div>
+            </section>
+          )}
+          {(view === "policy" || view === "assistant") && (
             <Placeholder view={view} />
           )}
         </main>

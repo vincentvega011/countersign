@@ -210,6 +210,16 @@ before the answer).
 | Load script from elsewhere into the dashboard | cross-site script | `script-src 'self'`; only styles are relaxed, on `/dashboard/` only (Decision 113) | n/a |
 | Commit the Studio licence key | maintainer | env only; tests and a secret scan rule on tracked files (Decision 112) | n/a |
 
+## Untrusted text on the merchant dashboard (P4.3, P4.4)
+
+Item titles, customer ids, agent names, claim values and every PayPal field reach the dashboard from agents or from a
+bundle, so any of them can be an HTML or script payload. Defence: the dashboard renders them only as React text (no
+`dangerouslySetInnerHTML`, no HTML from data, no `innerHTML` in the app), the page CSP allows scripts from this origin
+only (Decision 113), and Studio's own cells and tiles show values as text. Test: `tests/integration/test_dashboard_detail_browser.py`
+(hostile fixture) seeds `img onerror`, `script` and `onmouseover` payloads in a bundle's PayPal fields and consent terms
+and in a plain order's title and customer id, and asserts no script ran, no element or handler attribute was created and
+the payload shows literally. A remaining exposure is Studio's own cell rendering, covered only for the grid cells above.
+
 ## Review of the phase 2 implementation
 
 The whole phase 2 change set was reviewed against the invariants. Result: no finding that moves money

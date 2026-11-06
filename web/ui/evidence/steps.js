@@ -32,7 +32,7 @@ import {
 import { checkFields, checkInclusion, entryHash, rootOf } from "./log.js";
 import { readClosed, readOpen, split } from "./sdjwt.js";
 
-const VCT = {
+export const VCT = {
   checkout_open: "mandate.checkout.open.1",
   checkout: "mandate.checkout.1",
   payment_open: "mandate.payment.open.1",
@@ -650,7 +650,8 @@ async function paypalObjects(b) {
   return "ids, statuses, amounts, invoice id and items agree with the signed checkout";
 }
 
-async function customId(b) {
+// The custom_id every PayPal object must carry, recomputed from the signed mandates.
+export async function expectedCustomId(b) {
   const [, ccl] = await b.checkoutChain();
   const reference = jcs(
     dict([
@@ -663,7 +664,11 @@ async function customId(b) {
       ["payment_mandate", await digest(split(b.mandate("payment_closed"))[1])],
     ]),
   );
-  const want = `cs1.${b64url(await domainHash("cs.evidence.ref.v1", utf8(reference)))}`;
+  return `cs1.${b64url(await domainHash("cs.evidence.ref.v1", utf8(reference)))}`;
+}
+
+async function customId(b) {
+  const want = await expectedCustomId(b);
   const found = [hashable(get(b.raw.gate, "custom_id"))];
   for (const kind of ["order", "authorization", "capture"])
     for (const body of iter(get(b.raw.paypal, kind, [])))

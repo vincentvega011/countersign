@@ -38,6 +38,7 @@ from countersign.tables import (
     attempt_mandates,
     checkout_customers,
     checkout_sources,
+    evidence_bundles,
     open_mandates,
     payment_attempts,
 )
@@ -366,8 +367,40 @@ def protection_events(engine: Engine) -> list[dict[str, Any]]:
     return list(reversed(events))[:MAX_EVENTS]
 
 
+def order_detail(engine: Engine, checkout_id: str) -> dict[str, Any] | None:
+    """One order's row plus the stored evidence bundle text, or the reason there is none.
+
+    The bundle is the one `GET /evidence/{capture_id}` serves: sanitized when it was stored (PayPal
+    members pass an allowlist, the customer is a random id, only public keys). It is returned as the
+    exact stored text so the browser verifier checks the same bytes the offline CLI would. Nothing here
+    calls PayPal. `evidence.state` is one of: `bundle`; `simulated` (no bundle, a simulated row);
+    `unmandated` (the baseline captured without a mandate, so no bundle can exist); `missing` (a
+    verified capture with no bundle, L49); `not_captured` (nothing was captured).
+    """
+    rows = orders(engine, [checkout_id])
+    if not rows:
+        return None
+    row = rows[0]
+    with engine.connect() as conn:
+        found = conn.execute(
+            select(evidence_bundles.c.bundle).where(evidence_bundles.c.checkout_id == checkout_id)
+        ).first()
+    text = None if found is None else str(found[0])
+    if text is not None:
+        state = "bundle"
+    elif row["source"] == "simulator":
+        state = "simulated"
+    elif row["unauthorized"]:
+        state = "unmandated"
+    elif row["gate"] == "passed":
+        state = "missing"
+    else:
+        state = "not_captured"
+    return {"order": row, "state": state, "bundle_text": text}
+
+
 def eval_summary(path: Path) -> dict[str, Any] | None:
-    """The summary of the latest eval report: counts only, no case detail."""
+    """The summary of the latest eval report, with one short entry per case and mode."""
     try:
         report = json.loads(path.read_text())
     except (OSError, ValueError):
@@ -383,10 +416,27 @@ def eval_summary(path: Path) -> dict[str, Any] | None:
         if mode in ("full", "baseline") and isinstance(v, dict)
     }
     generated = report.get("generated_at")
+    cases: list[dict[str, Any]] = []
+    for c in (report.get("cases") if isinstance(report.get("cases"), list) else [])[:400]:
+        if not isinstance(c, dict) or c.get("mode") not in ("full", "baseline"):
+            continue
+        reason = c.get("reason_code")
+        cases.append(
+            {
+                "case": str(c.get("case", ""))[:80], "category": str(c.get("category", ""))[:80],
+                "mode": c["mode"], "outcome": str(c.get("outcome", ""))[:20],
+                "reason_code": reason[:64] if isinstance(reason, str) else None,
+                "unauthorized_captures": int(c["unauthorized_captures"])
+                if isinstance(c.get("unauthorized_captures"), int) else 0,
+                "captured_minor": int(c["captured_minor"])
+                if isinstance(c.get("captured_minor"), int) else 0,
+            }
+        )  # fmt: skip
     return {
         "suite": str(report.get("suite", ""))[:40],
         "generated_at": generated if isinstance(generated, str) else None,
         "modes": modes,
+        "cases": cases,
     }
 
 
@@ -412,6 +462,6 @@ def changed_since(engine: Engine, seq: int) -> tuple[int, list[str]]:
 
 
 __all__ = [
-    "API_VERSION", "changed_since", "eval_summary", "latest_seq", "mandates", "orders",
+    "API_VERSION", "changed_since", "eval_summary", "latest_seq", "mandates", "order_detail", "orders",
     "protection_events", "unauthorized_captures",
 ]  # fmt: skip

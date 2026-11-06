@@ -286,6 +286,32 @@ def seed_recorded(engine: Engine) -> int:
     return len(ids)
 
 
+def seed_bundle(engine: Engine) -> int:
+    """One order with a stored evidence bundle, made from the committed synthetic vector (once).
+
+    The services' own bundles need a device consent from the phone flow, which the simulated seed does
+    not run, so without this the detail and Evidence views would show only the "simulated" message.
+    The row is labelled `simulator` like every other simulated order.
+    """
+    from tests.dashboard_rows import insert_bundle_order, vector_text
+
+    text = vector_text("valid.json")
+    cid = _json_id(text)
+    with engine.connect() as conn:
+        if conn.execute(
+            select(checkout_sessions.c.id).where(checkout_sessions.c.id == cid)
+        ).first():
+            return 0
+    insert_bundle_order(engine, text)
+    return 1
+
+
+def _json_id(text: str) -> str:
+    import json
+
+    return str(json.loads(text)["checkout_id"])
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="dashboard_seed")
     parser.add_argument("--orders", type=int, default=300)
@@ -305,8 +331,10 @@ def main(argv: list[str] | None = None) -> int:
     engine = create_engine(url, pool_size=8)
     started = time.monotonic()
     recorded = seed_recorded(engine)
+    bundles = seed_bundle(engine)
     done = seed_simulated(engine, args.orders, args.shops)
     print(f"recorded rows added: {recorded}")
+    print(f"evidence bundle rows added: {bundles}")
     print("simulated scenarios:", ", ".join(f"{k} {v}" for k, v in sorted(done.items())))
     print(f"took {time.monotonic() - started:.1f}s")
     return 0

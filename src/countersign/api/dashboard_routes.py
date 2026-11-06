@@ -5,7 +5,10 @@ Security reasoning.
 - **Read only.** Every route is GET. There is no write endpoint, so nothing here can change a
   credential, the mode, a policy or a payment; a test checks that no other method is routed under
   `/dashboard/`. There is no merchant login yet (L57): the API is designed so that nothing sensitive is
-  reachable (fixed member lists, no secret, no payer data, no mandate text; a test scans every answer).
+  reachable (fixed member lists, no secret, no payer data; a test scans every answer). The one place
+  mandate text appears is `orders/{id}/detail`, which returns the stored evidence bundle, the same text
+  `GET /evidence/{capture_id}` serves (sanitized when stored, public keys only; Decision 118), and
+  `samples/{name}`, an exact table of committed synthetic vectors (Decision 120).
 - **Versioned and stable.** Paths are under `/dashboard/api/v1/`; every body carries `version`.
 - **The live stream** (`/dashboard/api/v1/stream`) is Server-Sent Events. It polls the decision log
   and announces the ids of checkouts named by new entries; the page then asks for those rows. It sends
@@ -32,7 +35,7 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
-from countersign.dashboard import read
+from countersign.dashboard import read, samples
 from countersign.dashboard.service import DashboardService
 
 DIST = Path(__file__).resolve().parents[3] / "web" / "dashboard" / "dist"
@@ -106,6 +109,24 @@ def install(app: FastAPI, service: DashboardService, dist: Path = DIST) -> None:
         if ids is not None:
             wanted = [i for i in ids.split(",") if IDS.fullmatch(i)][: read.MAX_IDS]
         return _json(await run_in_threadpool(service.orders, wanted))
+
+    @router.get(f"{API}/orders/{{checkout_id}}/detail")
+    async def order_detail(checkout_id: str) -> JSONResponse:
+        if IDS.fullmatch(checkout_id) is None:
+            return _json({"code": "order_unknown"}, 404)
+        body = await run_in_threadpool(service.detail, checkout_id)
+        return _json({"code": "order_unknown"}, 404) if body is None else _json(body)
+
+    @router.get(f"{API}/samples")
+    async def sample_list() -> JSONResponse:
+        return _json({"version": read.API_VERSION, "samples": samples.listing()})
+
+    @router.get(f"{API}/samples/{{name}}")
+    async def sample_one(name: str) -> JSONResponse:
+        body = samples.sample(name) if name in samples.SAMPLES else None
+        if body is None:
+            return _json({"code": "sample_unknown"}, 404)
+        return _json({"version": read.API_VERSION, **body})
 
     @router.get(f"{API}/summary")
     async def summary() -> JSONResponse:

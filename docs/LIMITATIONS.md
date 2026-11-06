@@ -547,6 +547,24 @@ licence keys are, so anyone who loads the dashboard can read it. Without a key, 
 watermark and console messages; behaviour after expiry was not tested. The bundle is about 6.7 MB of JavaScript (1.9
 MB compressed). Studio's grid widget exposes no master and detail; order detail needs its own view (P4.3).
 
+### L59. The detail and Evidence views show stored data, not PayPal
+
+The PayPal panel is the bundle's objects as fetched at capture time. The dashboard never calls PayPal, so it cannot show
+that an order changed after the capture. Bundles are verified without pinned keys, so the keys step reports "not pinned"
+by design (L52, L54). The log checks are consistency checks (L48).
+
+### L60. Order detail needs a grid click, and the demo data is mostly simulated
+
+The detail widget follows Studio's row selection; a filter that leaves one row does not open it. Only the seeded
+synthetic bundle has a full detail view in a simulated database: other simulated rows read "No evidence bundle:
+simulated". The dev seed makes no open mandates, so the mandate tiles and grid are empty there until the phone flow runs.
+
+### L61. The attack matrix is the committed report
+
+It reads `eval/reports/latest.json` (suite `attacks`, the 30 deterministic cases), not a live run, and the adversary LLM
+runs are not in it. 19 of the 30 cases are blocked in both modes and do not separate them; the widget says so.
+Protection events are capped at 20,000 and a tile over no rows shows blank.
+
 ### L39 (note)
 
 L39 was removed when the two cassettes were re-recorded (Decision 85). The numbers are not reused or shifted.

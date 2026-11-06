@@ -10,7 +10,7 @@ A phase starts only when the previous gate has passed.
 | P1    | Canonical core, UCP checkout and profile, `merchant_authorization`, PayPal client, decision log                                        | A UCP checkout is signed and verified by the independent Node verifier, and canonical terms round-trip through a real sandbox order                | Passed |
 | P2    | Mandates, Merchant and Credential Provider roles, constraints, capture gate, principal lock, ACP adapter, baseline mode, first attacks | Downgrade, order-changed-after-approval (nothing is authorized in full; authorized, then voided by the gate with `ABL_NO_PREAUTH_CHECK`) and replay attacks succeed in baseline and fail in full with nothing captured; concurrency tests pass | Passed      |
 | P3    | Trusted Surface with device keys and consent, shopping agent, evidence bundles and verifiers                                           | An autonomous purchase runs from phone approval to a captured sandbox order to a verified evidence bundle, with no server-held customer key        | Passed      |
-| P4    | Dashboard, assistant, hostile agent, full evaluation                                                                                   | The whole demo runs from the dashboard locally and the evaluation numbers are frozen                                                               | In progress (P4.1, P4.2 done) |
+| P4    | Dashboard, assistant, hostile agent, full evaluation                                                                                   | The whole demo runs from the dashboard locally and the evaluation numbers are frozen                                                               | In progress (P4.1 to P4.4 done) |
 | P5    | Deployment, design polish, documentation, fresh-clone test                                                                             | A stranger can use the hosted demo end to end and can run it locally from the README alone                                                         | Not started |
 | P6    | Video, submission text, final checks                                                                                                   | Everything is submitted with time to spare                                                                                                         | Not started |
 
@@ -250,8 +250,13 @@ recorded request ids again, so:
 - **What the trial provides** (tested, [ENV.md](ENV.md) section 3.6): row grouping, pivoting, set-style list
   filter, Studio charts, CSV export, totals row, cross filtering, edit and view mode, custom widgets. Not provided:
   master and detail, the raw grid API. Key tier STUDIO-PRO-AI, expiry 20 December 2026.
-- **Next:** P4.3 order detail and evidence views; P4.4 protection activity and policy; P4.5 Ask Countersign (Studio
-  agent framework); then the adversary LLM mode and the full evaluation.
+- **P4.3 and P4.4 (2026-11-06): done** (Decisions 118 to 122, L59 to L61). Order detail as a custom Studio widget
+  driven by the grid's row selection, with the browser verifier's checks; fixed messages for rows without a bundle;
+  the Evidence view (verify, download, file, committed tampered samples); the Protection dashboard (cross filtered, the
+  funnel narrows the attempts) and the Attack matrix widget; hostile-text Playwright test. Studio's grid does start a
+  cross filter on a row click, which is what drives the detail widget.
+- **Next:** P4.5 read-only Policy panel; P4.6 Ask Countersign on the Studio agent framework; then the adversary LLM
+  mode and the full evaluation.
 
 ## P3 gate (run 2026-11-05): passed
 
@@ -344,7 +349,7 @@ Findings from the P1 review that belong to P2 and are not optional there:
 
 - **Later:** the page for revoking a key and adding a second device (L36, L38).
 - **Later:** bind enrolment to a platform or merchant login, which closes L56 (an agent as its own customer) and L35.
-- **P4.3+:** a merchant login for the dashboard (L57); order detail as its own view (no master and detail in Studio).
+- **P4.5+:** a merchant login for the dashboard (L57).
 - **P4:** let the reader pin or recognise the customer's device key fingerprint on `/verify/` beyond showing it (L54).
 - **P5.1:** rate limit `GET /evidence/{capture_id}` (L46).
 - **Later:** anchor the decision log root so the log steps prove more than consistency (L48).

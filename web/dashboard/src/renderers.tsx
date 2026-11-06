@@ -26,6 +26,14 @@ const SOURCE: Record<string, Pill> = {
   Unlabelled: { tone: "neutral", glyph: "?" },
 };
 
+const MANDATE_STATE: Record<string, Pill> = {
+  Unused: { tone: "info", glyph: "○" },
+  "In flight": { tone: "warning", glyph: "◐" },
+  Used: { tone: "success", glyph: "✓" },
+  Revoked: { tone: "danger", glyph: "⊘" },
+  Expired: { tone: "neutral", glyph: "–" },
+};
+
 function pill(table: Record<string, Pill>, testid: string) {
   return function PillCell(props: AgWidgetCustomCellRendererProps) {
     const value = typeof props.value === "string" ? props.value : null;
@@ -49,6 +57,7 @@ const RENDERERS: Record<string, ReturnType<typeof pill>> = {
   status: pill(STATUS, "cell-status"),
   mandate: pill(MANDATE, "cell-mandate"),
   source: pill(SOURCE, "cell-source"),
+  state: pill(MANDATE_STATE, "cell-state"),
 };
 
 export function cellRendererFor(field: {

@@ -667,7 +667,7 @@ stream ([PROTOCOL.md](PROTOCOL.md) Decisions 112 to 117). No login yet ([LIMITAT
 
 Built (P4.1, P4.2):
 
-- **Shell:** navigation (Orders, Protection, Evidence, Policy, Assistant, Onboarding; the middle four are placeholders),
+- **Shell:** navigation (Orders, Protection, Evidence, Policy, Assistant, Onboarding; Policy and Assistant are placeholders),
   light and dark theme toggle, and a label with the protection mode, `APP_ENV` and "sandbox demo, simulated and
   recorded data is labelled".
 - **Onboarding** shows the real state of three steps: PayPal sandbox app configured (yes or no, no value), protection
@@ -680,9 +680,21 @@ Built (P4.1, P4.2):
   New or changed checkouts arrive live through the stream. Every row carries its source: sandbox, recorded or
   simulated (`make dashboard-seed` fills a dev database).
 
-Planned (P4.3 onward): order detail (Studio's grid widget has no master and detail, so a separate view: signed
-checkout, mandates, live PayPal order, gate timeline), evidence verify and download, protection activity, policy, and
-Ask Countersign (Studio's agent framework is available under the trial tier, [ENV.md](ENV.md) section 3.6).
+Built (P4.3, P4.4; Decisions 118 to 122):
+
+- **Order detail** (custom Studio widget under the orders grid, driven by the grid's row selection): signed checkout
+  with its `merchant_authorization` status, both mandates and the device consent with per-link results, the stored
+  PayPal objects beside the terms re-derived from the signed checkout (differences marked), the gate steps and the log
+  entries with inclusion proofs. All checks are the browser verifier's (`web/ui/evidence`). Rows without a bundle show a
+  fixed message. `GET /dashboard/api/v1/orders/{id}/detail`.
+- **Evidence** (`#/evidence/<checkout id>`): verify a stored bundle with the `/verify/` step list, download it from
+  `GET /evidence/{capture_id}`, load a file, or try a committed tampered sample (`/dashboard/api/v1/samples`).
+- **Protection** (Studio, four tables and one relation): blocked or voided attempts by reason code and by day,
+  voids, open mandates by state with ceiling and spend, the funnel, and the **Attack matrix** widget (full against
+  baseline per case, from `eval/reports/latest.json` through `/dashboard/api/v1/eval`).
+
+Planned: a read-only policy panel (P4.5), and Ask Countersign on Studio's agent framework (P4.6, [ENV.md](ENV.md)
+section 3.6).
 
 ### 7.2 Trusted Surface
 

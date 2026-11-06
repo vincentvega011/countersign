@@ -2,6 +2,7 @@
 // grid, all over the `orders` table so cross filters connect them. Visitors get it in view mode;
 // edit mode (dev only) starts from the same state.
 import { FUNNEL_ID } from "./funnel";
+import { DETAIL_ID } from "./OrderDetail";
 
 const t = (id: string, aggregation?: string) =>
   aggregation ? { id: `orders.${id}`, aggregation } : { id: `orders.${id}` };
@@ -96,6 +97,11 @@ export function ordersState(grouped: boolean) {
             },
           },
           grid,
+          detail: {
+            type: DETAIL_ID,
+            format: title("Order detail", "Select a row in the grid above"),
+            dataMapping: { checkout: [t("id")] },
+          },
         },
         widgetLayout: {
           captured: { xTrack: 0, yTrack: 0, xSpan: 6, ySpan: 3 },
@@ -106,6 +112,7 @@ export function ordersState(grouped: boolean) {
           byReason: { xTrack: 6, yTrack: 3, xSpan: 8, ySpan: 10 },
           funnel: { xTrack: 14, yTrack: 3, xSpan: 10, ySpan: 10 },
           grid: { xTrack: 0, yTrack: 13, xSpan: 24, ySpan: 15 },
+          detail: { xTrack: 0, yTrack: 28, xSpan: 24, ySpan: 26 },
         },
         filter: {
           widget: {

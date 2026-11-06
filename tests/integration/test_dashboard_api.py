@@ -170,3 +170,122 @@ def test_the_stream_announces_a_new_checkout(world: World) -> None:
     assert any(k == "orders" and made[0] in e["ids"] for k, e in events)
     for _, e in events:
         assert set(e) <= {"version", "seq", "ids"}
+
+
+# ----------------------------------------------------------------------------- order detail (P4.3)
+
+BUNDLE_PERSONAL = re.compile(
+    r'"(payer|buyer|email|email_address|address|address_line_1|postal_code|phone|given_name|surname|'
+    r'full_name|shipping|access_token|client_secret|client_id|secret|password|private_key|vault_id|d)"\s*:',
+    re.IGNORECASE,
+)
+
+
+def _bundle_world(world: World, admin: Engine) -> dict[str, str]:
+    from tests.dashboard_rows import insert_bundle_order, vector_text
+
+    with admin.begin() as conn:
+        conn.execute(text("TRUNCATE evidence_bundles"))
+    return insert_bundle_order(world.engine, vector_text("valid.json"))
+
+
+def test_detail_returns_the_stored_bundle_and_never_calls_paypal(
+    world: World, admin_engine: Engine
+) -> None:
+    ids = _bundle_world(world, admin_engine)
+    calls = len(world.sim.orders) + len(world.sim.authorizations)
+    r = world.client.get(f"{API}/orders/{ids['checkout_id']}/detail")
+    assert r.status_code == 200 and r.headers["cache-control"] == "no-store"
+    body = r.json()
+    assert set(body) == {"version", "checkout_id", "order", "state", "bundle_text"}
+    assert body["state"] == "bundle" and body["order"]["id"] == ids["checkout_id"]
+    served = world.client.get(f"/evidence/{ids['capture_id']}").text
+    assert body["bundle_text"] == served  # the exact stored text
+    assert len(world.sim.orders) + len(world.sim.authorizations) == calls
+
+
+def test_detail_answers_carry_no_personal_data_token_or_private_key(
+    world: World, admin_engine: Engine
+) -> None:
+    ids = _bundle_world(world, admin_engine)
+    _seed(world)
+    texts = [world.client.get(f"{API}/orders/{ids['checkout_id']}/detail").text]
+    for name in ("valid", "amount-raised", "custom-id", "payee"):
+        texts.append(world.client.get(f"{API}/samples/{name}").text)
+    for body in texts:
+        assert not EMAIL.search(body)
+        assert not BUNDLE_PERSONAL.search(body), BUNDLE_PERSONAL.search(body)
+        assert not re.search(r"-----BEGIN|Bearer\s|sim-secret|access_token", body)
+
+
+def test_detail_states_for_rows_without_a_bundle(world: World, admin_engine: Engine) -> None:
+    seeded = _seed(world)
+    paid = world.client.get(f"{API}/orders/{seeded['paid']}/detail").json()
+    assert paid["state"] == "simulated" and paid["bundle_text"] is None
+    # The same captured order read as a sandbox row with no bundle is "missing", never invented detail.
+    with admin_engine.begin() as conn:
+        conn.execute(
+            text("UPDATE checkout_sources SET source = 'live_sandbox' WHERE checkout_id = :c"),
+            {"c": seeded["paid"]},
+        )
+    assert world.client.get(f"{API}/orders/{seeded['paid']}/detail").json()["state"] == "missing"
+    open_ = world.client.get(f"{API}/orders/{seeded['open']}/detail").json()
+    assert open_["state"] == "simulated"
+
+
+def test_detail_unknown_and_malformed_ids_are_the_same_404(world: World) -> None:
+    handled = {
+        (r.status_code, r.text)
+        for r in (
+            world.client.get(f"{API}/orders/chk_nope/detail"),
+            world.client.get(f"{API}/orders/a%00b/detail"),
+            world.client.get(f"{API}/orders/{'x' * 80}/detail"),
+        )
+    }
+    assert handled == {(404, '{"code":"order_unknown"}')}
+    assert world.client.get(f"{API}/orders/..%2fetc/detail").status_code == 404  # never routed
+
+
+def test_samples_are_an_exact_table_with_404_for_everything_else(world: World) -> None:
+    listing = world.client.get(f"{API}/samples").json()["samples"]
+    assert [s["name"] for s in listing] == ["valid", "amount-raised", "custom-id", "payee"]
+    for name in ("valid", "amount-raised", "custom-id"):
+        body = world.client.get(f"{API}/samples/{name}").json()
+        assert body["pinned"] is not None and body["bundle_text"].startswith("{")
+    assert world.client.get(f"{API}/samples/payee").json()["pinned"] is None
+    assert world.client.get(f"{API}/samples/valid").json()["expected_first_failure"] is None
+    assert (
+        world.client.get(f"{API}/samples/custom-id").json()["expected_first_failure"]
+        == "paypal_custom_id"
+    )
+    for bad in (
+        "tampered",
+        "../valid",
+        "valid.json",
+        "..%2f..%2fpyproject.toml",
+        "tampered%2fpaypal_custom_id",
+        "VALID",
+        "x" * 80,
+    ):
+        r = world.client.get(f"{API}/samples/{bad}")
+        assert r.status_code == 404, bad
+        if "%2f" not in bad and "/" not in bad:
+            assert r.json() == {"code": "sample_unknown"}
+    assert world.client.get(f"{API}/samples/valid/extra").status_code == 404
+
+
+def test_the_eval_endpoint_carries_short_case_entries_only(world: World) -> None:
+    body = world.client.get(f"{API}/eval").json()["eval"]
+    assert body is not None and body["cases"]
+    allowed = {
+        "case",
+        "category",
+        "mode",
+        "outcome",
+        "reason_code",
+        "unauthorized_captures",
+        "captured_minor",
+    }
+    assert all(set(c) == allowed and c["mode"] in ("full", "baseline") for c in body["cases"])
+    full = [c for c in body["cases"] if c["mode"] == "full"]
+    assert full and not any(c["outcome"] == "success" or c["unauthorized_captures"] for c in full)

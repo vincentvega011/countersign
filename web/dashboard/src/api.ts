@@ -77,3 +77,81 @@ export function watchOrders(onChanged: (ids: string[]) => void): () => void {
   });
   return () => source.close();
 }
+
+export interface Detail {
+  version: number;
+  checkout_id: string;
+  order: Order;
+  state: "bundle" | "simulated" | "unmandated" | "missing" | "not_captured";
+  bundle_text: string | null;
+}
+export const fetchDetail = (id: string) =>
+  getJson<Detail>(`/orders/${encodeURIComponent(id)}/detail`);
+
+export interface MandateRow {
+  id: string;
+  customer_id: string;
+  agent: string;
+  state: string;
+  ceiling_minor: number;
+  spent_minor: number;
+  currency: string;
+  expires_at: string;
+  created_at: string;
+}
+export const fetchMandates = async () =>
+  (await getJson<{ mandates: MandateRow[] }>("/mandates")).mandates;
+
+export interface EventRow {
+  seq: number;
+  at: string;
+  checkout_id: string | null;
+  stage: string;
+  outcome: string;
+  reason: string;
+  source: string;
+}
+export const fetchEvents = async () =>
+  (await getJson<{ events: EventRow[] }>("/events")).events;
+
+export interface EvalCase {
+  case: string;
+  category: string;
+  mode: "full" | "baseline";
+  outcome: string;
+  reason_code: string | null;
+  unauthorized_captures: number;
+  captured_minor: number;
+}
+export interface EvalSummary {
+  suite: string;
+  generated_at: string | null;
+  modes: Record<string, Record<string, number>>;
+  cases: EvalCase[];
+}
+export const fetchEval = async () =>
+  (await getJson<{ eval: EvalSummary | null }>("/eval")).eval;
+
+export interface Sample {
+  name: string;
+  label: string;
+  bundle_text: string;
+  pinned: { merchant: object; platform: object } | null;
+  expected_first_failure: string | null;
+}
+export const fetchSamples = async () =>
+  (await getJson<{ samples: { name: string; label: string }[] }>("/samples"))
+    .samples;
+export const fetchSample = (name: string) =>
+  getJson<Sample>(`/samples/${encodeURIComponent(name)}`);
+
+// The one fetch that is not under the read API: the stored bundle, by capture id.
+export async function fetchBundleText(captureId: string): Promise<string> {
+  const response = await fetch(`/evidence/${encodeURIComponent(captureId)}`, {
+    credentials: "omit",
+    cache: "no-store",
+    redirect: "error",
+  });
+  if (!response.ok) throw new Error(`no bundle: ${response.status}`);
+  return response.text();
+}

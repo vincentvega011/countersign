@@ -3125,6 +3125,71 @@ values of `tokens.css` (colours, fonts, chart palette), switched with `data-ag-t
 "Edit layout" (Studio's edit panels) only when `APP_ENV=dev`. Onboarding is read only in demo; in dev it points to
 the environment, and there is no credentials form.
 
+### Decision 118: Order detail is a custom Studio widget driven by the grid's row selection
+
+**Flagged for the owner.** Studio's grid widget has no master and detail. A grid row click starts a cross filter, so
+the **Order detail** widget (`web/dashboard/src/OrderDetail.tsx`, registered with a form, default size and AI
+description like the funnel) asks Studio for the cross filtered rows of the `orders` table and shows an order only
+when that selection is exactly one checkout. A quick filter or page filter that leaves one row does not select it.
+Chosen over a separate detail page because it needs no second routing path, follows every other widget's filters,
+and is a second custom widget for the AG Grid story. Panels: (1) the merchant-signed checkout with the
+`merchant_authorization` status (the browser verifier's `checkout_jwt_hash` step) and items and totals through
+`formatAmount`; (2) both mandates decoded with each link's own result (platform signature on the open mandate, agent
+key binding on the closed one), the constraints, and the device consent with its signature step and the device key
+fingerprint; (3) the PayPal objects as stored in the bundle, labelled "as fetched at capture time" and never live
+(the dashboard has no PayPal credentials and no route that calls PayPal), next to the amount, `invoice_id`,
+`custom_id` (recomputed from the signed mandates by `expectedCustomId`, now exported from `steps.js`, behaviour
+unchanged), item names and prices re-derived from the signed checkout, a difference shown as "Differs" on a red row
+and the payee flagged if it changed between reads; (4) the nine gate steps, and the log entries with an inclusion
+proof each, noted as consistency checks (L48). Every check is a call into `web/ui/evidence`; `evidenceModel.ts`
+re-implements none. `GET /dashboard/api/v1/orders/{id}/detail` returns the order row, an `evidence.state` and the
+stored bundle text (the text `GET /evidence/{capture_id}` serves: allowlisted PayPal members, a random customer id,
+public keys only), so the browser verifies the exact bytes the offline CLI would. An unknown or malformed id is 404.
+
+### Decision 119: Rows without evidence say so in fixed words
+
+**Flagged for the owner.** `state` is `bundle`, `simulated` ("No evidence bundle: simulated"), `unmandated` (the
+baseline captured with no mandate, so none can exist), `missing` ("Bundle missing", a verified capture whose assembly
+failed, L49) or `not_captured`. A simulated row with no bundle always reads `simulated`, even if it was captured. No
+panel renders without a bundle and nothing is invented. The service's own bundles need the phone flow's device
+consent, which the simulated seed does not run, so `make dashboard-seed` also stores one order made from the committed
+synthetic vector `valid.json`, labelled `simulator`; its detail and Evidence views are real verification of
+synthetic data. Untrusted text (item titles, customer and agent ids, claim values, PayPal fields) is React text only;
+there is no `dangerouslySetInnerHTML`, and a Playwright test with `img onerror` and `script` payloads in a bundle and
+in a plain order asserts nothing runs, no element is created and the payload shows literally.
+
+### Decision 120: The Evidence view and its samples
+
+**Flagged for the owner.** `#/evidence/<checkout id>`: choose a captured order, **Verify evidence** runs
+`verifyText` on its stored bundle and lists the twelve steps with the `/verify/` wording, pills and stable step names
+(`verify-text.js` imported, not copied); **Download bundle** fetches `GET /evidence/{capture_id}`; a bundle file from
+disk uses the same path. Without pinned keys the last step reports `keys_not_pinned` and the summary says "Keys not
+pinned", as on `/verify/`. **Try a committed sample** uses `GET /dashboard/api/v1/samples[/{name}]`: an exact table of
+four names (the valid vector, two tampered, one forged) to files under `tests/vectors/evidence/`, built in
+`dashboard/samples.py`, nothing joined from a request; an unknown name or traversal shape is 404. A sample carries the
+first step it must fail at (from the vectors' index) and, for the valid and tampered vectors, the public keys to pin.
+The forged vectors are signed with their own throwaway keys, so they are checked against their bundle keys unpinned.
+
+### Decision 121: The Protection dashboard
+
+**Flagged for the owner.** A second Studio report over four tables: `orders`, `events` (blocked and voided attempts from
+the decision log), `mandates` (the open mandate registry with ceiling and spend) and `attacks`, with one relation
+(`events.checkout_id` to `orders.id`, many to one) so the funnel narrows the attempts. Tiles: blocked or voided
+attempts (count of events), voided authorizations (sum of a 0 or 1 field), open mandates, spend under mandates; charts
+by reason code, by day and mandates by state; the mandate grid; the funnel; attack cases by category. Numbers are
+aggregates of rows from the read API. A test compares three tiles with independent SQL over `decision_log` and
+`open_mandates` and checks the funnel's cross filter against SQL. A tile over no rows is blank, not 0.
+
+### Decision 122: The attack matrix widget
+
+**Flagged for the owner.** `GET /dashboard/api/v1/eval` now carries one short entry per case and mode (case, category,
+outcome, reason code, unauthorized captures, captured minor units; no other report member). The **Attack matrix**
+widget (`AttackMatrix.tsx`, form, default size and AI description) reads one row per case (full and baseline outcome
+side by side) through Studio's data API, so a click on a category bar narrows it. It shows the totals (full: 0 of 30
+succeeded, 0 unauthorized; baseline: counts from the report), a row per case with the reason code, and says in words
+how many cases do not separate the modes (the baseline also blocks them) and marks those rows. The widget computes
+every number from the rows it receives; a test compares them with `eval/reports/latest.json`.
+
 ## 4. Confirmed PayPal facts
 
 Observed in the PayPal sandbox with `scripts/sandbox_smoke.py` and `scripts/sandbox_confirm.py`

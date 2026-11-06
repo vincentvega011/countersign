@@ -52,6 +52,12 @@ class DashboardService:
         rows = read.orders(self.engine, ids)
         return {"version": read.API_VERSION, "orders": rows}
 
+    def detail(self, checkout_id: str) -> dict[str, Any] | None:
+        found = read.order_detail(self.engine, checkout_id)
+        if found is None:
+            return None
+        return {"version": read.API_VERSION, "checkout_id": checkout_id, **found}
+
     def summary(self) -> dict[str, Any]:
         return {
             "version": read.API_VERSION,

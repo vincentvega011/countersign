@@ -7,6 +7,7 @@ import type { AgStudioApi } from "ag-studio";
 import { fetchOrders, watchOrders, type Order } from "./api";
 import { dataSources, TABLE, toRow } from "./fields";
 import { FUNNEL_ID, funnelDefinition } from "./funnel";
+import { DETAIL_ID, orderDetailDefinition } from "./OrderDetail";
 import { cellRendererFor } from "./renderers";
 import { ordersState } from "./dashboardState";
 import { buildTheme } from "./theme";
@@ -33,7 +34,10 @@ export function OrdersStudio({ orders, mode, grouped, query, onLive }: Props) {
   const widgets = useCallback(
     (config: { menu: { label: string; widgetIds: readonly string[] }[] }) =>
       createWidgets({
-        additionalTypes: [funnelDefinition as never],
+        additionalTypes: [
+          funnelDefinition as never,
+          orderDetailDefinition as never,
+        ],
         overrides: [
           {
             id: "grid",
@@ -42,7 +46,7 @@ export function OrdersStudio({ orders, mode, grouped, query, onLive }: Props) {
         ],
         menu: [
           ...config.menu,
-          { label: "Countersign", widgetIds: [FUNNEL_ID] },
+          { label: "Countersign", widgetIds: [FUNNEL_ID, DETAIL_ID] },
         ] as never,
       } as never),
     [],
