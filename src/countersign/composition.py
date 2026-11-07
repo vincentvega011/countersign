@@ -25,12 +25,14 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+import structlog
 from fastapi import FastAPI
 from joserfc.jwk import ECKey
 from sqlalchemy import Engine
 
 from countersign.ablations import Ablations
 from countersign.api.app import create_app
+from countersign.api.assistant_routes import build_assistant
 from countersign.canonical.jsonstrict import loads_strict
 from countersign.checkout.binding import CompletionBinding
 from countersign.completion import CaptureStage, CompleteCoordinator, GateLockAdapter
@@ -41,6 +43,7 @@ from countersign.evidence import EvidenceService, PayPalObserver
 from countersign.gate import CaptureGate
 from countersign.gate.store import GateStore
 from countersign.lock import PrincipalLock
+from countersign.lock.store import LockStore
 from countersign.merchant.decision_log import LedgerDecisionLog
 from countersign.merchant.keys import MerchantKey
 from countersign.merchant.pg_reservations import PostgresReservationStore
@@ -52,6 +55,8 @@ from countersign.protocols.ucp.requests import JsonLoader
 from countersign.runtime import Mode, RuntimeSettings
 from countersign.trusted_surface import Merchant, TrustedSurface
 from countersign.webhooks import WebhookService
+
+log = structlog.get_logger("countersign.startup")
 
 
 @dataclass(frozen=True)
@@ -177,6 +182,13 @@ def build_app(settings: RuntimeSettings, wiring: Wiring) -> FastAPI:
             engine, wiring.paypal, wiring.webhook_id, settler=stage, clock_us=clock_us
         )
 
+    lock_reader = LockStore(engine, clock_us)
+    dashboard = DashboardService(
+        engine, settings, base, paypal_configured=wiring.paypal_configured,
+        data_source=wiring.data_source, lock_policy=lambda: lock_reader.current_policy().data(),
+    )  # fmt: skip
+    _log_policy_hash(dashboard)
+    dashboard.assistant = build_assistant(dashboard)
     return create_app(
         key=key, public_base_url=base, engine=engine, completion=coordinator, lock=lock,
         webhooks=webhooks, runtime=settings,
@@ -188,11 +200,16 @@ def build_app(settings: RuntimeSettings, wiring: Wiring) -> FastAPI:
             ),
         ), evidence=evidence, unmandated=unmandated, json_loader=json_loader,
         clock_us=clock_us, data_source=wiring.data_source,
-        dashboard=DashboardService(
-            engine, settings, base, paypal_configured=wiring.paypal_configured,
-            data_source=wiring.data_source,
-        ),
+        dashboard=dashboard,
     )  # fmt: skip
+
+
+def _log_policy_hash(dashboard: DashboardService) -> None:
+    """One process-log line at start: the SHA-256 of the active policy snapshot (Decision 124)."""
+    try:
+        log.info("policy_snapshot", sha256=dashboard.policy()["sha256"])
+    except Exception as error:  # noqa: BLE001 - the snapshot is informational; never block the start
+        log.warning("policy_snapshot_unavailable", error=type(error).__name__)
 
 
 def _now_us() -> int:

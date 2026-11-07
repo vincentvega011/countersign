@@ -98,6 +98,7 @@ export interface MandateRow {
   currency: string;
   expires_at: string;
   created_at: string;
+  source: string;
 }
 export const fetchMandates = async () =>
   (await getJson<{ mandates: MandateRow[] }>("/mandates")).mandates;
@@ -155,3 +156,58 @@ export async function fetchBundleText(captureId: string): Promise<string> {
   if (!response.ok) throw new Error(`no bundle: ${response.status}`);
   return response.text();
 }
+
+export interface PolicyView {
+  snapshot: {
+    protection: {
+      mode: string;
+      ablations: string[];
+      merchant_lock: {
+        version: number;
+        mode: string;
+        threshold_minor: number | null;
+        currency: string | null;
+      };
+    };
+    constraint_families: { checkout: string[]; payment: string[] };
+    capture_gate_steps: { code: string; check: string }[];
+    dashboard: { read_only: boolean; write_endpoints: number; login: boolean };
+    not_enabled: { id: string; label: string; status: string; note?: string }[];
+  };
+  sha256: string;
+}
+export const fetchPolicy = async () => getJson<PolicyView>("/policy");
+
+export interface AssistantCite {
+  kind: "order" | "evidence_step" | "eval_case" | "log" | "mandate" | "code";
+  id: string;
+  label: string;
+  step: string | null;
+}
+export interface AssistantLine {
+  text: string;
+  cites: AssistantCite[];
+}
+export interface AssistantAnswer {
+  status: "answered" | "unsupported" | "replay_only" | "unavailable";
+  text: string;
+  lines: AssistantLine[];
+  calls: { tool: string; args: Record<string, unknown> }[];
+  replaced: number;
+}
+export interface Suggestion {
+  label: string;
+  question: string;
+}
+export const fetchSuggestions = async () =>
+  getJson<{ mode: string; suggestions: Suggestion[] }>(
+    "/assistant/suggestions",
+  );
+export const askAssistant = async (q: string, signal?: AbortSignal) => {
+  const response = await fetch(
+    `/dashboard/api/v1/assistant/ask?q=${encodeURIComponent(q)}`,
+    { headers: { Accept: "application/json" }, signal },
+  );
+  if (!response.ok) throw new Error(`ask failed (${response.status})`);
+  return (await response.json()) as { mode: string; answer: AssistantAnswer };
+};

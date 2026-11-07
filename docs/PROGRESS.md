@@ -10,7 +10,7 @@ A phase starts only when the previous gate has passed.
 | P1    | Canonical core, UCP checkout and profile, `merchant_authorization`, PayPal client, decision log                                        | A UCP checkout is signed and verified by the independent Node verifier, and canonical terms round-trip through a real sandbox order                | Passed |
 | P2    | Mandates, Merchant and Credential Provider roles, constraints, capture gate, principal lock, ACP adapter, baseline mode, first attacks | Downgrade, order-changed-after-approval (nothing is authorized in full; authorized, then voided by the gate with `ABL_NO_PREAUTH_CHECK`) and replay attacks succeed in baseline and fail in full with nothing captured; concurrency tests pass | Passed      |
 | P3    | Trusted Surface with device keys and consent, shopping agent, evidence bundles and verifiers                                           | An autonomous purchase runs from phone approval to a captured sandbox order to a verified evidence bundle, with no server-held customer key        | Passed      |
-| P4    | Dashboard, assistant, hostile agent, full evaluation                                                                                   | The whole demo runs from the dashboard locally and the evaluation numbers are frozen                                                               | In progress (P4.1 to P4.4 done) |
+| P4    | Dashboard, assistant, hostile agent, full evaluation                                                                                   | The whole demo runs from the dashboard locally and the evaluation numbers are frozen                                                               | In progress (P4.1 to P4.6 done) |
 | P5    | Deployment, design polish, documentation, fresh-clone test                                                                             | A stranger can use the hosted demo end to end and can run it locally from the README alone                                                         | Not started |
 | P6    | Video, submission text, final checks                                                                                                   | Everything is submitted with time to spare                                                                                                         | Not started |
 
@@ -255,8 +255,11 @@ recorded request ids again, so:
   the Evidence view (verify, download, file, committed tampered samples); the Protection dashboard (cross filtered, the
   funnel narrows the attempts) and the Attack matrix widget; hostile-text Playwright test. Studio's grid does start a
   cross filter on a row click, which is what drives the detail widget.
-- **Next:** P4.5 read-only Policy panel; P4.6 Ask Countersign on the Studio agent framework; then the adversary LLM
-  mode and the full evaluation.
+- **P4.5 and P4.6 (2026-11-07): done** (Decisions 123 to 129, L62 to L64). Zero-valued tiles read 0 (Total widget, L61 fixed); the
+  dev seed makes five open mandates; read-only Policy panel with the policy hash (the editable, versioned policy view is cut for
+  time and `check_category_policy` is not wired, L62); Ask Countersign on Studio's agent framework (the model plans, code answers,
+  the grounding check mutation-tested 16 of 16, ten recorded questions replayed offline).
+- **Next:** P4.7 adversary agent; P4.8 evaluation suites.
 
 ## P3 gate (run 2026-11-05): passed
 
@@ -339,7 +342,7 @@ Findings from the P1 review that belong to P2 and are not optional there:
 
 - **P5.1:** rate limit completes and `complete_in_progress` log growth per checkout and per principal (Decision 68).
 - **Before vault mode is enabled:** key the payer vault on (customer id, agent thumbprint), not the agent key alone (L32).
-- **P4.5:** wire `check_category_policy` into the Merchant verifier and the Policy view (`category_escape` currently covers the `line_items` constraint only).
+- **Cut for time (L62):** wire `check_category_policy` into the Merchant verifier; the editable, versioned policy view.
 - **P5.1:** run `CaptureGate.recover` and the CP recovery on a schedule (L26).
 - **P5.1:** rate limit unverified webhook requests (L26).
 - **P5.1:** record a real refund once and confirm the `payments.refunds` reading (Decision 55 note).

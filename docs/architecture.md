@@ -667,7 +667,7 @@ stream ([PROTOCOL.md](PROTOCOL.md) Decisions 112 to 117). No login yet ([LIMITAT
 
 Built (P4.1, P4.2):
 
-- **Shell:** navigation (Orders, Protection, Evidence, Policy, Assistant, Onboarding; Policy and Assistant are placeholders),
+- **Shell:** navigation (Orders, Protection, Evidence, Policy, Assistant, Onboarding; Policy and Assistant are described below),
   light and dark theme toggle, and a label with the protection mode, `APP_ENV` and "sandbox demo, simulated and
   recorded data is labelled".
 - **Onboarding** shows the real state of three steps: PayPal sandbox app configured (yes or no, no value), protection
@@ -693,8 +693,8 @@ Built (P4.3, P4.4; Decisions 118 to 122):
   voids, open mandates by state with ceiling and spend, the funnel, and the **Attack matrix** widget (full against
   baseline per case, from `eval/reports/latest.json` through `/dashboard/api/v1/eval`).
 
-Planned: a read-only policy panel (P4.5), and Ask Countersign on Studio's agent framework (P4.6, [ENV.md](ENV.md)
-section 3.6).
+Built (P4.5, P4.6): the read-only **Policy** panel (the active policy and its SHA-256, Decision 124) and **Assistant** (section 7.4).
+KPI tiles use a custom Total widget so a tile over no rows reads 0.
 
 ### 7.2 Trusted Surface
 
@@ -716,12 +716,13 @@ steps. Used for the demo and the hosted demo only. Fictional brand names, no rea
 
 ### 7.4 Merchant assistant
 
-A model-backed assistant that answers merchant questions grounded in dashboard data, using read-only
-tools: query orders, fetch a checkout's gate steps, explain an error code, summarize an evidence
-bundle, compare baseline and full results. Every numeric answer cites the row or log entry it came
-from, and a grounding check replaces ungrounded numbers with a template answer. If the grid
-vendor's model-based features are licensed and fit, the assistant can drive grid state from natural language.
-Otherwise it returns a grid state object the dashboard applies. It has no write access.
+Ask Countersign (`src/countersign/assistant/`, [PROTOCOL.md](PROTOCOL.md) Decisions 125 to 129). The model only plans: one call with
+the question and the tool catalog returns a validated plan; deterministic code runs read-only tools over the dashboard read models and
+renders fixed-template lines, each with citations; a grounding check replaces any line with an unmatched numeral. Tools: orders
+(filters, aggregates), one order, gate steps, error codes, evidence steps, full against baseline, blocked attempts by reason, open
+mandates. Replay is the default (ten recorded questions, `eval/cassettes/assistant.json`); free text works only if recorded, or in
+live mode. In the dashboard it is a Custom Runner agent in Studio's assistant panel (edit mode only, L63) with suggestion chips and
+citation chips. The package imports no authorization module and none imports it. Studio's widget-building tools are not used.
 
 ### 7.5 Agents
 

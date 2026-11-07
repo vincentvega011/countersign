@@ -14,6 +14,7 @@ from typing import Any
 
 from sqlalchemy import Engine
 
+from countersign.dashboard import policy as policy_snapshot
 from countersign.dashboard import read
 from countersign.runtime import Mode, RuntimeSettings
 
@@ -29,6 +30,8 @@ class DashboardService:
     paypal_configured: bool
     data_source: str
     eval_path: Path = EVAL_LATEST
+    lock_policy: Callable[[], dict[str, Any]] | None = None
+    assistant: Any = None  # the Ask Countersign service, set by the composition root (Decision 125)
     poll_seconds: float = 1.0
     stream_seconds: float = 300.0  # the browser reconnects; a bounded stream frees its worker
     clock: Callable[[], float] = field(default=time.time)
@@ -75,3 +78,15 @@ class DashboardService:
 
     def eval(self) -> dict[str, Any]:
         return {"version": read.API_VERSION, "eval": read.eval_summary(self.eval_path)}
+
+    def policy(self) -> dict[str, Any]:
+        """The read-only policy snapshot and its SHA-256 (Decision 124)."""
+        body = policy_snapshot.snapshot(
+            self.runtime, self.lock_policy() if self.lock_policy else None
+        )
+        return {
+            "version": read.API_VERSION,
+            "snapshot": body,
+            "sha256": policy_snapshot.snapshot_hash(body),
+            "hash_of": "SHA-256 of the RFC 8785 canonical JSON of snapshot",
+        }

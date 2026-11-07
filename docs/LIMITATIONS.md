@@ -557,13 +557,34 @@ by design (L52, L54). The log checks are consistency checks (L48).
 
 The detail widget follows Studio's row selection; a filter that leaves one row does not open it. Only the seeded
 synthetic bundle has a full detail view in a simulated database: other simulated rows read "No evidence bundle:
-simulated". The dev seed makes no open mandates, so the mandate tiles and grid are empty there until the phone flow runs.
+simulated". The dev seed's five open mandates are simulated (Decision 123).
 
 ### L61. The attack matrix is the committed report
 
 It reads `eval/reports/latest.json` (suite `attacks`, the 30 deterministic cases), not a live run, and the adversary LLM
 runs are not in it. 19 of the 30 cases are blocked in both modes and do not separate them; the widget says so.
-Protection events are capped at 20,000 and a tile over no rows shows blank.
+Protection events are capped at 20,000. A tile over no rows now reads 0 (custom Total widget, Decision 117 amended).
+
+### L62. The Policy panel is read only; category policy is not wired
+
+The panel describes the active policy and its SHA-256 and nothing else (Decision 124). The editable, versioned policy view is cut
+for time. `check_category_policy` exists but is not wired into the Merchant verifier, so `category_escape` covers the `line_items`
+constraint only. The unmandated cap and velocity limits are not enabled; the panel lists them as such.
+
+### L63. The assistant panel exists only in Studio's edit mode
+
+Studio shows its AI panel in edit mode only, so the Assistant view runs in edit mode with just the AI panel configured. Verified: a
+Playwright test records every request while the view loads and a suggestion and free text are sent: all are GET to this origin; the
+server has no mutating route under `/dashboard` (a test); the agent has no tools and the page offers no edit panel. Not verified one
+by one: Studio's own edit gestures on the grid in that view (drag, resize) change only that page's in-browser state, since no write
+API exists.
+
+### L64. What the grounding check does not cover
+
+It checks numerals. Number words, names, dates in words and the truth of a citation's target are not checked; the templates avoid
+number words for data values. A tool that stated a wrong number that also appears in its own data would pass: counts are tested
+against independent SQL, not proven. Planner quality is the recorded model's: a question may be planned to a less apt tool, giving a
+correct but different answer. Recordings are tied to the catalog and the question text.
 
 ### L39 (note)
 

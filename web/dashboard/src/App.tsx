@@ -3,6 +3,7 @@
 // dashboard read API; nothing in this app can change a credential, a mode or a payment.
 import { useCallback, useEffect, useState } from "react";
 import { AgStudioProvider } from "ag-studio-react";
+import { AgStudioAiModule } from "ag-studio";
 import {
   fetchEvents,
   fetchEval,
@@ -18,6 +19,8 @@ import {
 import { OrdersStudio } from "./Studio";
 import { ProtectionStudio } from "./ProtectionStudio";
 import { EvidenceView } from "./Evidence";
+import { PolicyView_ } from "./Policy";
+import { AssistantStudio } from "./AssistantStudio";
 import { SOURCE_LABEL } from "./format";
 import { applyScheme, initialScheme, remember, type Scheme } from "./theme";
 
@@ -37,6 +40,8 @@ type View = (typeof VIEWS)[number]["id"];
 const parts = () => location.hash.replace(/^#\/?/, "").split("/");
 const viewFromHash = (): View =>
   (VIEWS.find((v) => v.id === parts()[0])?.id ?? "orders") as View;
+const orderFromHash = (): string =>
+  parts()[0] === "orders" && parts()[1] ? decodeURIComponent(parts()[1]) : "";
 const evidenceFromHash = (): string | null =>
   parts()[0] === "evidence" && parts()[1]
     ? decodeURIComponent(parts()[1])
@@ -56,7 +61,7 @@ export function App() {
   const [failed, setFailed] = useState(false);
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [grouped, setGrouped] = useState(false);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(() => orderFromHash().toLowerCase());
   const [live, setLive] = useState<{ at: Date; count: number } | null>(null);
 
   useEffect(() => applyScheme(scheme), [scheme]);
@@ -64,6 +69,8 @@ export function App() {
     const onHash = () => {
       setView(viewFromHash());
       setEvidenceId(evidenceFromHash());
+      const order = orderFromHash();
+      if (order) setQuery(order.toLowerCase());
     };
     addEventListener("hashchange", onHash);
     return () => removeEventListener("hashchange", onHash);
@@ -96,7 +103,7 @@ export function App() {
   const canEdit = status !== null && !status.read_only;
 
   return (
-    <AgStudioProvider licenseKey={LICENSE}>
+    <AgStudioProvider licenseKey={LICENSE} modules={[AgStudioAiModule]}>
       <div className="cs-shell">
         <header className="cs-top">
           <div className="cs-brand">
@@ -226,24 +233,13 @@ export function App() {
               </div>
             </section>
           )}
-          {(view === "policy" || view === "assistant") && (
-            <Placeholder view={view} />
+          {view === "policy" && <PolicyView_ />}
+          {view === "assistant" && orders && (
+            <AssistantStudio orders={orders} dark={scheme === "dark"} />
           )}
         </main>
       </div>
     </AgStudioProvider>
-  );
-}
-
-function Placeholder({ view }: { view: View }) {
-  const label = VIEWS.find((v) => v.id === view)?.label ?? "";
-  return (
-    <section className="cs-card cs-placeholder">
-      <h1 className="cs-title">{label}</h1>
-      <p>
-        This view is not built yet. The Orders view shows the live data today.
-      </p>
-    </section>
   );
 }
 

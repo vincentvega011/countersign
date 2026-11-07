@@ -29,7 +29,7 @@ from tests.mode_support import (
 )
 
 API = "/dashboard/api/v1"
-ENDPOINTS = ("status", "orders", "summary", "mandates", "events", "eval")
+ENDPOINTS = ("status", "orders", "summary", "mandates", "events", "eval", "policy")
 
 
 @pytest.fixture
@@ -116,6 +116,39 @@ def test_there_is_no_write_route_under_the_dashboard(world: World) -> None:
     for method in ("post", "put", "patch", "delete"):
         r = getattr(world.client, method)(f"{API}/orders")
         assert r.status_code == 405
+
+
+def test_the_policy_snapshot_is_read_only_canonical_and_hashed(world: World) -> None:
+    import hashlib
+
+    from countersign.canonical import canonicalize
+
+    body = world.client.get(f"{API}/policy").json()
+    snap = body["snapshot"]
+    assert body["sha256"] == hashlib.sha256(canonicalize(snap)).hexdigest()
+    assert snap["protection"]["mode"] == "full"
+    assert snap["dashboard"] == {"read_only": True, "write_endpoints": 0, "login": False}
+    assert [s["code"] for s in snap["capture_gate_steps"]][:2] == ["G-FETCH", "G-STATUS"]
+    assert len(snap["capture_gate_steps"]) == 9
+    assert "payment.budget" in snap["constraint_families"]["payment"]
+    assert {e["id"] for e in snap["not_enabled"]} >= {
+        "unmandated_cap", "velocity_limits", "category_policy",
+    }  # fmt: skip
+    # Same state, same hash; the hash moves when the stored merchant lock policy moves.
+    assert world.client.get(f"{API}/policy").json()["sha256"] == body["sha256"]
+    for method in ("post", "put", "patch", "delete"):
+        assert getattr(world.client, method)(f"{API}/policy").status_code == 405
+
+
+def test_the_policy_hash_is_logged_once_at_start(app_engine: Engine, admin_engine: Engine) -> None:
+    from structlog.testing import capture_logs
+
+    reset(admin_engine)
+    with capture_logs() as logs:
+        w = make_world(app_engine, RuntimeSettings(Mode.FULL, "demo"))
+    lines = [entry for entry in logs if entry.get("event") == "policy_snapshot"]
+    assert len(lines) == 1
+    assert lines[0]["sha256"] == w.client.get(f"{API}/policy").json()["sha256"]
 
 
 PERSONAL_KEYS = re.compile(

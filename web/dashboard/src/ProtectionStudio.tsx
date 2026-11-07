@@ -7,6 +7,7 @@ import type { EvalCase, EventRow, MandateRow, Order } from "./api";
 import { toRow } from "./fields";
 import { FUNNEL_ID, funnelDefinition } from "./funnel";
 import { ATTACK_MATRIX_ID, attackMatrixDefinition } from "./AttackMatrix";
+import { totalDefinition, totalMoneyDefinition } from "./kpi";
 import { cellRendererFor } from "./renderers";
 import {
   attackRows,
@@ -41,6 +42,8 @@ export function ProtectionStudio({ orders, events, mandates, cases }: Props) {
     (config: { menu: { label: string; widgetIds: readonly string[] }[] }) =>
       createWidgets({
         additionalTypes: [
+          totalDefinition as never,
+          totalMoneyDefinition as never,
           funnelDefinition as never,
           attackMatrixDefinition as never,
         ],

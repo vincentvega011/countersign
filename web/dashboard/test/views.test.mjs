@@ -26,7 +26,9 @@ async function tile(page, title) {
       const label =
         w.querySelector(".ag-studio-layout-widget-label")?.textContent ?? "";
       if (!label.startsWith(wanted)) continue;
-      const value = w.querySelector(".ag-studio-value-widget-content");
+      const value =
+        w.querySelector('[data-testid="kpi-value"]') ??
+        w.querySelector(".ag-studio-value-widget-content");
       if (value) return value.textContent.trim();
     }
     return null;
@@ -218,13 +220,11 @@ describe("the Protection view", () => {
     await tileEquals(page, "Open mandates", String(expected.mandates));
     assert.ok(expected.events > 0 && expected.mandates === 3);
     await page.click('[data-testid="funnel-step-4"]');
-    // A tile over no rows is blank, so zero captured checkouts with attempts reads as empty.
+    // A tile over no rows reads 0 (L61 fixed), never blank.
     await tileEquals(
       page,
       "Blocked or voided attempts",
-      expected.events_of_captured === 0
-        ? ""
-        : String(expected.events_of_captured),
+      String(expected.events_of_captured),
     );
     await page.click('[data-testid="funnel-step-4"]');
     await tileEquals(
@@ -314,5 +314,37 @@ describe("the attack matrix", () => {
       .first()
       .getAttribute("data-separates");
     assert.equal(first, "true");
+  });
+});
+
+describe("the Policy panel", () => {
+  test("it shows the server's policy hash, says it is read only and has no editing control", async (t) => {
+    const page = await open(browser, t, {
+      hash: "#/policy",
+      ready: '[data-testid="policy-hash"]',
+    });
+    const api = await getJson("/dashboard/api/v1/policy");
+    assert.equal(
+      await page.textContent('[data-testid="policy-hash"]'),
+      api.sha256,
+    );
+    assert.match(
+      await page.textContent('[data-testid="policy-note"]'),
+      /read only.*cannot be edited or versioned/,
+    );
+    const gate = await page.locator('[data-testid="policy-gate"] li').count();
+    assert.equal(gate, api.snapshot.capture_gate_steps.length);
+    const notEnabled = await page.textContent(
+      '[data-testid="policy-not-enabled"]',
+    );
+    for (const word of ["velocity", "Category policy", "without a mandate"])
+      assert.ok(notEnabled.toLowerCase().includes(word.toLowerCase()), word);
+    const controls = await page
+      .locator(
+        '[data-testid="policy"] input, [data-testid="policy"] button, [data-testid="policy"] form, [data-testid="policy"] textarea',
+      )
+      .count();
+    assert.equal(controls, 0);
+    assert.deepEqual(outsideOrigin(page), []);
   });
 });

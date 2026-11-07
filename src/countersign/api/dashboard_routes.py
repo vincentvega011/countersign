@@ -144,6 +144,10 @@ def install(app: FastAPI, service: DashboardService, dist: Path = DIST) -> None:
     async def evaluation() -> JSONResponse:
         return _json(await run_in_threadpool(service.eval))
 
+    @router.get(f"{API}/policy")
+    async def policy() -> JSONResponse:
+        return _json(await run_in_threadpool(service.policy))
+
     @router.get(f"{API}/stream")
     async def stream(request: Request) -> StreamingResponse:
         async def announce() -> Any:
@@ -203,3 +207,6 @@ def install(app: FastAPI, service: DashboardService, dist: Path = DIST) -> None:
         return Response(status_code=308, headers={"Location": f"{PREFIX}/"})
 
     app.include_router(router)
+    from countersign.api import assistant_routes
+
+    assistant_routes.install(app, service)

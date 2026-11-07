@@ -10,7 +10,8 @@ import {
 } from "./fields";
 import { FUNNEL_ID } from "./funnel";
 import { ATTACK_MATRIX_ID } from "./AttackMatrix";
-import { money, shortFingerprint } from "./format";
+import { TOTAL_ID, TOTAL_MONEY_ID } from "./kpi";
+import { SOURCE_LABEL, money, shortFingerprint } from "./format";
 
 const t = (table: string, id: string, aggregation?: string) =>
   aggregation
@@ -72,6 +73,7 @@ export function mandateRow(m: MandateRow): Row {
     currency: m.currency,
     expires: new Date(m.expires_at),
     created: new Date(m.created_at),
+    source: SOURCE_LABEL[m.source] ?? "Unlabelled",
   };
 }
 export const MANDATE_FIELDS = [
@@ -84,6 +86,7 @@ export const MANDATE_FIELDS = [
   { id: "currency", name: "Currency", format: "textFormat", cardinality: "low" },
   { id: "expires", name: "Expires", format: "dateTimeFormat" },
   { id: "created", name: "Created", format: "dateTimeFormat" },
+  { id: "source", name: "Source", format: "textFormat", cardinality: "low" },
 ] as const; // prettier-ignore
 
 // One row per attack case: its outcome under each mode, side by side.
@@ -173,7 +176,7 @@ export function protectionState() {
         id: "protection",
         widgets: {
           blocked: {
-            type: "value",
+            type: TOTAL_ID,
             format: title(
               "Blocked or voided attempts",
               "Every refusal and void in the decision log",
@@ -181,7 +184,7 @@ export function protectionState() {
             dataMapping: { value: [t("events", "id", "count")] },
           },
           voids: {
-            type: "value",
+            type: TOTAL_ID,
             format: title(
               "Voided authorizations",
               "The gate found a difference and voided",
@@ -189,12 +192,12 @@ export function protectionState() {
             dataMapping: { value: [t("events", "voided", "sum")] },
           },
           mandates: {
-            type: "value",
+            type: TOTAL_ID,
             format: title("Open mandates", "Signed by a customer's device"),
             dataMapping: { value: [t("mandates", "id", "count")] },
           },
           spent: {
-            type: "value",
+            type: TOTAL_MONEY_ID,
             format: title(
               "Spent under open mandates",
               "Captured against their ceilings",
@@ -249,6 +252,7 @@ export function protectionState() {
                 "ceiling_minor",
                 "spent_minor",
                 "expires",
+                "source",
               ].map((c) => t("mandates", c)),
             },
           },

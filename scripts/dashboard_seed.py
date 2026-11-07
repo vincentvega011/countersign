@@ -21,15 +21,16 @@ database is on this machine.
 from __future__ import annotations
 
 import argparse
+import base64
+import hashlib
 import os
 import random
-import secrets
 import sys
 import time
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import Engine, create_engine, select
+from sqlalchemy import Engine, create_engine, select, text
 from sqlalchemy.engine import make_url
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -94,7 +95,7 @@ class Shop:
 
     def __init__(self, engine: Engine, *, ablations: Ablations | None = None) -> None:
         self.client, self.sim, self.keys = _world(engine, ablations=ablations)
-        self.rng = random.Random(secrets.randbits(32))
+        self.rng = random.Random(11)
 
     def create(self, item: Any, quantity: int, **headers: str) -> dict[str, Any] | None:
         from tests.mode_support import UCP_AGENT, UCP_ROOT
@@ -122,7 +123,7 @@ class Shop:
 
         jwt = checkout_jwt(body)
         total = total_of(body)
-        nonce = secrets.token_urlsafe(9)
+        nonce = f"{self.rng.getrandbits(48):012x}"
         cnf = {"jwk": public_jwk(self.keys.agents[agent])}
 
         def edit_open(content: dict[str, Any]) -> None:
@@ -197,7 +198,7 @@ def seed_simulated(engine: Engine, count: int, shops: int) -> dict[str, int]:
 
     worlds = [Shop(engine) for _ in range(shops)]
     ablated = Shop(engine, ablations=Ablations(no_preauth_check=True))
-    customers = ["cus_" + secrets.token_urlsafe(16) for _ in range(40)]
+    customers = [f"cus_seed{n:02d}" for n in range(40)]
     names = [n for n, _ in SCENARIOS]
     weights = [w for _, w in SCENARIOS]
     rng = random.Random(7)
@@ -258,6 +259,92 @@ def seed_simulated(engine: Engine, count: int, shops: int) -> dict[str, int]:
                 shop.complete(cid, None, None)
         done[scenario] = done.get(scenario, 0) + 1
     return done
+
+
+# Open mandates in every lifecycle state, written with fixed ids and times (Decision 123). A real open
+# mandate needs a device consent from the phone flow; these rows are labelled by the reserved id prefix
+# `om_sim_`, which the dashboard shows as "Simulated". Their payment attempts are written the way the
+# service writes them (state, spend entry, stored mandate row), so no tile counts them as unauthorized.
+_MANDATE_CREATED_US = 1_793_000_000_000_000  # 2026-10-26
+_FAR_FUTURE = 1_893_456_000  # 2030-01-01
+_PAST = 1_767_225_600  # 2026-01-01
+
+
+def _thumb(label: str) -> str:
+    return base64.urlsafe_b64encode(hashlib.sha256(label.encode()).digest()).decode().rstrip("=")
+
+
+MANDATE_SEED = [
+    # (name, state it must read as, customer, agent label, ceiling, exp, attempt state, spent)
+    ("unused", "unused", "cus_seedmand1", "agent-a", 8000, _FAR_FUTURE, None, 0),
+    ("flight", "in_flight", "cus_seedmand1", "agent-b", 12000, _FAR_FUTURE, "authorizing", 0),
+    ("used", "used", "cus_seedmand2", "agent-a", 6000, _FAR_FUTURE, "captured", 5400),
+    ("revoked", "revoked", "cus_seedmand2", "agent-b", 9000, _FAR_FUTURE, None, 0),
+    ("expired", "expired", "cus_seedmand3", "agent-a", 5000, _PAST, None, 0),
+]  # fmt: skip
+
+
+def seed_mandates(engine: Engine) -> int:
+    """Five open mandates, one per state (unused, in flight, used, revoked, expired). Once per database."""
+    added = 0
+    with engine.begin() as conn:
+        conn.execute(text("SET LOCAL session_replication_role = replica"))
+        for n, (name, _state, customer, agent, ceiling, exp, attempt, spent) in enumerate(
+            MANDATE_SEED
+        ):
+            mid = f"om_sim_{name}"
+            if conn.execute(text("SELECT 1 FROM open_mandates WHERE id = :i"), {"i": mid}).first():
+                continue
+            created = _MANDATE_CREATED_US + n
+            conn.execute(
+                text(
+                    "INSERT INTO open_mandates (id, checkout_identity, customer_id, consent_id, "
+                    "agent_thumbprint, ceiling_minor, currency, exp, created_us) VALUES "
+                    "(:id, :co, :cust, :consent, :agent, :ceiling, 'USD', :exp, :created)"
+                ),
+                {"id": mid, "co": f"om_sim_chk_{name}", "cust": customer,
+                 "consent": f"consent_sim_{name}", "agent": _thumb(agent), "ceiling": ceiling,
+                 "exp": exp, "created": created},
+            )  # fmt: skip
+            added += 1
+            if name == "revoked":
+                conn.execute(
+                    text(
+                        "INSERT INTO open_mandate_revocations (payment_identity, checkout_identity, "
+                        "customer_id, revoked_us) VALUES (:p, :c, :cust, :at)"
+                    ),
+                    {"p": mid, "c": f"om_sim_chk_{name}", "cust": customer, "at": created + 1000},
+                )
+            if attempt is None:
+                continue
+            cid = f"chk_sim_mandate_{name}"
+            conn.execute(
+                text(
+                    "INSERT INTO spend_entries (id, mandate_digest, checkout_id, amount_minor, "
+                    "currency, state, refunded_minor, created_us, updated_us) VALUES "
+                    "(:id, :m, :c, :amt, 'USD', :st, 0, :at, :at)"
+                ),
+                {"id": f"spend_sim_{name}", "m": mid, "c": cid, "amt": spent or ceiling // 2,
+                 "st": "captured" if attempt == "captured" else "in_flight", "at": created + 2000},
+            )  # fmt: skip
+            conn.execute(
+                text(
+                    "INSERT INTO payment_attempts (checkout_id, reservation_handle, spend_id, "
+                    "mandate_digest, state, mode, custom_id, created_us, updated_us, capture_id) "
+                    "VALUES (:c, :h, :s, :m, :st, 'redirect', :cu, :at, :at, :cap)"
+                ),
+                {"c": cid, "h": f"handle_sim_{name}", "s": f"spend_sim_{name}", "m": mid,
+                 "st": attempt, "cu": f"cs1.sim{name}", "at": created + 2000,
+                 "cap": f"SIMCAPTURE{n}" if attempt == "captured" else None},
+            )  # fmt: skip
+            conn.execute(
+                text(
+                    "INSERT INTO attempt_mandates (checkout_id, payment_token, checkout_mandate, "
+                    "created_us) VALUES (:c, 'simulated', 'simulated', :at)"
+                ),
+                {"c": cid, "at": created + 2000},
+            )
+    return added
 
 
 def seed_recorded(engine: Engine) -> int:
@@ -332,7 +419,9 @@ def main(argv: list[str] | None = None) -> int:
     started = time.monotonic()
     recorded = seed_recorded(engine)
     bundles = seed_bundle(engine)
+    mandates = seed_mandates(engine)
     done = seed_simulated(engine, args.orders, args.shops)
+    print(f"open mandates added: {mandates}")
     print(f"recorded rows added: {recorded}")
     print(f"evidence bundle rows added: {bundles}")
     print("simulated scenarios:", ", ".join(f"{k} {v}" for k, v in sorted(done.items())))

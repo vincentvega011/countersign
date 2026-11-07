@@ -3,6 +3,7 @@
 // edit mode (dev only) starts from the same state.
 import { FUNNEL_ID } from "./funnel";
 import { DETAIL_ID } from "./OrderDetail";
+import { TOTAL_ID, TOTAL_MONEY_ID } from "./kpi";
 
 const t = (id: string, aggregation?: string) =>
   aggregation ? { id: `orders.${id}`, aggregation } : { id: `orders.${id}` };
@@ -50,22 +51,22 @@ export function ordersState(grouped: boolean) {
         id: "orders",
         widgets: {
           captured: {
-            type: "value",
+            type: TOTAL_MONEY_ID,
             format: title("Captured", "PayPal captures after the gate"),
             dataMapping: { value: [t("captured_minor", "sum")] },
           },
           orders: {
-            type: "value",
+            type: TOTAL_ID,
             format: title("Orders", "Agent checkouts"),
             dataMapping: { value: [t("id", "count")] },
           },
           blocked: {
-            type: "value",
+            type: TOTAL_ID,
             format: title("Blocked attempts", "Refused or voided"),
             dataMapping: { value: [t("blocked", "sum")] },
           },
           unauthorized: {
-            type: "value",
+            type: TOTAL_ID,
             format: title(
               "Unauthorized captures",
               "Captured with no verified mandate",

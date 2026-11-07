@@ -45,7 +45,9 @@ function tile(page, title) {
       const label =
         w.querySelector(".ag-studio-layout-widget-label")?.textContent ?? "";
       if (!label.startsWith(wanted)) continue;
-      const value = w.querySelector(".ag-studio-value-widget-content");
+      const value =
+        w.querySelector('[data-testid="kpi-value"]') ??
+        w.querySelector(".ag-studio-value-widget-content");
       if (value) return value.textContent.trim();
     }
     return null;

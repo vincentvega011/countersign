@@ -3190,6 +3190,75 @@ succeeded, 0 unauthorized; baseline: counts from the report), a row per case wit
 how many cases do not separate the modes (the baseline also blocks them) and marks those rows. The widget computes
 every number from the rows it receives; a test compares them with `eval/reports/latest.json`.
 
+### Decision 123: Seeded open mandates are labelled by a reserved id prefix
+
+**Flagged for the owner.** `scripts/dashboard_seed.py` (`seed_mandates`) writes five open mandates, one per state (unused, in flight,
+used, revoked, expired), with fixed ids (`om_sim_<state>`), fixed times, customers and agent keys, with replication checks off (a
+real mandate needs a phone consent). The used and in-flight ones have a payment attempt, spend entry and stored-mandate row, so no
+tile counts them as unauthorized. Mandates have no source table, so the read model labels `om_sim_*` as `simulator` and anything
+else `unlabelled`; real ids are token digests. The seed's own random choices are fixed too; app-minted checkout ids, signatures and
+times are not, so a rebuilt database matches in shape and counts, not byte for byte. The test support `reset()` now truncates
+`open_mandates`.
+
+### Decision 124: The policy snapshot and its hash
+
+**Flagged for the owner.** `dashboard/policy.py` builds one JSON object from the running code (the gate's `STEP_CODES`, the checkout
+and payment constraint handler tables, the runtime mode and ablations, the stored merchant lock policy), the dashboard's read-only
+status and explicit `not_enabled` entries (unmandated cap, velocity limits, category policy, editing and versioning). It is
+serialised with RFC 8785, hashed with SHA-256 and served by `GET /dashboard/api/v1/policy` with the hash; the Policy panel shows
+both and says in fixed text that it is read only. The hash is logged once per process start (`policy_snapshot`, process log: the
+decision log is per checkout). No write route exists (the test over every `/dashboard` route covers it). The editable, versioned
+policy view is cut for time and `check_category_policy` is not wired into the Merchant verifier (L62).
+
+### Decision 125: Ask Countersign is a read-only package with a fixed tool catalog
+
+**Flagged for the owner.** `src/countersign/assistant/`: eight tools (`query_orders`, `get_order`, `get_gate_steps`,
+`explain_error_code`, `summarize_evidence`, `compare_modes`, `blocked_attempts_by_reason`, `open_mandate_state`), each a pure function
+of validated arguments and a `DataSource` (an interface the package defines; `dashboard/assistant_data.py` adapts the dashboard read
+models and runs the offline verifier for evidence steps). The package imports no authorization module, the database layer, the
+dashboard or the API, and none imports it: `tests/unit/test_llm_boundary.py` checks it transitively. Orders can be named `latest`,
+`latest_captured` or `latest_voided`, resolved in code. Item titles and other free text are never echoed. Two GET routes under
+`/dashboard/api/v1/assistant/` (`suggestions`, `ask`), so the dashboard API keeps no mutating method.
+
+### Decision 126: The model only plans
+
+**Flagged for the owner.** One gateway call (`assistant_plan`): fixed instructions and the catalog (names, descriptions, JSON
+schemas) as the system message, the cleaned question (printable, at most 300 characters) as the user message. No row, id, amount or
+tool result is ever sent. The reply is `{"calls": [{tool, args}]}`, at most three; the gateway validates the structure (the tool name
+is an enum) and retries once, then `validate_call` re-checks each call's arguments against the tool's own schema. An unknown tool,
+bad arguments, an empty plan or a schema failure answers with the fixed sentence "I can only answer questions about orders,
+protection activity, evidence and evaluation results." Answers are fixed-template lines with numbers and identifiers from the rows
+read, each line carrying citations (order, evidence step, evaluation case, log entry, mandate, code).
+
+### Decision 127: Replay is the default; recorded questions; no invented plans
+
+**Flagged for the owner.** `LLM_MODE` replay everywhere including demo. Ten suggested questions (`assistant/suggestions.py`) are
+recorded with `scripts/record_assistant_cassettes.py` (live gateway in record mode, the scrubber, settings from the owner's shell);
+`eval/cassettes/assistant.json` stores the model id (the cassette key includes it), the catalog hash and the questions, and the app
+replays with that id. Free text works only if its planner call is in the cassettes; otherwise the fixed message "This demo replays
+recorded questions; pick a suggestion." In live mode free text uses the gateway's rate limit and call budget. A bad live
+configuration disables the assistant instead of stopping the app. Changing a question or the catalog needs a new recording (a test
+compares the catalog hash). Recorded with `gemini-3.5-flash-lite`; a test checks the cassettes carry only the documented members, and
+the recording was grepped for keys, provider headers, `thought_signature`, request and account ids (none).
+
+### Decision 128: The grounding check
+
+**Flagged for the owner.** `assistant/grounding.py`, a pure function: every numeral in an answer line must equal a number in the
+tool results of that answer (integers, floats, numerals inside strings, money fields in minor and major units). Formatting does not
+matter (`1,234`, `$54.00`); numerals inside identifiers (`chk_ab12`, `G-AMOUNT`, `3x`) are not claims. A line with an unmatched
+numeral is replaced whole by "I cannot verify that figure from the data." and counted. Templates use no numeral for data values.
+Mutation sweep `scripts/mutate_grounding.py`: 16 mutants, 16 killed. Number words are not checked (L64).
+
+### Decision 129: Studio integration
+
+**Flagged for the owner.** A Custom Runner agent (`web/dashboard/src/assistant.tsx`, an async generator) sends the last user message
+to `GET .../assistant/ask` and emits AG-UI events: `RUN_STARTED`, a display-only `countersign_lookup` tool call whose result carries
+the lines and their citations, the answer as one text message (Markdown-escaped), `RUN_FINISHED`. It has no model, no tools and never
+reads Studio's AI context. Suggestions are `promptStarters`; citations are chips drawn by an `aiToolDisplay` detail component and open
+in a new tab (`#/orders/<id>` filters the Orders view; `#/evidence/<id>`). Studio's AI panel exists only in edit mode, so the
+Assistant view runs in edit mode with only the AI panel configured (L63). Studio's widget-building tools were not used: they need
+the model to see Studio's schema and context.
+
 ## 4. Confirmed PayPal facts
 
 Observed in the PayPal sandbox with `scripts/sandbox_smoke.py` and `scripts/sandbox_confirm.py`

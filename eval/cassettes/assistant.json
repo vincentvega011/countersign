@@ -1,0 +1,16 @@
+{
+  "catalog_sha256": "318955404f42ffdfef9b45ea5d1e9b5034820dc0d7e5bae1d2ef3483d1d16488",
+  "model": "gemini-3.5-flash-lite",
+  "questions": [
+    "How many orders are there in total?",
+    "How many orders were captured, and for how much in total?",
+    "How many blocked or voided attempts are there for each reason code?",
+    "Which orders were voided by the capture gate?",
+    "How many orders were captured with no verified mandate?",
+    "How many open mandates are there in each state?",
+    "Which open mandates have been used, and how much was spent under them?",
+    "Which evidence steps passed for the latest_captured order?",
+    "What does the mandate_expired code mean?",
+    "How does full protection mode compare with baseline mode in the latest evaluation?"
+  ]
+}

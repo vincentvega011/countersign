@@ -8,6 +8,7 @@ import { fetchOrders, watchOrders, type Order } from "./api";
 import { dataSources, TABLE, toRow } from "./fields";
 import { FUNNEL_ID, funnelDefinition } from "./funnel";
 import { DETAIL_ID, orderDetailDefinition } from "./OrderDetail";
+import { totalDefinition, totalMoneyDefinition } from "./kpi";
 import { cellRendererFor } from "./renderers";
 import { ordersState } from "./dashboardState";
 import { buildTheme } from "./theme";
@@ -35,6 +36,8 @@ export function OrdersStudio({ orders, mode, grouped, query, onLive }: Props) {
     (config: { menu: { label: string; widgetIds: readonly string[] }[] }) =>
       createWidgets({
         additionalTypes: [
+          totalDefinition as never,
+          totalMoneyDefinition as never,
           funnelDefinition as never,
           orderDetailDefinition as never,
         ],

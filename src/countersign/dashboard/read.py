@@ -60,6 +60,7 @@ EVENT_KINDS = (
     "acp.complete_denied", "gate.rejected", "checkout.customer_refused", UNMANDATED_CAPTURE,
 )  # fmt: skip
 AUTHORIZED = ("authorized", "capturing", "captured", "unresolved")
+SIMULATED_MANDATE_PREFIX = "om_sim_"  # reserved for ids the dev seed writes (Decision 123)
 IN_FLIGHT = ("reserved", "order_created", "authorizing", "authorized", "capturing", "unresolved")
 
 
@@ -314,6 +315,9 @@ def mandates(engine: Engine, now_s: int) -> list[dict[str, Any]]:
                         "spent_minor": spent if isinstance(spent, int) else 0,
                         "currency": view.currency, "expires_at": _iso(view.exp * 1_000_000),
                         "created_at": _iso(view.created_us),
+                        "source": "simulator"
+                        if view.id.startswith(SIMULATED_MANDATE_PREFIX)
+                        else "unlabelled",
                     }
                 )  # fmt: skip
     return out

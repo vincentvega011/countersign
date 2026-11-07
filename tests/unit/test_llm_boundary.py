@@ -96,3 +96,53 @@ def test_the_guard_sees_a_direct_and_a_transitive_import(tmp_path: Path) -> None
     assert "countersign.gate.direct reaches countersign.llm.gateway" in found
     assert any(f.startswith("countersign.gate.chain reaches") for f in found)
     assert any(f.startswith("countersign.llm.bad reaches countersign.gate") for f in found)
+
+
+# ----------------------------------------------------------------------------------- the assistant
+# Ask Countersign (Decisions 125 to 129) plans with the model and answers with fixed templates. It may use
+# the gateway, but it must not reach any authorization module, the database layer, the dashboard or API
+# code, or anything that talks to PayPal, and no authorization module may reach it.
+ASSISTANT_FORBIDDEN = (
+    *AUTHORIZATION, "dashboard", "api", "protocols", "degraded", "completion", "composition",
+    "webhooks", "runtime", "tables", "main",
+)  # fmt: skip
+
+
+def assistant_violations(graph: dict[str, set[str]]) -> list[str]:
+    found: list[str] = []
+    for module in sorted(graph):
+        reach = reachable(graph, module)
+        if in_package(module, "assistant"):
+            hit = sorted(m for m in reach if any(in_package(m, p) for p in ASSISTANT_FORBIDDEN))
+            if hit:
+                found.append(f"{module} reaches {hit[0]}")
+        elif any(in_package(module, p) for p in AUTHORIZATION):
+            hit = sorted(m for m in reach if in_package(m, "assistant"))
+            if hit:
+                found.append(f"{module} reaches {hit[0]}")
+    return found
+
+
+def test_the_assistant_reaches_no_authorization_module_and_none_reaches_it() -> None:
+    graph = build_graph()
+    assert any(in_package(m, "assistant") for m in graph), "the assistant package was not found"
+    assert assistant_violations(graph) == []
+    # It does use the gateway: the planner is the only model call.
+    assert any(in_package(m, "llm") for m in reachable(graph, "countersign.assistant.planner"))
+
+
+def test_the_assistant_guard_sees_direct_and_transitive_imports(tmp_path: Path) -> None:
+    pkg = tmp_path / "countersign"
+    for sub in ("assistant", "gate", "helpers"):
+        (pkg / sub).mkdir(parents=True)
+        (pkg / sub / "__init__.py").write_text("")
+    (pkg / "__init__.py").write_text("")
+    (pkg / "gate" / "g.py").write_text("x = 1\n")
+    (pkg / "helpers" / "mid.py").write_text("from countersign.gate import g\n")
+    (pkg / "assistant" / "direct.py").write_text("from countersign.gate import g\n")
+    (pkg / "assistant" / "chain.py").write_text("from countersign.helpers import mid\n")
+    (pkg / "gate" / "back.py").write_text("from countersign.assistant import direct\n")
+    found = assistant_violations(build_graph(tmp_path))
+    assert any(f.startswith("countersign.assistant.direct reaches countersign.gate") for f in found)
+    assert any(f.startswith("countersign.assistant.chain reaches countersign.gate") for f in found)
+    assert any(f.startswith("countersign.gate.back reaches countersign.assistant") for f in found)
