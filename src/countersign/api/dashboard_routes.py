@@ -36,6 +36,7 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
+from countersign.canonical.jsonstrict import loads_strict
 from countersign.dashboard import read, samples
 from countersign.dashboard.service import DashboardService
 
@@ -173,8 +174,8 @@ def install(app: FastAPI, service: DashboardService, dist: Path = DIST) -> None:
             return _json({"code": "attack_run_header_required"}, 403)
         raw = await request.body()
         try:
-            asked = json.loads(raw) if len(raw) <= 256 else None
-        except ValueError:
+            asked = loads_strict(raw, max_bytes=256)
+        except (ValueError, TypeError):  # strict loader errors are ValueError subclasses (INV-8)
             asked = None
         attack = (
             asked.get("attack") if isinstance(asked, dict) and set(asked) == {"attack"} else None

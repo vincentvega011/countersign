@@ -80,6 +80,7 @@ class World:
     sim: PayPalSim
     keys: Keys
     engine: Engine
+    merchant_key: Any = None  # the merchant signing key, for evaluation (evidence key pins)
 
 
 def make_world(
@@ -107,7 +108,7 @@ def make_world(
             clock=lambda: float(NOW), clock_us=Clock(), paypal_now=lambda: paypal_sim.NOW,
         ),
     )  # fmt: skip
-    return World(TestClient(app, raise_server_exceptions=False), sim, keys, engine)
+    return World(TestClient(app, raise_server_exceptions=False), sim, keys, engine, key)
 
 
 # ------------------------------------------------------------------ UCP helpers

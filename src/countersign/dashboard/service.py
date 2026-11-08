@@ -85,7 +85,11 @@ class DashboardService:
         return {"version": read.API_VERSION, "events": read.protection_events(self.engine)}
 
     def eval(self) -> dict[str, Any]:
-        return {"version": read.API_VERSION, "eval": read.eval_summary(self.eval_path)}
+        return {
+            "version": read.API_VERSION,
+            "eval": read.eval_summary(self.eval_path),
+            "results": read.eval_results(self.eval_path),
+        }
 
     def policy(self) -> dict[str, Any]:
         """The read-only policy snapshot and its SHA-256 (Decision 124)."""

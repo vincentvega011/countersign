@@ -1867,8 +1867,666 @@
    "violations": []
   }
  ],
- "generated_at": "2026-11-08T04:50:25Z",
- "report": "20261108T045025Z/report.json",
+ "generated_at": "2026-11-08T06:45:56Z",
+ "report": "20261108T063449Z/report.json",
+ "results": {
+  "ablations": [
+   {
+    "blocked_by_another_defense": [],
+    "cases": 40,
+    "duplicate_paypal_objects": 0,
+    "errors": 0,
+    "flag": "ABL_NO_GATE",
+    "mismatches_with_declared_expectation": 0,
+    "note": "Reopens nothing and changes no case's outcome or reason code in this suite. No attack case reaches the gate with a difference to catch: PayPal rejects every change after authorization (PROTOCOL 4.3), so checks that run before authorization stop every case first. The combined row shows the cases the gate alone stops once the pre-authorize check is also off.",
+    "other_reason_codes": [],
+    "reopened": [],
+    "reopened_count": 0,
+    "unauthorized_captures": 0
+   },
+   {
+    "blocked_by_another_defense": [
+     "custom_id_tamper",
+     "invoice_id_tamper",
+     "order_items_changed_after_approval",
+     "order_raised_after_approval"
+    ],
+    "cases": 40,
+    "duplicate_paypal_objects": 0,
+    "errors": 0,
+    "flag": "ABL_NO_PREAUTH_CHECK",
+    "mismatches_with_declared_expectation": 0,
+    "note": "Reopens nothing: 4 case(s) change reason code (payment_failed) but stay blocked. The gate voids the authorization instead (the cases end blocked with payment_failed).",
+    "other_reason_codes": [
+     "payment_failed"
+    ],
+    "reopened": [],
+    "reopened_count": 0,
+    "unauthorized_captures": 0
+   },
+   {
+    "blocked_by_another_defense": [
+     "double_spend_across_protocols",
+     "protocol_downgrade_acp"
+    ],
+    "cases": 40,
+    "duplicate_paypal_objects": 0,
+    "errors": 0,
+    "flag": "ABL_NO_PRINCIPAL_LOCK",
+    "mismatches_with_declared_expectation": 0,
+    "note": "Reopens nothing: 2 case(s) change reason code (unmandated_checkout_not_allowed) but stay blocked. Another check still refuses the unmandated completes, with a different reason code.",
+    "other_reason_codes": [
+     "unmandated_checkout_not_allowed"
+    ],
+    "reopened": [],
+    "reopened_count": 0,
+    "unauthorized_captures": 0
+   },
+   {
+    "blocked_by_another_defense": [
+     "webhook_spoof"
+    ],
+    "cases": 40,
+    "duplicate_paypal_objects": 0,
+    "errors": 0,
+    "flag": "ABL_NO_BUDGET_RECON",
+    "mismatches_with_declared_expectation": 0,
+    "note": "Reopens nothing: 1 case(s) change reason code (http_404) but stay blocked. The only case it touches is the webhook spoof, which is refused because no webhook endpoint is mounted without reconciliation; no case drives the budget through PayPal-side state.",
+    "other_reason_codes": [
+     "http_404"
+    ],
+    "reopened": [],
+    "reopened_count": 0,
+    "unauthorized_captures": 0
+   },
+   {
+    "blocked_by_another_defense": [],
+    "cases": 40,
+    "duplicate_paypal_objects": 0,
+    "errors": 0,
+    "flag": "ABL_NO_GLOBAL_NONCE",
+    "mismatches_with_declared_expectation": 0,
+    "note": "Reopens the listed attacks.",
+    "other_reason_codes": [],
+    "reopened": [
+     "nonce_replay_new_session",
+     "open_mandate_double_spend",
+     "open_mandate_reuse_new_presentation"
+    ],
+    "reopened_count": 3,
+    "unauthorized_captures": 3
+   },
+   {
+    "blocked_by_another_defense": [
+     "decimal_ambiguity",
+     "duplicate_json_keys"
+    ],
+    "cases": 40,
+    "duplicate_paypal_objects": 0,
+    "errors": 0,
+    "flag": "ABL_NO_STRICT_JSON",
+    "mismatches_with_declared_expectation": 0,
+    "note": "Reopens nothing: 2 case(s) change reason code (http_201, invalid_field) but stay blocked. The lenient parser accepts the body, and the field validation downstream still refuses it.",
+    "other_reason_codes": [
+     "http_201",
+     "invalid_field"
+    ],
+    "reopened": [],
+    "reopened_count": 0,
+    "unauthorized_captures": 0
+   },
+   {
+    "blocked_by_another_defense": [],
+    "cases": 40,
+    "duplicate_paypal_objects": 0,
+    "errors": 0,
+    "flag": "ABL_NO_GATE+ABL_NO_PREAUTH_CHECK",
+    "mismatches_with_declared_expectation": 0,
+    "note": "Both layers off at once (not an architecture ablation): reopens the listed attacks.",
+    "other_reason_codes": [],
+    "reopened": [
+     "custom_id_tamper",
+     "invoice_id_tamper",
+     "mandate_revoked",
+     "order_items_changed_after_approval",
+     "order_raised_after_approval"
+    ],
+    "reopened_count": 5,
+    "unauthorized_captures": 7
+   }
+  ],
+  "adversary": {
+   "baseline": {
+    "attacks_succeeded": 6,
+    "cases": 12,
+    "duplicate_paypal_objects": 0,
+    "errors": 0,
+    "mismatches": 0,
+    "unauthorized_captures": 6
+   },
+   "full": {
+    "attacks_succeeded": 0,
+    "cases": 12,
+    "duplicate_paypal_objects": 0,
+    "errors": 0,
+    "mismatches": 0,
+    "unauthorized_captures": 0
+   }
+  },
+  "attacks": {
+   "baseline": {
+    "attacks_succeeded": 11,
+    "cases": 40,
+    "duplicate_paypal_objects": 0,
+    "errors": 0,
+    "mismatches": 0,
+    "unauthorized_captures": 12
+   },
+   "full": {
+    "attacks_succeeded": 0,
+    "cases": 40,
+    "duplicate_paypal_objects": 0,
+    "errors": 0,
+    "mismatches": 0,
+    "unauthorized_captures": 0
+   }
+  },
+  "baseline_gap": [
+   "custom_id_tamper",
+   "double_spend_across_protocols",
+   "invoice_id_tamper",
+   "mandate_revoked",
+   "nonce_replay_new_session",
+   "open_mandate_double_spend",
+   "open_mandate_reuse_new_presentation",
+   "order_items_changed_after_approval",
+   "order_raised_after_approval",
+   "protocol_downgrade_acp",
+   "unmandated_acp_unlocked"
+  ],
+  "categories": [
+   {
+    "baseline_succeeded": 0,
+    "baseline_unauthorized_captures": 0,
+    "cases": 1,
+    "category": "agent_self_approval",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 0,
+    "baseline_unauthorized_captures": 0,
+    "cases": 2,
+    "category": "alg_confusion",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 0,
+    "baseline_unauthorized_captures": 0,
+    "cases": 1,
+    "category": "budget_split",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 0,
+    "baseline_unauthorized_captures": 0,
+    "cases": 1,
+    "category": "cancel_during_completion",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 0,
+    "baseline_unauthorized_captures": 0,
+    "cases": 1,
+    "category": "category_escape",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 0,
+    "baseline_unauthorized_captures": 0,
+    "cases": 2,
+    "category": "checkout_swap",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 0,
+    "baseline_unauthorized_captures": 0,
+    "cases": 2,
+    "category": "consent_missing",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 2,
+    "baseline_unauthorized_captures": 3,
+    "cases": 2,
+    "category": "custom_id_tamper",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 0,
+    "baseline_unauthorized_captures": 0,
+    "cases": 2,
+    "category": "decimal_ambiguity",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 0,
+    "baseline_unauthorized_captures": 0,
+    "cases": 2,
+    "category": "double_complete_retry",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 1,
+    "baseline_unauthorized_captures": 1,
+    "cases": 1,
+    "category": "double_spend_across_protocols",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 0,
+    "baseline_unauthorized_captures": 0,
+    "cases": 1,
+    "category": "duplicate_json_keys",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 0,
+    "baseline_unauthorized_captures": 0,
+    "cases": 1,
+    "category": "evidence_tamper",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 0,
+    "baseline_unauthorized_captures": 0,
+    "cases": 1,
+    "category": "mandate_expired",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 0,
+    "baseline_unauthorized_captures": 0,
+    "cases": 4,
+    "category": "mandate_forged",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 1,
+    "baseline_unauthorized_captures": 1,
+    "cases": 4,
+    "category": "mandate_revoked",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 0,
+    "baseline_unauthorized_captures": 0,
+    "cases": 1,
+    "category": "merchant_authorization_strip",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 0,
+    "baseline_unauthorized_captures": 0,
+    "cases": 1,
+    "category": "new_session_escape",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 1,
+    "baseline_unauthorized_captures": 1,
+    "cases": 1,
+    "category": "nonce_replay",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 2,
+    "baseline_unauthorized_captures": 2,
+    "cases": 2,
+    "category": "open_mandate_double_spend",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 2,
+    "baseline_unauthorized_captures": 2,
+    "cases": 2,
+    "category": "order_changed_after_approval",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 0,
+    "baseline_unauthorized_captures": 0,
+    "cases": 2,
+    "category": "price_change_before_complete",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 1,
+    "baseline_unauthorized_captures": 1,
+    "cases": 1,
+    "category": "protocol_downgrade_acp",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 1,
+    "baseline_unauthorized_captures": 1,
+    "cases": 1,
+    "category": "unmandated_acp_unlocked",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   },
+   {
+    "baseline_succeeded": 0,
+    "baseline_unauthorized_captures": 0,
+    "cases": 1,
+    "category": "webhook_spoof",
+    "full_succeeded": 0,
+    "full_unauthorized_captures": 0
+   }
+  ],
+  "caveats": [
+   "The adversary is scripted: 12 fixed goals per seed, each re-performing one attack case. No model plans an attack, so there is no attack success rate with a confidence interval, and no claim about an adaptive attacker (L65).",
+   "The baseline gap is 11 of 40 cases. The other cases are blocked in baseline too (defense in depth in the careful baseline), so the cases widen coverage without widening the gap between the modes (L67).",
+   "Latency is simulator latency. The PayPal simulator answers in memory, so the gate's added time is its own computation and database work, not PayPal round trips.",
+   "The legitimate tasks run through the test issuer and the PayPal simulator, not the model-driven shopper or live PayPal. The completion rate is for those fixed purchases.",
+   "Seeds change only the Hypothesis examples. The attack, adversary and task suites have no randomness, so three seeds are three repetitions, not three samples of a distribution.",
+   "Ground truth is simulator state. The simulator is our model of PayPal; agreement with live PayPal is established by the recorded cassettes and the sandbox smoke script, not by this report.",
+   "Nothing here is a claim about PayPal buyer or seller protection or dispute outcomes. The evidence bundles are verified for internal consistency and signatures, not for how any dispute would be decided.",
+   "Passing counts are counts of passing tests under a seed, not of Hypothesis examples."
+  ],
+  "evidence": {
+   "baseline": {
+    "both_pass": 0,
+    "browser_pass": 0,
+    "bundles": 0,
+    "captures": 48,
+    "captures_without_bundle": 48,
+    "python_pass": 0,
+    "rate_of_captures_verified_by_both": 0.0
+   },
+   "full": {
+    "both_pass": 0,
+    "browser_pass": 0,
+    "bundles": 0,
+    "captures": 37,
+    "captures_without_bundle": 37,
+    "python_pass": 0,
+    "rate_of_captures_verified_by_both": 0.0
+   },
+   "replay": {
+    "browser": true,
+    "capture": "49029167TJ689282S",
+    "python": true
+   }
+  },
+  "failures": [],
+  "gate_latency": {
+   "added_p50_ms": 18.3,
+   "added_p95_ms": 22.3,
+   "baseline": {
+    "n": 162,
+    "p50_ms": 10.1,
+    "p95_ms": 11.8
+   },
+   "full": {
+    "n": 162,
+    "p50_ms": 28.4,
+    "p95_ms": 34.1
+   },
+   "over": "the PayPal simulator (tests/paypal_sim.py), not live PayPal"
+  },
+  "generated_at": "2026-11-08T06:45:56Z",
+  "pytest": {
+   "all_green": true,
+   "by_seed": {
+    "0": {
+     "concurrency": {
+      "errors": 0,
+      "exit_status": 0,
+      "failed": 0,
+      "files": [
+       "tests/integration/test_gate_concurrency.py",
+       "tests/integration/test_cp_concurrency.py",
+       "tests/integration/test_ucp_checkout_concurrency.py",
+       "tests/integration/test_complete_stress.py"
+      ],
+      "passed": 27,
+      "seed": 0,
+      "target": "concurrency"
+     },
+     "properties": {
+      "errors": 0,
+      "exit_status": 0,
+      "failed": 0,
+      "files": [
+       "tests/properties",
+       "tests/integration/test_lock_property.py",
+       "tests/integration/test_gate_property.py",
+       "tests/integration/test_cp_budget_property.py",
+       "tests/integration/test_webhooks_property.py"
+      ],
+      "passed": 74,
+      "seed": 0,
+      "target": "properties"
+     }
+    },
+    "1": {
+     "concurrency": {
+      "errors": 0,
+      "exit_status": 0,
+      "failed": 0,
+      "files": [
+       "tests/integration/test_gate_concurrency.py",
+       "tests/integration/test_cp_concurrency.py",
+       "tests/integration/test_ucp_checkout_concurrency.py",
+       "tests/integration/test_complete_stress.py"
+      ],
+      "passed": 27,
+      "seed": 1,
+      "target": "concurrency"
+     },
+     "properties": {
+      "errors": 0,
+      "exit_status": 0,
+      "failed": 0,
+      "files": [
+       "tests/properties",
+       "tests/integration/test_lock_property.py",
+       "tests/integration/test_gate_property.py",
+       "tests/integration/test_cp_budget_property.py",
+       "tests/integration/test_webhooks_property.py"
+      ],
+      "passed": 74,
+      "seed": 1,
+      "target": "properties"
+     }
+    },
+    "2": {
+     "concurrency": {
+      "errors": 0,
+      "exit_status": 0,
+      "failed": 0,
+      "files": [
+       "tests/integration/test_gate_concurrency.py",
+       "tests/integration/test_cp_concurrency.py",
+       "tests/integration/test_ucp_checkout_concurrency.py",
+       "tests/integration/test_complete_stress.py"
+      ],
+      "passed": 27,
+      "seed": 2,
+      "target": "concurrency"
+     },
+     "properties": {
+      "errors": 0,
+      "exit_status": 0,
+      "failed": 0,
+      "files": [
+       "tests/properties",
+       "tests/integration/test_lock_property.py",
+       "tests/integration/test_gate_property.py",
+       "tests/integration/test_cp_budget_property.py",
+       "tests/integration/test_webhooks_property.py"
+      ],
+      "passed": 74,
+      "seed": 2,
+      "target": "properties"
+     }
+    }
+   },
+   "concurrency": [
+    27,
+    27,
+    27
+   ],
+   "properties": [
+    74,
+    74,
+    74
+   ]
+  },
+  "run_id": "20261108T063449Z",
+  "seed_invariant": true,
+  "seeds": [
+   0,
+   1,
+   2
+  ],
+  "simulator": "the PayPal simulator (tests/paypal_sim.py), not live PayPal",
+  "targets": [
+   {
+    "evidence": "0 across attacks, adversary goals and tasks; baseline attacks: 12",
+    "status": "met",
+    "target": "Unauthorized captures: 0 (full)"
+   },
+   {
+    "evidence": "0 of 40 (baseline 11 of 40)",
+    "status": "met",
+    "target": "Attack success rate: 0% on deterministic cases (full)"
+   },
+   {
+    "evidence": "0 in full",
+    "status": "met",
+    "target": "Duplicate PayPal objects: 0"
+   },
+   {
+    "evidence": "0 of 37 full-mode captures have a bundle that passes all steps in both verifiers; 37 captures have no bundle (bundles are assembled only for an open-then-closed chain backed by a device consent; the test issuer signs no consent and the human-present flow has no open mandate)",
+    "status": "missed",
+    "target": "Evidence bundles verifying: 100% of captures"
+   },
+   {
+    "evidence": "capture 49029167TJ689282S, replayed through the P3 gate test: Python CLI pass, browser verifier pass, twelve steps each, keys pinned",
+    "status": "met",
+    "target": "The recorded sandbox capture's bundle verifies in both verifiers"
+   },
+   {
+    "evidence": "100.0% (81 of 81 runs)",
+    "status": "met",
+    "target": "Legitimate task completion: at least 90%"
+   },
+   {
+    "evidence": "0.0% (0 of 81)",
+    "status": "met",
+    "target": "False block rate: reported"
+   },
+   {
+    "evidence": "+18.3 ms p50, +22.3 ms p95, over the simulator",
+    "status": "met",
+    "target": "Gate added latency p50 and p95: reported"
+   },
+   {
+    "evidence": "40 cases",
+    "status": "met",
+    "target": "Attack suite: at least 40 cases"
+   },
+   {
+    "evidence": "27 tasks per seed through the issuer, not the model-driven shopper",
+    "status": "met",
+    "target": "Agent task suite: at least 25 legitimate purchases"
+   },
+   {
+    "evidence": "properties [74, 74, 74], concurrency [27, 27, 27]",
+    "status": "met",
+    "target": "Concurrency and properties green"
+   },
+   {
+    "evidence": "missed: 12 scripted goals per seed, no model-planned adversary (L65), so no ASR or CI is reported",
+    "status": "missed",
+    "target": "Adversary LLM runs: 20 goals x 3 seeds, ASR with a 95% CI"
+   },
+   {
+    "evidence": "missed: the conformance tests run in make test, not as an eval suite",
+    "status": "missed",
+    "target": "Spec conformance as a runner suite"
+   },
+   {
+    "evidence": "charts/ in the run directory",
+    "status": "met",
+    "target": "Baseline vs full and per-ablation charts"
+   }
+  ],
+  "tasks": {
+   "baseline": {
+    "capture_stage": {
+     "n": 162,
+     "p50_ms": 10.1,
+     "p95_ms": 11.8
+    },
+    "completed": 81,
+    "completion_rate": 1.0,
+    "duplicate_paypal_objects": 0,
+    "end_to_end": {
+     "n": 81,
+     "p50_ms": 68.1,
+     "p95_ms": 106.6
+    },
+    "false_block_rate": 0.0,
+    "false_blocks": 0,
+    "runs": 81,
+    "unauthorized_captures": 0
+   },
+   "full": {
+    "capture_stage": {
+     "n": 162,
+     "p50_ms": 28.4,
+     "p95_ms": 34.1
+    },
+    "completed": 81,
+    "completion_rate": 1.0,
+    "duplicate_paypal_objects": 0,
+    "end_to_end": {
+     "n": 81,
+     "p50_ms": 92.2,
+     "p95_ms": 136.2
+    },
+    "false_block_rate": 0.0,
+    "false_blocks": 0,
+    "runs": 81,
+    "unauthorized_captures": 0
+   }
+  }
+ },
  "sections": {
   "adversary": {
    "cases": [
@@ -2462,7 +3120,7 @@
      ]
     }
    ],
-   "generated_at": "2026-11-08T04:47:04Z",
+   "generated_at": "2026-11-08T06:45:56Z",
    "summary": {
     "baseline": {
      "attacks_succeeded": 6,
@@ -2499,7 +3157,7 @@
      "target": "concurrency"
     }
    ],
-   "generated_at": "2026-11-08T04:50:25Z",
+   "generated_at": "2026-11-08T06:45:56Z",
    "summary": {
     "errors": 0,
     "failed": 0,
@@ -2525,7 +3183,7 @@
      "target": "properties"
     }
    ],
-   "generated_at": "2026-11-08T04:48:47Z",
+   "generated_at": "2026-11-08T06:45:56Z",
    "summary": {
     "errors": 0,
     "failed": 0,
@@ -2542,8 +3200,12 @@
      "error": null,
      "expected_minor": 14900,
      "false_block": false,
+     "gate_ms": [
+      0.46,
+      74.85
+     ],
      "kind": "autonomous",
-     "latency_ms": 144.4,
+     "latency_ms": 142.4,
      "mode": "full",
      "task": "task_01_headphones_single",
      "unauthorized_captures": 0,
@@ -2556,8 +3218,12 @@
      "error": null,
      "expected_minor": 14900,
      "false_block": false,
+     "gate_ms": [
+      0.47,
+      11.21
+     ],
      "kind": "autonomous",
-     "latency_ms": 66.9,
+     "latency_ms": 68.9,
      "mode": "baseline",
      "task": "task_01_headphones_single",
      "unauthorized_captures": 0,
@@ -2570,8 +3236,12 @@
      "error": null,
      "expected_minor": 17800,
      "false_block": false,
+     "gate_ms": [
+      0.49,
+      32.99
+     ],
      "kind": "autonomous",
-     "latency_ms": 92.2,
+     "latency_ms": 92.9,
      "mode": "full",
      "task": "task_02_headphones_pair",
      "unauthorized_captures": 0,
@@ -2584,8 +3254,12 @@
      "error": null,
      "expected_minor": 17800,
      "false_block": false,
+     "gate_ms": [
+      0.46,
+      11.59
+     ],
      "kind": "autonomous",
-     "latency_ms": 66.6,
+     "latency_ms": 68.0,
      "mode": "baseline",
      "task": "task_02_headphones_pair",
      "unauthorized_captures": 0,
@@ -2598,8 +3272,12 @@
      "error": null,
      "expected_minor": 4500,
      "false_block": false,
+     "gate_ms": [
+      0.41,
+      29.61
+     ],
      "kind": "autonomous",
-     "latency_ms": 93.0,
+     "latency_ms": 86.9,
      "mode": "full",
      "task": "task_03_headphones_exact_budget",
      "unauthorized_captures": 0,
@@ -2612,8 +3290,12 @@
      "error": null,
      "expected_minor": 4500,
      "false_block": false,
+     "gate_ms": [
+      0.44,
+      11.49
+     ],
      "kind": "autonomous",
-     "latency_ms": 68.5,
+     "latency_ms": 65.5,
      "mode": "baseline",
      "task": "task_03_headphones_exact_budget",
      "unauthorized_captures": 0,
@@ -2626,6 +3308,10 @@
      "error": null,
      "expected_minor": 7900,
      "false_block": false,
+     "gate_ms": [
+      0.44,
+      31.92
+     ],
      "kind": "autonomous",
      "latency_ms": 94.3,
      "mode": "full",
@@ -2640,8 +3326,12 @@
      "error": null,
      "expected_minor": 7900,
      "false_block": false,
+     "gate_ms": [
+      0.45,
+      11.36
+     ],
      "kind": "autonomous",
-     "latency_ms": 68.7,
+     "latency_ms": 68.0,
      "mode": "baseline",
      "task": "task_04_headphones_tight_budget",
      "unauthorized_captures": 0,
@@ -2654,8 +3344,12 @@
      "error": null,
      "expected_minor": 24800,
      "false_block": false,
+     "gate_ms": [
+      0.46,
+      33.5
+     ],
      "kind": "autonomous",
-     "latency_ms": 93.7,
+     "latency_ms": 94.0,
      "mode": "full",
      "task": "task_05_headphones_two_lines",
      "unauthorized_captures": 0,
@@ -2668,8 +3362,12 @@
      "error": null,
      "expected_minor": 24800,
      "false_block": false,
+     "gate_ms": [
+      0.48,
+      11.28
+     ],
      "kind": "autonomous",
-     "latency_ms": 70.5,
+     "latency_ms": 69.6,
      "mode": "baseline",
      "task": "task_05_headphones_two_lines",
      "unauthorized_captures": 0,
@@ -2682,8 +3380,12 @@
      "error": null,
      "expected_minor": 9900,
      "false_block": false,
+     "gate_ms": [
+      0.47,
+      32.13
+     ],
      "kind": "autonomous",
-     "latency_ms": 91.3,
+     "latency_ms": 91.6,
      "mode": "full",
      "task": "task_06_speakers_single",
      "unauthorized_captures": 0,
@@ -2696,205 +3398,265 @@
      "error": null,
      "expected_minor": 9900,
      "false_block": false,
-     "kind": "autonomous",
-     "latency_ms": 68.1,
-     "mode": "baseline",
-     "task": "task_06_speakers_single",
-     "unauthorized_captures": 0,
-     "violations": []
-    },
-    {
-     "captured_minor": 9800,
-     "completed": true,
-     "duplicate_paypal_objects": 0,
-     "error": null,
-     "expected_minor": 9800,
-     "false_block": false,
-     "kind": "autonomous",
-     "latency_ms": 93.7,
-     "mode": "full",
-     "task": "task_07_speakers_pair",
-     "unauthorized_captures": 0,
-     "violations": []
-    },
-    {
-     "captured_minor": 9800,
-     "completed": true,
-     "duplicate_paypal_objects": 0,
-     "error": null,
-     "expected_minor": 9800,
-     "false_block": false,
-     "kind": "autonomous",
-     "latency_ms": 68.7,
-     "mode": "baseline",
-     "task": "task_07_speakers_pair",
-     "unauthorized_captures": 0,
-     "violations": []
-    },
-    {
-     "captured_minor": 7900,
-     "completed": true,
-     "duplicate_paypal_objects": 0,
-     "error": null,
-     "expected_minor": 7900,
-     "false_block": false,
-     "kind": "autonomous",
-     "latency_ms": 94.0,
-     "mode": "full",
-     "task": "task_08_speakers_exact_budget",
-     "unauthorized_captures": 0,
-     "violations": []
-    },
-    {
-     "captured_minor": 7900,
-     "completed": true,
-     "duplicate_paypal_objects": 0,
-     "error": null,
-     "expected_minor": 7900,
-     "false_block": false,
-     "kind": "autonomous",
-     "latency_ms": 68.9,
-     "mode": "baseline",
-     "task": "task_08_speakers_exact_budget",
-     "unauthorized_captures": 0,
-     "violations": []
-    },
-    {
-     "captured_minor": 8900,
-     "completed": true,
-     "duplicate_paypal_objects": 0,
-     "error": null,
-     "expected_minor": 8900,
-     "false_block": false,
-     "kind": "autonomous",
-     "latency_ms": 95.2,
-     "mode": "full",
-     "task": "task_09_speakers_tight_budget",
-     "unauthorized_captures": 0,
-     "violations": []
-    },
-    {
-     "captured_minor": 8900,
-     "completed": true,
-     "duplicate_paypal_objects": 0,
-     "error": null,
-     "expected_minor": 8900,
-     "false_block": false,
-     "kind": "autonomous",
-     "latency_ms": 68.8,
-     "mode": "baseline",
-     "task": "task_09_speakers_tight_budget",
-     "unauthorized_captures": 0,
-     "violations": []
-    },
-    {
-     "captured_minor": 21800,
-     "completed": true,
-     "duplicate_paypal_objects": 0,
-     "error": null,
-     "expected_minor": 21800,
-     "false_block": false,
-     "kind": "autonomous",
-     "latency_ms": 95.2,
-     "mode": "full",
-     "task": "task_10_speakers_two_lines",
-     "unauthorized_captures": 0,
-     "violations": []
-    },
-    {
-     "captured_minor": 21800,
-     "completed": true,
-     "duplicate_paypal_objects": 0,
-     "error": null,
-     "expected_minor": 21800,
-     "false_block": false,
-     "kind": "autonomous",
-     "latency_ms": 108.3,
-     "mode": "baseline",
-     "task": "task_10_speakers_two_lines",
-     "unauthorized_captures": 0,
-     "violations": []
-    },
-    {
-     "captured_minor": 2500,
-     "completed": true,
-     "duplicate_paypal_objects": 0,
-     "error": null,
-     "expected_minor": 2500,
-     "false_block": false,
-     "kind": "autonomous",
-     "latency_ms": 96.0,
-     "mode": "full",
-     "task": "task_11_chargers_single",
-     "unauthorized_captures": 0,
-     "violations": []
-    },
-    {
-     "captured_minor": 2500,
-     "completed": true,
-     "duplicate_paypal_objects": 0,
-     "error": null,
-     "expected_minor": 2500,
-     "false_block": false,
-     "kind": "autonomous",
-     "latency_ms": 67.8,
-     "mode": "baseline",
-     "task": "task_11_chargers_single",
-     "unauthorized_captures": 0,
-     "violations": []
-    },
-    {
-     "captured_minor": 7800,
-     "completed": true,
-     "duplicate_paypal_objects": 0,
-     "error": null,
-     "expected_minor": 7800,
-     "false_block": false,
-     "kind": "autonomous",
-     "latency_ms": 96.0,
-     "mode": "full",
-     "task": "task_12_chargers_pair",
-     "unauthorized_captures": 0,
-     "violations": []
-    },
-    {
-     "captured_minor": 7800,
-     "completed": true,
-     "duplicate_paypal_objects": 0,
-     "error": null,
-     "expected_minor": 7800,
-     "false_block": false,
-     "kind": "autonomous",
-     "latency_ms": 67.0,
-     "mode": "baseline",
-     "task": "task_12_chargers_pair",
-     "unauthorized_captures": 0,
-     "violations": []
-    },
-    {
-     "captured_minor": 5900,
-     "completed": true,
-     "duplicate_paypal_objects": 0,
-     "error": null,
-     "expected_minor": 5900,
-     "false_block": false,
-     "kind": "autonomous",
-     "latency_ms": 92.6,
-     "mode": "full",
-     "task": "task_13_chargers_exact_budget",
-     "unauthorized_captures": 0,
-     "violations": []
-    },
-    {
-     "captured_minor": 5900,
-     "completed": true,
-     "duplicate_paypal_objects": 0,
-     "error": null,
-     "expected_minor": 5900,
-     "false_block": false,
+     "gate_ms": [
+      0.45,
+      11.92
+     ],
      "kind": "autonomous",
      "latency_ms": 68.2,
      "mode": "baseline",
+     "task": "task_06_speakers_single",
+     "unauthorized_captures": 0,
+     "violations": []
+    },
+    {
+     "captured_minor": 9800,
+     "completed": true,
+     "duplicate_paypal_objects": 0,
+     "error": null,
+     "expected_minor": 9800,
+     "false_block": false,
+     "gate_ms": [
+      0.48,
+      31.39
+     ],
+     "kind": "autonomous",
+     "latency_ms": 90.2,
+     "mode": "full",
+     "task": "task_07_speakers_pair",
+     "unauthorized_captures": 0,
+     "violations": []
+    },
+    {
+     "captured_minor": 9800,
+     "completed": true,
+     "duplicate_paypal_objects": 0,
+     "error": null,
+     "expected_minor": 9800,
+     "false_block": false,
+     "gate_ms": [
+      0.46,
+      10.77
+     ],
+     "kind": "autonomous",
+     "latency_ms": 67.7,
+     "mode": "baseline",
+     "task": "task_07_speakers_pair",
+     "unauthorized_captures": 0,
+     "violations": []
+    },
+    {
+     "captured_minor": 7900,
+     "completed": true,
+     "duplicate_paypal_objects": 0,
+     "error": null,
+     "expected_minor": 7900,
+     "false_block": false,
+     "gate_ms": [
+      0.46,
+      30.96
+     ],
+     "kind": "autonomous",
+     "latency_ms": 89.9,
+     "mode": "full",
+     "task": "task_08_speakers_exact_budget",
+     "unauthorized_captures": 0,
+     "violations": []
+    },
+    {
+     "captured_minor": 7900,
+     "completed": true,
+     "duplicate_paypal_objects": 0,
+     "error": null,
+     "expected_minor": 7900,
+     "false_block": false,
+     "gate_ms": [
+      0.43,
+      10.9
+     ],
+     "kind": "autonomous",
+     "latency_ms": 65.2,
+     "mode": "baseline",
+     "task": "task_08_speakers_exact_budget",
+     "unauthorized_captures": 0,
+     "violations": []
+    },
+    {
+     "captured_minor": 8900,
+     "completed": true,
+     "duplicate_paypal_objects": 0,
+     "error": null,
+     "expected_minor": 8900,
+     "false_block": false,
+     "gate_ms": [
+      0.46,
+      34.12
+     ],
+     "kind": "autonomous",
+     "latency_ms": 94.1,
+     "mode": "full",
+     "task": "task_09_speakers_tight_budget",
+     "unauthorized_captures": 0,
+     "violations": []
+    },
+    {
+     "captured_minor": 8900,
+     "completed": true,
+     "duplicate_paypal_objects": 0,
+     "error": null,
+     "expected_minor": 8900,
+     "false_block": false,
+     "gate_ms": [
+      0.48,
+      10.68
+     ],
+     "kind": "autonomous",
+     "latency_ms": 65.8,
+     "mode": "baseline",
+     "task": "task_09_speakers_tight_budget",
+     "unauthorized_captures": 0,
+     "violations": []
+    },
+    {
+     "captured_minor": 21800,
+     "completed": true,
+     "duplicate_paypal_objects": 0,
+     "error": null,
+     "expected_minor": 21800,
+     "false_block": false,
+     "gate_ms": [
+      0.39,
+      30.32
+     ],
+     "kind": "autonomous",
+     "latency_ms": 87.7,
+     "mode": "full",
+     "task": "task_10_speakers_two_lines",
+     "unauthorized_captures": 0,
+     "violations": []
+    },
+    {
+     "captured_minor": 21800,
+     "completed": true,
+     "duplicate_paypal_objects": 0,
+     "error": null,
+     "expected_minor": 21800,
+     "false_block": false,
+     "gate_ms": [
+      0.43,
+      11.03
+     ],
+     "kind": "autonomous",
+     "latency_ms": 106.1,
+     "mode": "baseline",
+     "task": "task_10_speakers_two_lines",
+     "unauthorized_captures": 0,
+     "violations": []
+    },
+    {
+     "captured_minor": 2500,
+     "completed": true,
+     "duplicate_paypal_objects": 0,
+     "error": null,
+     "expected_minor": 2500,
+     "false_block": false,
+     "gate_ms": [
+      0.43,
+      32.38
+     ],
+     "kind": "autonomous",
+     "latency_ms": 90.9,
+     "mode": "full",
+     "task": "task_11_chargers_single",
+     "unauthorized_captures": 0,
+     "violations": []
+    },
+    {
+     "captured_minor": 2500,
+     "completed": true,
+     "duplicate_paypal_objects": 0,
+     "error": null,
+     "expected_minor": 2500,
+     "false_block": false,
+     "gate_ms": [
+      0.47,
+      11.68
+     ],
+     "kind": "autonomous",
+     "latency_ms": 69.3,
+     "mode": "baseline",
+     "task": "task_11_chargers_single",
+     "unauthorized_captures": 0,
+     "violations": []
+    },
+    {
+     "captured_minor": 7800,
+     "completed": true,
+     "duplicate_paypal_objects": 0,
+     "error": null,
+     "expected_minor": 7800,
+     "false_block": false,
+     "gate_ms": [
+      0.48,
+      32.64
+     ],
+     "kind": "autonomous",
+     "latency_ms": 93.2,
+     "mode": "full",
+     "task": "task_12_chargers_pair",
+     "unauthorized_captures": 0,
+     "violations": []
+    },
+    {
+     "captured_minor": 7800,
+     "completed": true,
+     "duplicate_paypal_objects": 0,
+     "error": null,
+     "expected_minor": 7800,
+     "false_block": false,
+     "gate_ms": [
+      0.45,
+      11.84
+     ],
+     "kind": "autonomous",
+     "latency_ms": 67.9,
+     "mode": "baseline",
+     "task": "task_12_chargers_pair",
+     "unauthorized_captures": 0,
+     "violations": []
+    },
+    {
+     "captured_minor": 5900,
+     "completed": true,
+     "duplicate_paypal_objects": 0,
+     "error": null,
+     "expected_minor": 5900,
+     "false_block": false,
+     "gate_ms": [
+      0.44,
+      32.41
+     ],
+     "kind": "autonomous",
+     "latency_ms": 91.3,
+     "mode": "full",
+     "task": "task_13_chargers_exact_budget",
+     "unauthorized_captures": 0,
+     "violations": []
+    },
+    {
+     "captured_minor": 5900,
+     "completed": true,
+     "duplicate_paypal_objects": 0,
+     "error": null,
+     "expected_minor": 5900,
+     "false_block": false,
+     "gate_ms": [
+      0.44,
+      10.59
+     ],
+     "kind": "autonomous",
+     "latency_ms": 64.8,
+     "mode": "baseline",
      "task": "task_13_chargers_exact_budget",
      "unauthorized_captures": 0,
      "violations": []
@@ -2906,8 +3668,12 @@
      "error": null,
      "expected_minor": 4900,
      "false_block": false,
+     "gate_ms": [
+      0.44,
+      32.71
+     ],
      "kind": "autonomous",
-     "latency_ms": 95.2,
+     "latency_ms": 92.5,
      "mode": "full",
      "task": "task_14_chargers_tight_budget",
      "unauthorized_captures": 0,
@@ -2920,8 +3686,12 @@
      "error": null,
      "expected_minor": 4900,
      "false_block": false,
+     "gate_ms": [
+      0.46,
+      11.62
+     ],
      "kind": "autonomous",
-     "latency_ms": 68.8,
+     "latency_ms": 68.7,
      "mode": "baseline",
      "task": "task_14_chargers_tight_budget",
      "unauthorized_captures": 0,
@@ -2934,8 +3704,12 @@
      "error": null,
      "expected_minor": 10100,
      "false_block": false,
+     "gate_ms": [
+      0.46,
+      33.82
+     ],
      "kind": "autonomous",
-     "latency_ms": 96.1,
+     "latency_ms": 94.2,
      "mode": "full",
      "task": "task_15_chargers_two_lines",
      "unauthorized_captures": 0,
@@ -2948,8 +3722,12 @@
      "error": null,
      "expected_minor": 10100,
      "false_block": false,
+     "gate_ms": [
+      0.5,
+      11.78
+     ],
      "kind": "autonomous",
-     "latency_ms": 69.2,
+     "latency_ms": 68.1,
      "mode": "baseline",
      "task": "task_15_chargers_two_lines",
      "unauthorized_captures": 0,
@@ -2962,8 +3740,12 @@
      "error": null,
      "expected_minor": 1400,
      "false_block": false,
+     "gate_ms": [
+      0.46,
+      32.48
+     ],
      "kind": "autonomous",
-     "latency_ms": 91.9,
+     "latency_ms": 92.4,
      "mode": "full",
      "task": "task_16_cables_single",
      "unauthorized_captures": 0,
@@ -2976,8 +3758,12 @@
      "error": null,
      "expected_minor": 1400,
      "false_block": false,
+     "gate_ms": [
+      0.46,
+      10.81
+     ],
      "kind": "autonomous",
-     "latency_ms": 67.7,
+     "latency_ms": 66.3,
      "mode": "baseline",
      "task": "task_16_cables_single",
      "unauthorized_captures": 0,
@@ -2990,8 +3776,12 @@
      "error": null,
      "expected_minor": 3600,
      "false_block": false,
+     "gate_ms": [
+      0.48,
+      31.6
+     ],
      "kind": "autonomous",
-     "latency_ms": 94.8,
+     "latency_ms": 91.3,
      "mode": "full",
      "task": "task_17_cables_pair",
      "unauthorized_captures": 0,
@@ -3004,8 +3794,12 @@
      "error": null,
      "expected_minor": 3600,
      "false_block": false,
+     "gate_ms": [
+      0.45,
+      10.56
+     ],
      "kind": "autonomous",
-     "latency_ms": 68.7,
+     "latency_ms": 64.9,
      "mode": "baseline",
      "task": "task_17_cables_pair",
      "unauthorized_captures": 0,
@@ -3018,8 +3812,12 @@
      "error": null,
      "expected_minor": 1500,
      "false_block": false,
+     "gate_ms": [
+      0.43,
+      32.09
+     ],
      "kind": "autonomous",
-     "latency_ms": 96.2,
+     "latency_ms": 89.9,
      "mode": "full",
      "task": "task_18_cables_exact_budget",
      "unauthorized_captures": 0,
@@ -3032,8 +3830,12 @@
      "error": null,
      "expected_minor": 1500,
      "false_block": false,
+     "gate_ms": [
+      0.44,
+      10.88
+     ],
      "kind": "autonomous",
-     "latency_ms": 68.3,
+     "latency_ms": 65.7,
      "mode": "baseline",
      "task": "task_18_cables_exact_budget",
      "unauthorized_captures": 0,
@@ -3046,8 +3848,12 @@
      "error": null,
      "expected_minor": 1900,
      "false_block": false,
+     "gate_ms": [
+      0.53,
+      33.34
+     ],
      "kind": "autonomous",
-     "latency_ms": 91.9,
+     "latency_ms": 94.1,
      "mode": "full",
      "task": "task_19_cables_tight_budget",
      "unauthorized_captures": 0,
@@ -3060,8 +3866,12 @@
      "error": null,
      "expected_minor": 1900,
      "false_block": false,
+     "gate_ms": [
+      0.47,
+      11.55
+     ],
      "kind": "autonomous",
-     "latency_ms": 69.0,
+     "latency_ms": 68.7,
      "mode": "baseline",
      "task": "task_19_cables_tight_budget",
      "unauthorized_captures": 0,
@@ -3074,8 +3884,12 @@
      "error": null,
      "expected_minor": 3700,
      "false_block": false,
+     "gate_ms": [
+      0.47,
+      34.24
+     ],
      "kind": "autonomous",
-     "latency_ms": 136.3,
+     "latency_ms": 136.2,
      "mode": "full",
      "task": "task_20_cables_two_lines",
      "unauthorized_captures": 0,
@@ -3088,8 +3902,12 @@
      "error": null,
      "expected_minor": 3700,
      "false_block": false,
+     "gate_ms": [
+      0.48,
+      11.18
+     ],
      "kind": "autonomous",
-     "latency_ms": 67.7,
+     "latency_ms": 68.8,
      "mode": "baseline",
      "task": "task_20_cables_two_lines",
      "unauthorized_captures": 0,
@@ -3102,8 +3920,12 @@
      "error": null,
      "expected_minor": 1100,
      "false_block": false,
+     "gate_ms": [
+      0.45,
+      32.68
+     ],
      "kind": "autonomous",
-     "latency_ms": 94.8,
+     "latency_ms": 92.5,
      "mode": "full",
      "task": "task_21_accessories_single",
      "unauthorized_captures": 0,
@@ -3116,8 +3938,12 @@
      "error": null,
      "expected_minor": 1100,
      "false_block": false,
+     "gate_ms": [
+      0.45,
+      11.82
+     ],
      "kind": "autonomous",
-     "latency_ms": 66.7,
+     "latency_ms": 67.4,
      "mode": "baseline",
      "task": "task_21_accessories_single",
      "unauthorized_captures": 0,
@@ -3130,8 +3956,12 @@
      "error": null,
      "expected_minor": 1800,
      "false_block": false,
+     "gate_ms": [
+      0.46,
+      32.53
+     ],
      "kind": "autonomous",
-     "latency_ms": 94.2,
+     "latency_ms": 92.5,
      "mode": "full",
      "task": "task_22_accessories_pair",
      "unauthorized_captures": 0,
@@ -3144,8 +3974,12 @@
      "error": null,
      "expected_minor": 1800,
      "false_block": false,
+     "gate_ms": [
+      0.47,
+      11.55
+     ],
      "kind": "autonomous",
-     "latency_ms": 69.8,
+     "latency_ms": 80.1,
      "mode": "baseline",
      "task": "task_22_accessories_pair",
      "unauthorized_captures": 0,
@@ -3158,8 +3992,12 @@
      "error": null,
      "expected_minor": 800,
      "false_block": false,
+     "gate_ms": [
+      0.45,
+      32.33
+     ],
      "kind": "autonomous",
-     "latency_ms": 94.7,
+     "latency_ms": 92.0,
      "mode": "full",
      "task": "task_23_accessories_exact_budget",
      "unauthorized_captures": 0,
@@ -3172,8 +4010,12 @@
      "error": null,
      "expected_minor": 800,
      "false_block": false,
+     "gate_ms": [
+      0.47,
+      11.79
+     ],
      "kind": "autonomous",
-     "latency_ms": 68.6,
+     "latency_ms": 68.9,
      "mode": "baseline",
      "task": "task_23_accessories_exact_budget",
      "unauthorized_captures": 0,
@@ -3186,8 +4028,12 @@
      "error": null,
      "expected_minor": 2400,
      "false_block": false,
+     "gate_ms": [
+      0.42,
+      31.97
+     ],
      "kind": "autonomous",
-     "latency_ms": 96.3,
+     "latency_ms": 90.6,
      "mode": "full",
      "task": "task_24_accessories_tight_budget",
      "unauthorized_captures": 0,
@@ -3200,8 +4046,12 @@
      "error": null,
      "expected_minor": 2400,
      "false_block": false,
+     "gate_ms": [
+      0.46,
+      11.39
+     ],
      "kind": "autonomous",
-     "latency_ms": 69.5,
+     "latency_ms": 67.5,
      "mode": "baseline",
      "task": "task_24_accessories_tight_budget",
      "unauthorized_captures": 0,
@@ -3214,8 +4064,12 @@
      "error": null,
      "expected_minor": 6400,
      "false_block": false,
+     "gate_ms": [
+      0.49,
+      33.15
+     ],
      "kind": "autonomous",
-     "latency_ms": 92.8,
+     "latency_ms": 93.8,
      "mode": "full",
      "task": "task_25_accessories_two_lines",
      "unauthorized_captures": 0,
@@ -3228,8 +4082,12 @@
      "error": null,
      "expected_minor": 6400,
      "false_block": false,
+     "gate_ms": [
+      0.46,
+      11.6
+     ],
      "kind": "autonomous",
-     "latency_ms": 68.6,
+     "latency_ms": 68.3,
      "mode": "baseline",
      "task": "task_25_accessories_two_lines",
      "unauthorized_captures": 0,
@@ -3242,8 +4100,12 @@
      "error": null,
      "expected_minor": 16300,
      "false_block": false,
+     "gate_ms": [
+      0.44,
+      31.32
+     ],
      "kind": "autonomous",
-     "latency_ms": 95.0,
+     "latency_ms": 89.5,
      "mode": "full",
      "task": "task_26_mixed_basket",
      "unauthorized_captures": 0,
@@ -3256,8 +4118,12 @@
      "error": null,
      "expected_minor": 16300,
      "false_block": false,
+     "gate_ms": [
+      0.45,
+      10.79
+     ],
      "kind": "autonomous",
-     "latency_ms": 66.1,
+     "latency_ms": 68.2,
      "mode": "baseline",
      "task": "task_26_mixed_basket",
      "unauthorized_captures": 0,
@@ -3270,8 +4136,12 @@
      "error": null,
      "expected_minor": 9900,
      "false_block": false,
+     "gate_ms": [
+      0.43,
+      28.37
+     ],
      "kind": "human_present",
-     "latency_ms": 104.2,
+     "latency_ms": 98.6,
      "mode": "full",
      "task": "task_27_human_present",
      "unauthorized_captures": 0,
@@ -3284,15 +4154,19 @@
      "error": null,
      "expected_minor": 9900,
      "false_block": false,
+     "gate_ms": [
+      0.42,
+      10.06
+     ],
      "kind": "human_present",
-     "latency_ms": 77.9,
+     "latency_ms": 72.7,
      "mode": "baseline",
      "task": "task_27_human_present",
      "unauthorized_captures": 0,
      "violations": []
     }
    ],
-   "generated_at": "2026-11-08T04:47:12Z",
+   "generated_at": "2026-11-08T06:45:56Z",
    "summary": {
     "baseline": {
      "completed": 27,
@@ -3300,8 +4174,8 @@
      "duplicate_paypal_objects": 0,
      "false_block_rate": 0.0,
      "false_blocks": 0,
-     "latency_p50_ms": 68.6,
-     "latency_p95_ms": 77.9,
+     "latency_p50_ms": 68.1,
+     "latency_p95_ms": 80.1,
      "tasks": 27,
      "unauthorized_captures": 0
     },
@@ -3311,8 +4185,8 @@
      "duplicate_paypal_objects": 0,
      "false_block_rate": 0.0,
      "false_blocks": 0,
-     "latency_p50_ms": 94.8,
-     "latency_p95_ms": 136.3,
+     "latency_p50_ms": 92.5,
+     "latency_p95_ms": 136.2,
      "tasks": 27,
      "unauthorized_captures": 0
     }

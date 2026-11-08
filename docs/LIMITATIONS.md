@@ -610,6 +610,31 @@ is simulator latency. The property and concurrency figures are counts of passing
 evidence tamper case covers the Python verifier on a synthetic bundle. Cases that need a device-bound world, a moving clock or
 refund netting in the judge are not in the suite (Decision 132).
 
+### L68. No evaluation capture has an evidence bundle
+
+Bundles are assembled only for an open-then-closed chain backed by a device consent. The evaluation's autonomous purchases use the
+test issuer, which signs no consent, and the Human Present flow has closed mandates only ("the presented mandate is not a chain"), so
+in the release run 0 of 37 full-mode captures have a bundle (`eval/reports/20261108T063449Z/report.json`, `results.evidence`). The target "evidence bundles
+verifying: 100% of captures" is therefore **missed**, not met. What does verify in both verifiers with the keys pinned is the one
+recorded sandbox capture (`49029167TJ689282S`, the P3 gate replay). Fix, not done: run autonomous tasks through the real consent and
+proposal routes, and decide whether a Human Present purchase should get a bundle of its own kind.
+
+### L69. What the ablation table is and is not
+
+Seeds repeat deterministic suites; ablations ran once each. Five of the six architecture ablations reopen nothing on their own
+(`ABL_NO_GATE`, `ABL_NO_PREAUTH_CHECK`, `ABL_NO_PRINCIPAL_LOCK`, `ABL_NO_BUDGET_RECON`, `ABL_NO_STRICT_JSON`) because another layer
+stops each case, and PayPal does not allow a change after authorization, so no case reaches the gate with a difference to catch.
+Only `ABL_NO_GLOBAL_NONCE` reopens three cases. The extra pair row (gate and pre-authorize check off) reopens five with 7
+unauthorized captures. Passing "reopens nothing" is not evidence that a layer is unneeded: the suite has no case that exercises
+`ABL_NO_BUDGET_RECON` through PayPal-side state. "Unauthorized captures" counts captures, so a case can contribute two
+(`custom_id_tamper` gives baseline 12 captures for 11 succeeded cases).
+
+### L70. Gate latency is two simulator timings, subtracted
+
+The capture stage time (full 28.4 ms p50, 34.1 ms p95; baseline 10.1 ms, 11.8 ms; added 18.3 and 22.3 ms) is wall clock around
+`CaptureGate.run` over the in-memory PayPal simulator on one machine. It contains the gate's database and signing work and none of
+PayPal's network time, so against live PayPal the added latency is mostly extra PayPal reads and is unmeasured. The added p50 varied by about 2 ms across three runs of the same code during this phase (20.0, 20.8 and 18.3 ms); only the frozen run is kept, and it is the one cited.
+
 ### L39 (note)
 
 L39 was removed when the two cassettes were re-recorded (Decision 85). The numbers are not reused or shifted.

@@ -209,6 +209,11 @@ def test_order_detail_evidence_and_protection(clean: tuple[str, dict[str, Any]])
     _run(base, expected, ["test/detail.test.mjs", "test/views.test.mjs"])
 
 
+def test_results_view_shows_the_frozen_evaluation(clean: tuple[str, dict[str, Any]]) -> None:
+    base, expected = clean
+    _run(base, expected, ["test/results.test.mjs"])
+
+
 def test_untrusted_text_is_rendered_as_text(hostile: tuple[str, dict[str, Any]]) -> None:
     base, expected = hostile
     _run(base, expected, ["test/hostile.test.mjs"])

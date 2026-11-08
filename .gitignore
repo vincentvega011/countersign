@@ -34,3 +34,4 @@ eval/reports/*/
 .DS_Store
 .idea/
 .vscode/
+!eval/reports/20261108T063449Z/

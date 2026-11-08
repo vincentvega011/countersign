@@ -13,6 +13,8 @@ uv run python -m eval.run --suite all --mode both     # every suite below
 uv run python -m eval.run --mode full --case nonce_replay_new_session --no-write
 ```
 
+- `--seeds 0,1,2` (with `--suite all --mode both`, also `make eval`): the release run. Every suite per seed, all ablations, evidence
+  verification, charts, `results` in `latest.json` (Decision 134).
 - `--suite attacks | adversary | tasks | properties | concurrency | all`. `--mode full | baseline | both`
   (not used by `properties` and `concurrency`). `--case ID` (repeatable) runs selected cases, goals or
   tasks. `--no-write` prints only.
@@ -71,6 +73,7 @@ A case that succeeds in `full` is a security finding. Report it; do not change t
 | --- | --- |
 | `core.py` | `AttackCase`, `Expect`, `Ctx` (what a case may do and register) |
 | `suites.py` | the task rows and the pytest-backed property and concurrency suites |
+| `release.py`, `verify.py`, `charts.py` | the release run, bundle verification with both verifiers, SVG charts |
 | `launch.py` | one adversary goal against baseline and full, for the dashboard |
 | `adversary/` | the harness side of the adversary: the customer and payer it is given, the runner |
 | `tasks/` | the fixed legitimate purchases and their runner |

@@ -249,3 +249,64 @@ export async function startAttackRun(attack: string): Promise<AttackRun> {
   if (!response.ok) throw new Error(String(body.code ?? response.status));
   return body as AttackRun;
 }
+
+export interface ModeBlock {
+  cases: number;
+  attacks_succeeded: number;
+  unauthorized_captures: number;
+  duplicate_paypal_objects: number;
+}
+export interface TaskBlock {
+  runs: number;
+  completed: number;
+  false_blocks: number;
+  completion_rate: number;
+  false_block_rate: number;
+  unauthorized_captures: number;
+  duplicate_paypal_objects: number;
+  stage_p50_ms: number;
+  stage_p95_ms: number;
+  stage_calls: number;
+}
+export interface EvidenceBlock {
+  captures: number;
+  bundles: number;
+  python_pass: number;
+  browser_pass: number;
+  both_pass: number;
+  captures_without_bundle: number;
+}
+export interface Results {
+  run_id: string;
+  generated_at: string;
+  seeds: number[];
+  seed_invariant: boolean;
+  simulator: string;
+  attacks: Record<"full" | "baseline", ModeBlock>;
+  adversary: Record<"full" | "baseline", ModeBlock>;
+  tasks: Record<"full" | "baseline", TaskBlock>;
+  evidence: Record<"full" | "baseline", EvidenceBlock>;
+  gate_added_p50_ms: number;
+  gate_added_p95_ms: number;
+  baseline_gap: string[];
+  categories: {
+    category: string;
+    cases: number;
+    full_succeeded: number;
+    baseline_succeeded: number;
+  }[];
+  ablations: {
+    flag: string;
+    cases: number;
+    reopened_count: number;
+    reopened: string;
+    unauthorized_captures: number;
+    duplicate_paypal_objects: number;
+    another_defense: number;
+    note: string;
+  }[];
+  targets: { target: string; status: "met" | "missed"; evidence: string }[];
+  caveats: string[];
+}
+export const fetchResults = async () =>
+  (await getJson<{ results: Results | null }>("/eval")).results;

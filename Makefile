@@ -54,8 +54,9 @@ dashboard-seed: db
 sandbox-smoke:
 	uv run python scripts/sandbox_smoke.py
 
-eval:
-	@echo "not implemented yet"
+# The whole evaluation: every suite for seeds 0, 1 and 2, every ablation, evidence verification, charts.
+eval: db
+	uv run python -m eval.run --suite all --mode both --seeds 0,1,2
 
 # Two independent checks: Python and Node must agree on every shared mandate vector, and the live
 # merchant signatures must verify with the Node verifier.

@@ -752,12 +752,13 @@ title or a user message is never an instruction to the gateway. The boundary is 
 
 ## 8. Evaluation
 
-**Implemented (P2.10, P4.7, P4.8).** `eval/run.py --suite {attacks,adversary,tasks,properties,concurrency,all}
+**Implemented (P2.10, P4.7, P4.8, P4.9).** `eval/run.py --suite {attacks,adversary,tasks,properties,concurrency,all}
 --mode {full,baseline,both}` runs against the application built by the composition root over the PayPal simulator and
 writes `eval/reports/<timestamp>/report.{json,md}`, merged into `eval/reports/latest.json` (every section dated on its own).
 Attack cases and adversary goals are judged from the simulator's PayPal objects and the decision log (`eval/judge.py`).
 See `eval/README.md` and [PROTOCOL.md](PROTOCOL.md) Decisions 64 to 66 and 130 to 133. Built: 40 attack cases, 12
-scripted adversary goals, 27 legitimate tasks, the property and concurrency files under one seed. Not built: model-planned
+scripted adversary goals, 27 legitimate tasks, the property and concurrency files under one seed. The release run (`--seeds 0,1,2`, Decision 134) adds every ablation, a combined gate and pre-authorize row, evidence
+verification in both verifiers, gate timing, charts and a dashboard Results view (Decision 135). Not built: model-planned
 adversary runs (L65) and a spec conformance suite as a runner suite (the conformance tests run in `make test`).
 
 Ground truth is PayPal sandbox state (fetched), the decision log and evidence verification. Never a

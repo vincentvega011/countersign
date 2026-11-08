@@ -13,7 +13,8 @@ import secrets
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
 
 from alembic import command
 from sqlalchemy import Engine, create_engine, text
@@ -29,7 +30,8 @@ from tests.integration.conftest import (
     drop_database,
     scratch_urls,
 )
-from tests.mode_support import make_world, reset, settings_for
+from tests.mode_support import make_world, settings_for
+from tests.mode_support import reset as _reset
 
 
 @dataclass(frozen=True)
@@ -65,12 +67,44 @@ def scratch_databases() -> Iterator[Databases]:
         drop_database(server_url, name, role)
 
 
+@dataclass(frozen=True)
+class BundleJob:
+    """A stored evidence bundle and the service keys to pin when verifying it (see `eval.verify`)."""
+
+    capture_id: str
+    text: str
+    merchant_jwk: dict[str, Any]
+    platform_jwk: dict[str, Any]
+
+
 @dataclass
 class CaseRun:
     verdict: Verdict
     reason: str | None
     side_effects: list[str]
     error: str | None = None
+    bundles: list[BundleJob] = field(default_factory=list)
+
+
+def collect_bundles(world: Any, admin: Engine) -> list[BundleJob]:
+    """Every evidence bundle the app stored, with the merchant and platform public keys it signs with."""
+    with admin.connect() as conn:
+        rows = conn.execute(
+            text("SELECT capture_id, bundle FROM evidence_bundles ORDER BY capture_id")
+        ).all()
+    if not rows:
+        return []
+    public = world.keys.issuer.as_dict(private=False)
+    platform = {k: public[k] for k in ("kty", "crv", "x", "y")}
+    merchant = dict(world.merchant_key.public_jwk)
+    return [BundleJob(str(r[0]), str(r[1]), merchant, platform) for r in rows]
+
+
+def reset(admin: Engine) -> None:
+    """Empty the tables the cases use, and the evidence tables the shared reset leaves alone."""
+    _reset(admin)
+    with admin.begin() as conn:
+        conn.execute(text("TRUNCATE paypal_observations, evidence_bundles CASCADE"))
 
 
 def run_case(case: AttackCase, config: str | RuntimeSettings, dbs: Databases) -> CaseRun:
@@ -86,4 +120,6 @@ def run_case(case: AttackCase, config: str | RuntimeSettings, dbs: Databases) ->
         except Exception as exc:  # noqa: BLE001 - a crashed case is reported, never counted as blocked
             error = f"{type(exc).__name__}: {exc}"[:200]
     verdict = judge(ctx, dbs.app)
-    return CaseRun(verdict, ctx.reason, sorted(ctx.side_effects), error)
+    return CaseRun(
+        verdict, ctx.reason, sorted(ctx.side_effects), error, collect_bundles(world, dbs.admin)
+    )

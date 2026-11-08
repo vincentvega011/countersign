@@ -265,7 +265,46 @@ recorded request ids again, so:
   verdicts. Attack suite 30 to 40 cases. 27 legitimate tasks (one Human Present). `properties` and `concurrency` run from
   `eval.run`; `--suite all` merges every section into `eval/reports/latest.json`. **LLM adversary mode is cut** (L65).
   Figures are in `eval/reports/latest.json`, not repeated here.
-- **Next:** P4 gate (whole demo from the dashboard, numbers frozen), then P5.
+- **P4.9 and P4.10 (2026-11-08): done** (Decisions 134 and 135, L68 to L70). The release evaluation, the dashboard Results view, the click
+  path in [DEMO.md](DEMO.md), the reviews in [p4-review.md](p4-review.md). Gate below.
+- **Next:** P5.
+
+## P4 gate (run 2026-11-08): passed
+
+Frozen run: **`20261108T063449Z`**, seeds 0, 1, 2 (`eval/reports/20261108T063449Z/report.json`, `report.md`, `charts/`; `eval/reports/latest.json` points at it).
+**Documents and the README must cite only these figures and this run.** Any other figure is not frozen.
+
+| Figure | Value | Source |
+| --- | --- | --- |
+| Attack cases, full: succeeded, unauthorized captures, duplicate PayPal objects | 0 of 40, 0, 0 | `results.attacks.full` |
+| Attack cases, baseline: succeeded, unauthorized captures, duplicate PayPal objects | 11 of 40, 12, 0 | `results.attacks.baseline` |
+| Scripted adversary goals, full and baseline: succeeded | 0 of 12 and 6 of 12 | `results.adversary` |
+| Legitimate tasks (27 per seed, 81 runs per mode): completion, false block rate | 100.0% (81 of 81), 0.0% (0 of 81), both modes | `results.tasks` |
+| Capture stage time over the PayPal simulator, p50 and p95 | full 28.4 and 34.1 ms, baseline 10.1 and 11.8 ms, added 18.3 and 22.3 ms | `results.gate_latency` |
+| Properties and concurrency under seeds 0, 1, 2 | 74 and 27 passed under each seed | `results.pytest` |
+| Ablations (alone) that reopen an attack | `ABL_NO_GLOBAL_NONCE`: 3 cases (3 unauthorized captures). The other five reopen nothing | `results.ablations` |
+| Gate and pre-authorize check off together (not an architecture ablation) | reopens 5 cases, 7 unauthorized captures | `results.ablations` |
+| Evidence bundles for evaluation captures | 0 of 37 full-mode captures (**target missed**, L68) | `results.evidence` |
+| Recorded sandbox capture `49029167TJ689282S` verifies in the Python CLI and the browser verifier | yes, twelve steps each, keys pinned | `results.evidence.replay` |
+
+Targets missed, stated as such: evidence bundles verifying for 100% of captures (L68), the adversary run with a model and a confidence
+interval (L65), the spec conformance suite as a runner suite. Everything else in architecture section 8 is met; the per-target table is
+in the report.
+
+Gate evidence:
+
+- **The demo from the dashboard** ([DEMO.md](DEMO.md)): seed, an attack run side by side (baseline captured money, full blocked with
+  `mandate_required`), Results, an order detail, its evidence (eleven of twelve steps pass; the twelfth reports unpinned keys), and a
+  recorded assistant question with citations. A browser script ran the whole path against a local instance with no console errors.
+- **Gates, run once and separately on the final tree:** `make lint` exit 0. The full test suite (the command `make test` runs after its
+  `docker compose` step, which was skipped by rule) exit 0 (3932 passed, 2 skipped, 4 xfailed). `make interop` exit 0. The safety gate (mypy, safety coverage and the
+  safety test selection `make test-safety` runs, again without its Docker step) exit 0, 3873 passed. `python -m eval.run --suite attacks
+  --mode both` exit 0.
+- **Reviews** ([p4-review.md](p4-review.md)): security-reviewer over everything since the P2 gate, `PASS WITH NOTES`, no BLOCK; one
+  MEDIUM carried forward, two LOW fixed or documented. design-reviewer over every surface: no BLOCK; HIGH items in the new Results
+  view fixed, the rest carried forward below.
+- **Mutation sweeps** were not run: no invariant module was touched in P4.9 and P4.10 (only the dashboard read API, one dashboard route,
+  the eval harness and the frontend).
 
 ## P3 gate (run 2026-11-05): passed
 
@@ -365,6 +404,19 @@ Findings from the P1 review that belong to P2 and are not optional there:
 - **P4:** let the reader pin or recognise the customer's device key fingerprint on `/verify/` beyond showing it (L54).
 - **P5.1:** rate limit `GET /evidence/{capture_id}` (L46).
 - **Later:** anchor the decision log root so the log steps prove more than consistency (L48).
+
+- **P5.1 (from the P4 reviews):** gate the dashboard API in demo (a shared demo token or a plain statement that it is public, L57),
+  because it lists capture ids and so every bundle; operator token or launcher off in demo, a per-IP limit and run-record rotation (L66).
+- **P5:** pin the merchant key (from `/.well-known/ucp`) and the platform key in the dashboard's "Verify evidence", so the headline
+  shot proves authenticity and not only consistency.
+- **P5:** append `evidence.failed` to the decision log when a bundle cannot be assembled (L68); run autonomous evaluation tasks through
+  the real consent routes so every evaluation capture gets a bundle, and decide what a Human Present purchase should leave behind (L68).
+- **P5 design polish (design review):** the Orders tiles and donut (labels, one source for the numbers, status colours from the tokens),
+  truncated Orders cells, the "Working" badge on the idle setup card, the Orders placeholder dashes, the dashboard at 375 px (11 px
+  overflow, 34 px targets), the approve-intent and approve-purchase screens with live data (not captured in the review), a legend
+  for the category chart.
+- **P5:** a hosted baseline as a separate, labelled instance; seed real data on the hosted demo, including open mandates and several real
+  sandbox bundles; trademark check on the six invented brand names.
 
 ## Open risks
 

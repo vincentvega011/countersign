@@ -9,15 +9,18 @@ import {
   fetchEval,
   fetchMandates,
   fetchOrders,
+  fetchResults,
   fetchStatus,
   type EvalCase,
   type EventRow,
   type MandateRow,
   type Order,
+  type Results,
   type Status,
 } from "./api";
 import { OrdersStudio } from "./Studio";
 import { ProtectionStudio } from "./ProtectionStudio";
+import { ResultsStudio } from "./ResultsStudio";
 import { EvidenceView } from "./Evidence";
 import { PolicyView_ } from "./Policy";
 import { AssistantStudio } from "./AssistantStudio";
@@ -29,6 +32,7 @@ const LICENSE = __AG_STUDIO_LICENSE_KEY__ || undefined;
 const VIEWS = [
   { id: "orders", label: "Orders" },
   { id: "protection", label: "Protection" },
+  { id: "results", label: "Results" },
   { id: "evidence", label: "Evidence" },
   { id: "policy", label: "Policy" },
   { id: "assistant", label: "Assistant" },
@@ -56,6 +60,7 @@ export function App() {
     mandates: MandateRow[];
     cases: EvalCase[];
   } | null>(null);
+  const [results, setResults] = useState<Results | null | undefined>(undefined);
   const [status, setStatus] = useState<Status | null>(null);
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -91,6 +96,12 @@ export function App() {
       )
       .catch(() => setFailed(true));
   }, [view, protection]);
+  useEffect(() => {
+    if (view !== "results" || results !== undefined) return;
+    fetchResults()
+      .then(setResults)
+      .catch(() => setFailed(true));
+  }, [view, results]);
   const onLive = useCallback(
     (count: number) => setLive({ at: new Date(), count }),
     [],
@@ -230,6 +241,31 @@ export function App() {
             <section className="cs-protection" aria-label="Protection activity">
               <div className="cs-studio" data-testid="protection-studio">
                 <ProtectionStudio orders={orders} {...protection} />
+              </div>
+            </section>
+          )}
+          {view === "results" && results === null && (
+            <p className="cs-notice" data-testid="results-empty">
+              No full evaluation has been run yet. Run{" "}
+              <code>
+                python -m eval.run --suite all --mode both --seeds 0,1,2
+              </code>
+              .
+            </p>
+          )}
+          {view === "results" && results && (
+            <section className="cs-protection" aria-label="Evaluation results">
+              <p className="cs-muted" data-testid="results-meta">
+                Run {results.run_id} · seeds {results.seeds.join(", ")} ·
+                simulator, not live PayPal. Read only.
+              </p>
+              <p className="cs-muted" data-testid="results-note">
+                Simulator captures carry no evidence bundle, so the bundle
+                columns read 0 there; the recorded sandbox capture is verified
+                separately (see Targets).
+              </p>
+              <div className="cs-studio" data-testid="results-studio">
+                <ResultsStudio results={results} />
               </div>
             </section>
           )}

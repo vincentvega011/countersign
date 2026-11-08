@@ -32,7 +32,11 @@ PYTEST_SUITES: dict[str, tuple[str, ...]] = {
 }
 
 
-def task_rows(modes: list[str], only: list[str] | None = None) -> list[dict[str, Any]]:
+def task_rows(
+    modes: list[str],
+    only: list[str] | None = None,
+    bundles: list[tuple[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
     rows = []
     with scratch_databases() as dbs:
         for task in build_tasks():
@@ -40,11 +44,14 @@ def task_rows(modes: list[str], only: list[str] | None = None) -> list[dict[str,
                 continue
             for mode in modes:
                 done = run_task(task, mode, dbs)
+                if bundles is not None:
+                    bundles.extend((mode, b) for b in done.bundles)
                 rows.append(
                     {
                         "task": task.id, "kind": task.kind, "mode": mode,
                         "completed": done.completed, "false_block": done.false_block,
                         "latency_ms": round(done.latency_ms, 1),
+                        "gate_ms": [round(g, 2) for g in done.gate_ms],
                         "captured_minor": done.captured_minor, "expected_minor": done.expected_minor,
                         "unauthorized_captures": done.verdict.unauthorized_captures,
                         "duplicate_paypal_objects": done.verdict.duplicate_objects,
@@ -59,17 +66,17 @@ def _count(pattern: str, text: str) -> int:
     return int(found.group(1)) if found else 0
 
 
-def run_pytest_suite(name: str) -> list[dict[str, Any]]:
+def run_pytest_suite(name: str, seed: int = SEED) -> list[dict[str, Any]]:
     targets = PYTEST_SUITES[name]
     command = [
         sys.executable, "-m", "pytest", *targets, "-q", "-p", "no:cacheprovider",
-        f"--hypothesis-seed={SEED}", "--no-header", "-o", "addopts=",
+        f"--hypothesis-seed={seed}", "--no-header", "-o", "addopts=",
     ]  # fmt: skip
     done = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, check=False)
     tail = "\n".join(done.stdout.strip().splitlines()[-3:])
     return [
         {
-            "target": name, "files": list(targets), "seed": SEED, "exit_status": done.returncode,
+            "target": name, "files": list(targets), "seed": seed, "exit_status": done.returncode,
             "passed": _count(r"(\d+) passed", tail), "failed": _count(r"(\d+) failed", tail),
             "errors": _count(r"(\d+) error", tail),
         }

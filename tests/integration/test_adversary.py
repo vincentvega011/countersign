@@ -161,6 +161,10 @@ def test_the_request_is_strict(launched: tuple[World, FakeLauncher]) -> None:
     assert w.client.post(API, content=b"{not json", headers=HEADERS).status_code == 404
     big = w.client.post(API, content=b'{"attack": "' + b"a" * 400 + b'"}', headers=HEADERS)
     assert big.status_code == 404
+    dup = b'{"attack": "nope", "attack": "protocol_downgrade_acp"}'  # strict loader: duplicate keys (INV-8)
+    assert w.client.post(API, content=dup, headers=HEADERS).status_code == 404
+    nan = b'{"attack": "protocol_downgrade_acp", "x": NaN}'
+    assert w.client.post(API, content=nan, headers=HEADERS).status_code == 404
     assert fake.calls == []
 
 

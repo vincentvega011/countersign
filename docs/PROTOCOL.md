@@ -3327,6 +3327,33 @@ and report passed, failed and errors (test counts, not example counts). `--suite
 carries `sections` for the non-attack suites, each dated on its own; `latest.json` is merged, so a partial run replaces only the
 sections it ran and keeps the older ones with their own dates (the attack matrix reads the top-level attack figures as before).
 
+### Decision 134: The release evaluation and what it reports
+
+`python -m eval.run --suite all --mode both --seeds 0,1,2` (`make eval`) runs, for each seed, the attack suite, the scripted adversary
+goals, the 27 tasks, and the property and concurrency files (`--hypothesis-seed` is the seed). The attack, adversary and task suites
+contain no randomness, so the seeds are repetitions; the report states whether the three runs were identical (they were:
+`seed_invariant`). Every architecture ablation then runs against all 40 attack cases once, and one extra configuration is added that
+is not an architecture ablation: `ABL_NO_GATE` and `ABL_NO_PREAUTH_CHECK` off together, because alone neither reopens anything (the
+other layer stops the case) and the pair shows what the gate adds. Capture stage time is measured by wrapping `CaptureGate.run`
+(`ImmediateCapture` inherits it, so one wrapper times the gate in full and the immediate capture in baseline); it measures and
+changes nothing. Added gate latency is full minus baseline at p50 and p95 over 162 calls per mode, over the PayPal simulator.
+Evidence: every bundle the app stored in the attack and task runs is verified with the Python CLI and the browser verifier (Node),
+service keys pinned from the world that produced it; the recorded sandbox capture is verified through the two P3 gate replay tests.
+Output: `report.json` (rows for every seed, ablation rows, and a `results` block), `report.md`, `charts/*.svg` (dependency free), and
+`latest.json`, which now also carries `results` for the dashboard. The frozen run `20261108T063449Z` is un-ignored in `.gitignore`
+so the files that documents cite are in the repository. Exit status is 1 on any mismatch, crash, uncompleted task or failed test.
+The release code is `eval/release.py`; the helper `rerender` rebuilds a finished run's notes and markdown from its `report.json`.
+
+### Decision 135: The Results view reads `results` through the existing eval endpoint
+
+`GET /dashboard/api/v1/eval` returns a second member, `results`, produced by `read.eval_results`, which re-types every field and
+bounds every string, so a malformed report degrades to `null` (the view then says no full evaluation has run). No route, static file
+or CSP rule was added; the view is a read of the same file as the attack matrix. The view is AG Studio widgets: four Total tiles
+over a one-row `full_mode` table (a first version totalled the two-row `modes` table and showed baseline plus full, 18 instead of 0;
+the browser test caught it), a grid of totals per mode, two bar charts, a pivot grid of ablations grouped by result, a grid of tasks
+and capture stage time, and a pivot grid of targets grouped by met and missed. Nothing in the view is typed in; the meta line names
+the run id.
+
 ## 4. Confirmed PayPal facts
 
 Observed in the PayPal sandbox with `scripts/sandbox_smoke.py` and `scripts/sandbox_confirm.py`

@@ -23,7 +23,7 @@ import structlog
 
 import eval.attacks as attacks_package
 from eval.core import AttackCase
-from eval.harness import run_case, scratch_databases
+from eval.harness import BundleJob, run_case, scratch_databases
 from eval.report import build, build_all, build_section, row, write
 from eval.suites import run_pytest_suite, task_rows
 
@@ -43,13 +43,24 @@ def load_cases() -> list[AttackCase]:
     return sorted(cases, key=lambda c: c.id)
 
 
-def run_suite(modes: list[str], only: list[str] | None = None) -> list[dict[str, Any]]:
+def run_suite(
+    modes: list[str],
+    only: list[str] | None = None,
+    bundles: list[tuple[str, BundleJob]] | None = None,
+) -> list[dict[str, Any]]:
+    """The attack cases in each configuration (a mode or an ablation name from `CONFIGS`).
+
+    `bundles`, when given, collects every evidence bundle the runs stored, tagged with the mode.
+    """
     cases = [c for c in load_cases() if not only or c.id in only]
     rows = []
     with scratch_databases() as dbs:
         for case in cases:
             for mode in modes:
-                rows.append(row(case, mode, run_case(case, mode, dbs)))
+                done = run_case(case, mode, dbs)
+                rows.append(row(case, mode, done))
+                if bundles is not None:
+                    bundles.extend((mode, b) for b in done.bundles)
     return rows
 
 
@@ -79,9 +90,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--suite", choices=SUITES, default="attacks")
     parser.add_argument("--mode", choices=["full", "baseline", "both"], default="both")
     parser.add_argument("--case", action="append", help="run only this case id (repeatable)")
+    parser.add_argument(
+        "--seeds",
+        default=None,
+        help="comma separated Hypothesis seeds, for example 0,1,2. With --suite all this runs the "
+        "whole evaluation once per seed plus every ablation and writes the full report",
+    )
     parser.add_argument("--no-write", action="store_true", help="print only; write no report")
     args = parser.parse_args(argv)
     structlog.configure(wrapper_class=structlog.make_filtering_bound_logger(logging.WARNING))
+    if args.seeds is not None:
+        if args.suite != "all" or args.mode != "both" or args.case:
+            parser.error("--seeds needs --suite all --mode both and no --case")
+        from eval.release import run_release
+
+        return run_release([int(x) for x in args.seeds.split(",")], write=not args.no_write)
     modes = ["full", "baseline"] if args.mode == "both" else [args.mode]
     wanted = SUITES[:-1] if args.suite == "all" else (args.suite,)
     sections: dict[str, dict[str, Any]] = {}

@@ -3,8 +3,9 @@
 Security reasoning (Decision 107, L46). A bundle holds sanitized sandbox data only: PayPal objects pass the
 member allowlist of `evidence.observer` (no payer, no email, no name, no address, no shipping, no links),
 and the customer is a random `cus_` id. It is served in every `APP_ENV` so the `/verify/` page can load
-one by capture id. There is no listing endpoint, so a caller must already know a capture id, and an
-unknown id and a malformed one get the same answer (status, body, headers), so the endpoint is no oracle
+one by capture id. This route has no listing, but the dashboard API (`/dashboard/api/v1/orders`) lists capture ids and has
+no login (L57), so a bundle is readable by anyone who can reach a demo instance; the bundles hold sanitized
+sandbox data only. An unknown id and a malformed one get the same answer (status, body, headers), so the endpoint is no oracle
 for which ids are well formed. Every fetch writes one process log line (not a decision log entry: a read
 decides nothing). Answers are never cached.
 """
