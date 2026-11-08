@@ -3259,6 +3259,74 @@ in a new tab (`#/orders/<id>` filters the Orders view; `#/evidence/<id>`). Studi
 Assistant view runs in edit mode with only the AI panel configured (L63). Studio's widget-building tools were not used: they need
 the model to see Studio's schema and context.
 
+### Decision 130: The adversary is a separate process, scripted, and reaches the app over HTTP only
+
+**Flagged for the owner.** `agents/adversary` follows the isolation pattern of `agents/shopper` (Decision 98) with less in
+it: standard library and `httpx` only, its own `wire.py` (base64url, the (r, n - s) signature rewrite, a one-character tamper,
+a JSON body with a duplicate key), no `countersign` import, no environment read, no PayPal or database name anywhere.
+`tests/unit/test_adversary_boundary.py` enforces all three. It has twelve scripts, each named after the `eval/attacks` case it
+re-performs (`protocol_downgrade_acp`, `unmandated_acp_unlocked`, `double_spend_across_protocols`, `new_session_escape`,
+`nonce_replay_new_session`, `open_mandate_double_spend`, `open_mandate_reuse_new_presentation`, `budget_split`, `checkout_swap`,
+`mandate_forged`, `category_escape`, `duplicate_json_keys`); several run across UCP and ACP in one goal. Two things an agent
+cannot do come from a `Counterparties` object the caller provides: what the customer signed (`sign(authorized=...)`) and the
+payer's approval at PayPal. In the harness (`eval/adversary/consent.py`) the customer is the issuer the attack cases use and the
+payer is the PayPal simulator; `authorized=True` also tells the judge what was really signed, which the adversary never sees.
+The target is a whole app built by the composition root and reached through its HTTP interface with the ASGI test client, not a
+network socket. Every request appends one line to the attempt log (attack id, target mode, time, step, method, path, body shape,
+header names only, status, the adversary's own reading, the stable code): no header value, token or body is written. The verdict
+is the judge's (PayPal state and the decision log) and never the log's. A test runs every script in both modes and requires the
+verdict to equal the registry case's declared outcome (12 goals, 24 runs). **LLM mode is cut** (L65). `python -m agents.adversary
+--list` lists the scripts; a run is `uv run python -m eval.run --suite adversary [--case ID]`.
+
+### Decision 131: The dashboard "Run attack" launcher is the one gated write
+
+**Flagged for the owner.** `GET` and `POST /dashboard/api/v1/attack-runs`. `POST {"attack": id}` builds a fresh baseline and a
+fresh full instance on scratch databases (`eval/launch.py`), lets the scripted adversary attack both, judges each, and returns
+and stores one run record. It is refused (403 `attack_runs_disabled`) unless `APP_ENV` is `dev`, `eval` or `demo` **and** a
+launcher is installed. `countersign.main` installs it in dev and eval, in demo only when `EVAL_DATABASE_ADMIN_URL` is set, never
+elsewhere, and not when `ATTACK_RUNS=0`; the launcher is imported by name so the server's type check does not follow into the
+evaluation code. Further gates: a custom request header `X-Countersign-Dashboard: 1` (403 `attack_run_header_required`; a
+cross-site request cannot add it without a preflight, which the app never answers), a body of at most 256 bytes with exactly one
+member `attack` that must be in the launcher's own list (404 `attack_unknown`), one run at a time (409 `attack_run_busy`), and
+503 `attack_runs_unavailable` when no scratch database can be created. The route reads and writes no merchant data: the only files
+written are `eval/reports/attack-runs/<run id>/{record.json, attempts-baseline.jsonl, attempts-full.jsonl}`. The existing
+static file allowlist and CSP are unchanged (`connect-src 'self'` covers the call). The Attack matrix widget gets a select and a
+button (`RunPanel`) that appears only when `GET attack-runs` says enabled and shows, per instance, "money captured outside what was
+signed or allowed: yes or no" from the judge. The policy snapshot still says `write_endpoints: 0` (no merchant write endpoint);
+L66 records that this is narrower than "no POST route".
+
+### Decision 132: The attack suite grows from 30 to 40 cases
+
+Ten new cases, each exercising a defense no earlier case isolates: `mandate_roles_swapped` (exact `vct` and audience per slot),
+`payment_mandate_missing` (INV-3: no authorization without a Payment Mandate), `open_mandate_as_closed` (the closed link signed by
+the bound key is required), `payment_mandate_other_checkout` (the payment mandate binds to the same checkout hash),
+`amount_off_by_one_minor_unit` (one cent more and one cent less), `currency_swap` (EUR amount on a USD checkout),
+`mandate_other_agent_key` (closed links signed by an agent other than the one in `cnf`), `complete_after_cancel` (a canceled checkout
+completed with valid mandates), `concurrent_complete_race` (twelve simultaneous completes, then twelve retries after payer
+approval), and `evidence_bundle_tamper` (four rewrites of the committed synthetic bundle, judged by the offline verifier alone).
+**None separates the modes**: all ten are blocked in baseline too, because those defenses are shared; the matrix says so. To
+build them `tests/mode_support.mandate_pair` gained `payment_issue`, `currency` and `lines`. **Dropped** because they cannot be
+judged from PayPal state, the log or evidence verification as the harness stands: a consent record replayed across customers and
+a revoked device key used after revoke (both need a device-bound world; the Trusted Surface tests cover them), an open mandate
+that expires mid-flight (the world's clock is fixed), a shipping address change (the canonical checkout has no address), a
+valid-signature webhook replay (the judge does not net refunds, so a legitimate refund would read as an over-budget capture).
+`evidence_bundle_tamper` cannot use the world's own bundles: they need a device consent record behind the open mandate, which the
+issuer-built mandates lack, so it starts from `tests/vectors/evidence/valid.json`, and it exercises the Python verifier only
+(the browser verifier is held to the same vectors by its own test).
+
+### Decision 133: Task, property and concurrency suites, and how reports merge
+
+`eval/tasks` builds 27 fixed legitimate purchases (26 autonomous across the five catalog categories: single items, quantity two,
+two lines, a budget equal to the total, one cent above it, and a generous one; one Human Present purchase through the real Trusted
+Surface offer and consent routes with a Python device). A task completes only if PayPal holds exactly one capture for exactly the
+signed total and the judge finds no violation; otherwise it is a false block. Reported per mode: completion rate, false block rate,
+unauthorized captures, duplicate objects, latency p50 and p95 (wall clock over the simulator, so noisy and not comparable with
+live PayPal). They run through the issuer and the simulator, not through the model-driven shopper, so no recording is involved and
+no cassette changed. `--suite properties` and `--suite concurrency` run pytest over fixed file lists with `--hypothesis-seed=0`
+and report passed, failed and errors (test counts, not example counts). `--suite all` runs all five. Reports: `report.json`
+carries `sections` for the non-attack suites, each dated on its own; `latest.json` is merged, so a partial run replaces only the
+sections it ran and keeps the older ones with their own dates (the attack matrix reads the top-level attack figures as before).
+
 ## 4. Confirmed PayPal facts
 
 Observed in the PayPal sandbox with `scripts/sandbox_smoke.py` and `scripts/sandbox_confirm.py`

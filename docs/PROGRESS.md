@@ -10,7 +10,7 @@ A phase starts only when the previous gate has passed.
 | P1    | Canonical core, UCP checkout and profile, `merchant_authorization`, PayPal client, decision log                                        | A UCP checkout is signed and verified by the independent Node verifier, and canonical terms round-trip through a real sandbox order                | Passed |
 | P2    | Mandates, Merchant and Credential Provider roles, constraints, capture gate, principal lock, ACP adapter, baseline mode, first attacks | Downgrade, order-changed-after-approval (nothing is authorized in full; authorized, then voided by the gate with `ABL_NO_PREAUTH_CHECK`) and replay attacks succeed in baseline and fail in full with nothing captured; concurrency tests pass | Passed      |
 | P3    | Trusted Surface with device keys and consent, shopping agent, evidence bundles and verifiers                                           | An autonomous purchase runs from phone approval to a captured sandbox order to a verified evidence bundle, with no server-held customer key        | Passed      |
-| P4    | Dashboard, assistant, hostile agent, full evaluation                                                                                   | The whole demo runs from the dashboard locally and the evaluation numbers are frozen                                                               | In progress (P4.1 to P4.6 done) |
+| P4    | Dashboard, assistant, hostile agent, full evaluation                                                                                   | The whole demo runs from the dashboard locally and the evaluation numbers are frozen                                                               | In progress (P4.1 to P4.8 done) |
 | P5    | Deployment, design polish, documentation, fresh-clone test                                                                             | A stranger can use the hosted demo end to end and can run it locally from the README alone                                                         | Not started |
 | P6    | Video, submission text, final checks                                                                                                   | Everything is submitted with time to spare                                                                                                         | Not started |
 
@@ -259,7 +259,13 @@ recorded request ids again, so:
   dev seed makes five open mandates; read-only Policy panel with the policy hash (the editable, versioned policy view is cut for
   time and `check_category_policy` is not wired, L62); Ask Countersign on Studio's agent framework (the model plans, code answers,
   the grounding check mutation-tested 16 of 16, ten recorded questions replayed offline).
-- **Next:** P4.7 adversary agent; P4.8 evaluation suites.
+- **P4.7 and P4.8 (2026-11-08): done** (Decisions 130 to 133, L65 to L67). `agents/adversary`: a separate, HTTP-only,
+  scripted agent with 12 goals, an attempt log without secrets, a boundary test, and a parity test against the registry.
+  Dashboard "Run attack" (dev, eval, demo only) runs a goal against fresh baseline and full instances and shows the judge's
+  verdicts. Attack suite 30 to 40 cases. 27 legitimate tasks (one Human Present). `properties` and `concurrency` run from
+  `eval.run`; `--suite all` merges every section into `eval/reports/latest.json`. **LLM adversary mode is cut** (L65).
+  Figures are in `eval/reports/latest.json`, not repeated here.
+- **Next:** P4 gate (whole demo from the dashboard, numbers frozen), then P5.
 
 ## P3 gate (run 2026-11-05): passed
 
@@ -339,6 +345,9 @@ Findings from the P1 review that belong to P2 and are not optional there:
   model code (`tests/unit/test_gate_import_guard.py`).
 
 ## Carried forward
+
+- **P5.1:** rate limit the attack-run launcher and keep run records off ephemeral disk if it stays on in demo (L66).
+- **Later:** a model-planned adversary and more goals if time allows (L65).
 
 - **P5.1:** rate limit completes and `complete_in_progress` log growth per checkout and per principal (Decision 68).
 - **Before vault mode is enabled:** key the payer vault on (customer id, agent thumbprint), not the agent key alone (L32).

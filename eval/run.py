@@ -1,9 +1,13 @@
-"""Eval runner: `uv run python -m eval.run --suite attacks --mode both`.
+"""Eval runner: `uv run python -m eval.run --suite all --mode both`.
 
-Runs every attack case under `eval/attacks/` in `full`, `baseline` or both, judges each from PayPal
-state and the decision log, and writes `eval/reports/<timestamp>/report.{json,md}` and
-`eval/reports/latest.json`. Exit status 1 when a case's outcome differs from its declared
-expectation or a case crashed, 0 otherwise.
+Suites: `attacks` (every case under `eval/attacks/`, judged from PayPal state and the decision log),
+`adversary` (the scripted goals of `agents/adversary`, judged the same way), `tasks` (legitimate
+purchases: completion, latency, false blocks), `properties` and `concurrency` (the Hypothesis and the
+parallel tests, run with a fixed seed). `all` runs every suite. Reports go to
+`eval/reports/<timestamp>/report.{json,md}` and merge into `eval/reports/latest.json`.
+
+Exit status 1 when an outcome differs from its declared expectation, a case crashed, a task did not
+complete or a pytest suite failed, 0 otherwise.
 """
 
 from __future__ import annotations
@@ -20,7 +24,10 @@ import structlog
 import eval.attacks as attacks_package
 from eval.core import AttackCase
 from eval.harness import run_case, scratch_databases
-from eval.report import build, row, write
+from eval.report import build, build_all, build_section, row, write
+from eval.suites import run_pytest_suite, task_rows
+
+SUITES = ("attacks", "adversary", "tasks", "properties", "concurrency", "all")
 
 
 def load_cases() -> list[AttackCase]:
@@ -46,26 +53,72 @@ def run_suite(modes: list[str], only: list[str] | None = None) -> list[dict[str,
     return rows
 
 
+def run_adversary(modes: list[str], only: list[str] | None = None) -> list[dict[str, Any]]:
+    """The scripted adversary goals, each judged against the registry case of the same id."""
+    from agents.adversary.scripts import SCRIPTS
+    from eval.adversary.runner import run_goal
+
+    registry = {c.id: c for c in load_cases()}
+    rows = []
+    with scratch_databases() as dbs:
+        for goal in sorted(SCRIPTS):
+            if only and goal not in only:
+                continue
+            for mode in modes:
+                done = run_goal(goal, mode, dbs)
+                rows.append({**row(registry[goal], mode, done.run), "attempts": done.attempts})
+    return rows
+
+
+def _mismatches(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [r for r in rows if r.get("matches_expectation") is False or r.get("error")]
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="eval.run")
-    parser.add_argument("--suite", choices=["attacks"], default="attacks")
+    parser.add_argument("--suite", choices=SUITES, default="attacks")
     parser.add_argument("--mode", choices=["full", "baseline", "both"], default="both")
     parser.add_argument("--case", action="append", help="run only this case id (repeatable)")
     parser.add_argument("--no-write", action="store_true", help="print only; write no report")
     args = parser.parse_args(argv)
     structlog.configure(wrapper_class=structlog.make_filtering_bound_logger(logging.WARNING))
     modes = ["full", "baseline"] if args.mode == "both" else [args.mode]
-    rows = run_suite(modes, args.case)
-    report = build(rows, args.suite)
+    wanted = SUITES[:-1] if args.suite == "all" else (args.suite,)
+    sections: dict[str, dict[str, Any]] = {}
+    attack_rows: list[dict[str, Any]] = []
+    failures: list[str] = []
+    for suite in wanted:
+        if suite == "attacks":
+            attack_rows = run_suite(modes, args.case)
+            failures += [f"attack {r['case']} [{r['mode']}]" for r in _mismatches(attack_rows)]
+        elif suite == "adversary":
+            rows = run_adversary(modes, args.case)
+            sections[suite] = build_section(rows)
+            failures += [f"adversary {r['case']} [{r['mode']}]" for r in _mismatches(rows)]
+        elif suite == "tasks":
+            rows = task_rows(modes, args.case)
+            sections[suite] = build_section(rows)
+            failures += [f"task {r['task']} [{r['mode']}]" for r in rows if not r["completed"]]
+        else:
+            rows = run_pytest_suite(suite)
+            sections[suite] = build_section(rows)
+            failures += [f"{suite} {r['target']}" for r in rows if r["failed"] or r["errors"]]
+    if args.suite == "attacks":
+        report = build(attack_rows, "attacks")
+    elif args.suite == "all":
+        report = build_all(attack_rows, sections)
+    else:
+        report = {"suite": args.suite, **sections[args.suite]}
     if not args.no_write:
         print(f"report: {write(report)}")
-    for mode, m in report["summary"].items():
-        print(f"{mode}: {m}")
-    bad = [r for r in rows if r["matches_expectation"] is False or r["error"]]
-    for r in bad:
-        print(f"MISMATCH {r['case']} [{r['mode']}] got {r['outcome']} expected {r['expected']} "
-              f"error={r['error']}", file=sys.stderr)  # fmt: skip
-    return 1 if bad else 0
+    if attack_rows:
+        for mode, m in report["summary"].items():
+            print(f"attacks {mode}: {m}")
+    for name, section in sections.items():
+        print(f"{name}: {section['summary']}")
+    for failure in failures:
+        print(f"FAILED {failure}", file=sys.stderr)
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":

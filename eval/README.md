@@ -9,15 +9,28 @@ report (`eval/reports/latest.json`, and `report.md` next to it in the newest tim
 ```
 make db                                    # Postgres from docker-compose
 uv run python -m eval.run --suite attacks --mode both
+uv run python -m eval.run --suite all --mode both     # every suite below
 uv run python -m eval.run --mode full --case nonce_replay_new_session --no-write
 ```
 
-- `--mode full | baseline | both`. `--case ID` (repeatable) runs selected cases. `--no-write` prints
-  only.
+- `--suite attacks | adversary | tasks | properties | concurrency | all`. `--mode full | baseline | both`
+  (not used by `properties` and `concurrency`). `--case ID` (repeatable) runs selected cases, goals or
+  tasks. `--no-write` prints only.
+- `attacks`: the cases under `eval/attacks/`, each re-performed by the test issuer and judged below.
+- `adversary`: the scripted goals of `agents/adversary`, a separate process that speaks HTTP only. Each
+  goal is named after the attack case it re-performs and must reach that case's declared outcome.
+- `tasks`: legitimate purchases (`eval/tasks`): completion rate, false block rate, latency. One of them
+  is a Human Present purchase through the Trusted Surface routes.
+- `properties`, `concurrency`: pytest over fixed file lists with `--hypothesis-seed=0` (`eval/suites.py`).
+- Scripted goals are fewer than the plan's twenty and are not model-planned (LIMITATIONS L65).
 - A run creates a scratch database, migrates it, runs every case in every mode against a fresh
   application built by `countersign.composition.build_app` over the PayPal simulator, and drops it.
-- It writes `eval/reports/<timestamp>/report.json`, `report.md` and updates `eval/reports/latest.json`.
-- The exit status is 1 if a case's outcome differs from its declared expectation or a case crashed.
+- It writes `eval/reports/<timestamp>/report.json`, `report.md` and merges into `eval/reports/latest.json`:
+  a partial run replaces only the sections it ran, and every section carries its own date.
+- The exit status is 1 if a case's outcome differs from its declared expectation, a case or task
+  crashed, a task did not complete, or a pytest suite failed.
+- The dashboard's "Run attack" button (dev, eval and demo only) runs one adversary goal against a fresh
+  baseline and a fresh full instance (`eval/launch.py`, Decision 131).
 - The results are deterministic: no identifier is part of a row, and `tests/integration/test_attack_suite.py`
   runs the suite twice and compares.
 
@@ -57,6 +70,10 @@ A case that succeeds in `full` is a security finding. Report it; do not change t
 | file | role |
 | --- | --- |
 | `core.py` | `AttackCase`, `Expect`, `Ctx` (what a case may do and register) |
+| `suites.py` | the task rows and the pytest-backed property and concurrency suites |
+| `launch.py` | one adversary goal against baseline and full, for the dashboard |
+| `adversary/` | the harness side of the adversary: the customer and payer it is given, the runner |
+| `tasks/` | the fixed legitimate purchases and their runner |
 | `judge.py` | ground truth from the simulator's PayPal objects and the hash-chained log |
 | `harness.py` | scratch database, one case in one configuration |
 | `report.py` | `report.json`, `report.md`, `latest.json` |

@@ -586,6 +586,30 @@ number words for data values. A tool that stated a wrong number that also appear
 against independent SQL, not proven. Planner quality is the recorded model's: a question may be planned to a less apt tool, giving a
 correct but different answer. Recordings are tied to the catalog and the question text.
 
+### L65. The adversary has no model-planned mode, and its goals are scripted
+
+LLM mode was cut for time (Decision 130). The adversary is twelve fixed scripts, below the twenty goals the plan called for, so
+"adversary success rate with a confidence interval" cannot be reported: a scripted run is deterministic and its result is a pass or a
+fail, not a rate. The scripts re-perform registry cases; they do not search for new attacks. What the customer signed and the
+payer's approval are supplied by the harness, so the adversary cannot be run against an arbitrary live instance on its own.
+
+### L66. The launcher needs a scratch database and writes local run records
+
+"Run attack" creates two scratch databases per run (it needs an administrator database connection, `EVAL_DATABASE_ADMIN_URL` or the
+local default) and stores run records as files under `eval/reports/attack-runs/`, which are ephemeral on a hosted instance. The
+target is an app reached through its HTTP interface in process, not a separate server. It is a write route under `/dashboard/`
+(the policy panel's "0 write endpoints" means no merchant data endpoint). There is no dashboard login (L57), so in demo anyone who
+can reach the dashboard can start a run when the launcher is installed, which is why demo needs the administrator URL set on
+purpose; runs are serialized and each is small, but they are not rate limited (P5.1).
+
+### L67. What the larger suites do not show
+
+All ten new attack cases are blocked in baseline too, so they widen coverage but do not widen the gap between the modes. The
+legitimate tasks run through the test issuer and the PayPal simulator, not the model-driven shopper or live PayPal, and their latency
+is simulator latency. The property and concurrency figures are counts of passing tests under one seed, not of examples. The
+evidence tamper case covers the Python verifier on a synthetic bundle. Cases that need a device-bound world, a moving clock or
+refund netting in the judge are not in the suite (Decision 132).
+
 ### L39 (note)
 
 L39 was removed when the two cassettes were re-recorded (Decision 85). The numbers are not reused or shifted.

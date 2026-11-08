@@ -539,6 +539,12 @@ a {
   color: var(--color-muted);
   font-size: var(--text-xs);
 }
+.cs-runpanel {
+  display: grid;
+  gap: var(--space-2);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
 
 /* ---------------------------------------------------------------- evidence view */
 .cs-evidence {

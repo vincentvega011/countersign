@@ -123,6 +123,7 @@ class AttackCase:
     expected: dict[str, Expect]  # keys "full" and "baseline"
     run: Callable[[Ctx], None]
     webhook_id: str | None = None  # set when the case needs the webhook route installed
+    racy: bool = False  # threads race: the PayPal call count varies and is not reported
 
     def __post_init__(self) -> None:
         if set(self.expected) != {"full", "baseline"}:

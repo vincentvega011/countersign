@@ -31,7 +31,6 @@ from tests.constraint_fixtures import (
     MERCHANT,
     checkout_constraints,
     closed_payment_values,
-    line_items_constraint,
     payment_constraints,
 )
 from tests.integration.test_ucp_complete import Clock
@@ -151,13 +150,23 @@ def mandate_pair(
     reuse: Pair | None = None,
     sub: str | None = None,
     checkout_issue: dict[str, Any] | None = None,
+    payment_issue: dict[str, Any] | None = None,
+    currency: str = "USD",
+    lines: list[tuple[str, str, int]] | None = None,
 ) -> Pair:
     jwt = checkout_jwt(body)
     total = total_of(body)
 
     def edit_open(content: dict[str, Any]) -> None:
+        wanted = lines or [(ITEM.id, ITEM.title, 1)]
         content["constraints"] = [
-            line_items_constraint(ITEM.id, 1, ITEM.title),
+            {
+                "type": "checkout.line_items",
+                "items": [
+                    {"id": f"line_{n}", "acceptable_items": [{"id": i, "title": t}], "quantity": q}
+                    for n, (i, t, q) in enumerate(wanted, 1)
+                ],
+            },
             checkout_constraints()[1],
         ]
 
@@ -176,12 +185,13 @@ def mandate_pair(
         content["constraints"] = payment_constraints(digest, budget)
 
     def edit_closed(content: dict[str, Any]) -> None:
-        content.update(closed_payment_values(amount if amount is not None else total, "USD"))
+        content.update(closed_payment_values(amount if amount is not None else total, currency))
 
     pm = issue("payment", keys=world.keys, audience="credential-provider",
                checkout_jwt_value=jwt, nonce=nonce_payment, edit_open_content=edit_payment,
                edit_kb_content=edit_closed, edit_open_payload=edit_payload,
-               reuse_open_token=reuse.open_payment if reuse else None, **extra)  # fmt: skip
+               reuse_open_token=reuse.open_payment if reuse else None,
+               **extra, **(payment_issue or {}))  # fmt: skip
     return Pair(cm.token, pm.token, cm.open_token, pm.open_token, nonce_checkout, nonce_payment)
 
 

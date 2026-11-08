@@ -317,6 +317,27 @@ describe("the attack matrix", () => {
   });
 });
 
+describe("Run attack", () => {
+  test("it runs one scripted attack against baseline and full and shows the judge's verdicts", async (t) => {
+    const page = await open(browser, t, {
+      hash: "#/protection",
+      ready: '[data-testid="funnel-value-0"]',
+    });
+    await page.waitForSelector('[data-testid="run-panel"]');
+    await page.selectOption(
+      '[data-testid="run-select"]',
+      "protocol_downgrade_acp",
+    );
+    await page.click('[data-testid="run-button"]');
+    await page.waitForSelector('[data-testid="run-result"]', {
+      timeout: 90000,
+    });
+    assert.match(await page.textContent('[data-testid="run-baseline"]'), /Yes/);
+    assert.match(await page.textContent('[data-testid="run-full"]'), /No/);
+    assert.deepEqual(outsideOrigin(page), []);
+  });
+});
+
 describe("the Policy panel", () => {
   test("it shows the server's policy hash, says it is read only and has no editing control", async (t) => {
     const page = await open(browser, t, {

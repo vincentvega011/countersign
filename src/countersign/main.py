@@ -15,6 +15,7 @@ it no mandate verifies and no consent is accepted), `PUBLIC_BASE_URL`, `MERCHANT
 
 from __future__ import annotations
 
+import importlib
 import json
 import os
 from collections.abc import Mapping
@@ -75,8 +76,30 @@ def wiring_from_env(env: Mapping[str, str]) -> Wiring:
     )
 
 
+def install_attack_runs(app: FastAPI, settings: RuntimeSettings, env: Mapping[str, str]) -> None:
+    """The dashboard's "Run attack" launcher (Decision 131): dev and eval by default, demo only when an
+    administrator database is named, never elsewhere. Missing evaluation code means no launcher."""
+    from countersign.dashboard.service import ATTACK_RUN_ENVS
+
+    if settings.app_env not in ATTACK_RUN_ENVS or env.get("ATTACK_RUNS") == "0":
+        return
+    if settings.app_env == "demo" and not env.get("EVAL_DATABASE_ADMIN_URL"):
+        return
+    dashboard = getattr(app.state, "dashboard", None)
+    if dashboard is None:
+        return
+    try:  # imported by name so the server's type check never follows into the evaluation code
+        launcher = importlib.import_module("eval.launch").AttackLauncher()
+    except ImportError:
+        log.info("attack_runs_unavailable", reason="evaluation code not installed")
+        return
+    dashboard.attack_launcher = launcher
+
+
 def create(env: Mapping[str, str] | None = None) -> FastAPI:
     source = os.environ if env is None else env
     settings = RuntimeSettings.from_env(source)  # raises ModeRefused before anything else runs
     announce(settings)
-    return build_app(settings, wiring_from_env(source))
+    app = build_app(settings, wiring_from_env(source))
+    install_attack_runs(app, settings, source)
+    return app

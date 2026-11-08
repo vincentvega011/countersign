@@ -2,9 +2,10 @@
 
 Security reasoning.
 
-- **Read only.** Every route is GET. There is no write endpoint, so nothing here can change a
-  credential, the mode, a policy or a payment; a test checks that no other method is routed under
-  `/dashboard/`. There is no merchant login yet (L57): the API is designed so that nothing sensitive is
+- **Read only, with one exception.** Every route is GET except `POST attack-runs` (Decision 131), which
+  exists only in dev, eval or demo with the launcher installed and creates a run record on a scratch
+  database; it cannot change a credential, the mode, a policy, merchant data or a payment. A test checks
+  that no other method is routed under `/dashboard/`. There is no merchant login yet (L57): the API is designed so that nothing sensitive is
   reachable (fixed member lists, no secret, no payer data; a test scans every answer). The one place
   mandate text appears is `orders/{id}/detail`, which returns the stored evidence bundle, the same text
   `GET /evidence/{capture_id}` serves (sanitized when stored, public keys only; Decision 118), and
@@ -49,6 +50,7 @@ MEDIA = {
 }
 ASSET = re.compile(r"assets/[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*\.(?:js|css|woff2|svg)")
 IDS = re.compile(r"[A-Za-z0-9_-]{1,64}")
+RUN_HEADER = "X-Countersign-Dashboard"
 
 
 CSP = (
@@ -143,6 +145,52 @@ def install(app: FastAPI, service: DashboardService, dist: Path = DIST) -> None:
     @router.get(f"{API}/eval")
     async def evaluation() -> JSONResponse:
         return _json(await run_in_threadpool(service.eval))
+
+    @router.get(f"{API}/attack-runs")
+    async def attack_runs() -> JSONResponse:
+        if not service.attack_runs_enabled():
+            return _json(
+                {"version": read.API_VERSION, "enabled": False, "attacks": [], "recent": []}
+            )
+        launcher = service.attack_launcher
+        recent = await run_in_threadpool(launcher.recent)
+        return _json(
+            {"version": read.API_VERSION, "enabled": True, "attacks": launcher.launchable(),
+             "recent": recent}
+        )  # fmt: skip
+
+    @router.post(f"{API}/attack-runs")
+    async def start_attack_run(request: Request) -> JSONResponse:
+        """The one write under `/dashboard/`: it creates a run record and touches no merchant data.
+
+        Gated three ways: the deployment must be dev, eval or demo with a launcher installed; the request
+        must carry a custom header (a cross-site form or fetch cannot send it without a CORS preflight,
+        which this app never answers); and the body must name an attack from the launcher's own list.
+        """
+        if not service.attack_runs_enabled():
+            return _json({"code": "attack_runs_disabled"}, 403)
+        if request.headers.get(RUN_HEADER) != "1":
+            return _json({"code": "attack_run_header_required"}, 403)
+        raw = await request.body()
+        try:
+            asked = json.loads(raw) if len(raw) <= 256 else None
+        except ValueError:
+            asked = None
+        attack = (
+            asked.get("attack") if isinstance(asked, dict) and set(asked) == {"attack"} else None
+        )
+        launcher = service.attack_launcher
+        known = {a["id"] for a in launcher.launchable()}
+        if not isinstance(attack, str) or IDS.fullmatch(attack) is None or attack not in known:
+            return _json({"code": "attack_unknown"}, 404)
+        try:
+            record = await run_in_threadpool(launcher.run, attack)
+        except Exception as error:  # noqa: BLE001 - mapped to fixed codes; no message is echoed
+            name = type(error).__name__
+            if name == "Busy":
+                return _json({"code": "attack_run_busy"}, 409)
+            return _json({"code": "attack_runs_unavailable"}, 503)
+        return _json(record, 201)
 
     @router.get(f"{API}/policy")
     async def policy() -> JSONResponse:

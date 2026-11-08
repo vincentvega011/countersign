@@ -107,15 +107,20 @@ def _routes(node: Any) -> Iterator[Any]:
             )
 
 
-def test_there_is_no_write_route_under_the_dashboard(world: World) -> None:
+def test_there_is_no_write_route_under_the_dashboard_except_the_gated_launcher(
+    world: World,
+) -> None:
     app = world.client.app  # type: ignore[attr-defined]
     routes = [r for r in _routes(app) if r.path.startswith("/dashboard")]
     assert any(r.path == f"{API}/orders" for r in routes)
-    for route in routes:
-        assert set(route.methods) <= {"GET", "HEAD"}, route.path
+    for route in routes:  # the one exception is the gated run launcher (Decision 131)
+        allowed = {"GET", "HEAD"} | ({"POST"} if route.path == f"{API}/attack-runs" else set())
+        assert set(route.methods) <= allowed, route.path
     for method in ("post", "put", "patch", "delete"):
         r = getattr(world.client, method)(f"{API}/orders")
         assert r.status_code == 405
+    refused = world.client.post(f"{API}/attack-runs", json={"attack": "x"})
+    assert refused.status_code == 403  # this deployment is demo with no launcher installed
 
 
 def test_the_policy_snapshot_is_read_only_canonical_and_hashed(world: World) -> None:

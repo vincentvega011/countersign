@@ -15,6 +15,7 @@ import subprocess
 import threading
 import time
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -129,7 +130,9 @@ def _open_mandates(admin: Engine) -> None:
 
 
 @pytest.fixture
-def clean(app_engine: Engine, admin_engine: Engine) -> Iterator[tuple[str, dict[str, Any]]]:
+def clean(
+    app_engine: Engine, admin_engine: Engine, tmp_path: Path
+) -> Iterator[tuple[str, dict[str, Any]]]:
     reset(admin_engine)
     with admin_engine.begin() as conn:
         conn.execute(text("TRUNCATE evidence_bundles"))
@@ -137,6 +140,9 @@ def clean(app_engine: Engine, admin_engine: Engine) -> Iterator[tuple[str, dict[
     ids = insert_bundle_order(app_engine, vector_text("valid.json"))
     _open_mandates(admin_engine)
     world = make_world(app_engine, RuntimeSettings(Mode.FULL, "demo"))
+    from eval.launch import AttackLauncher
+
+    world.client.app.state.dashboard.attack_launcher = AttackLauncher(tmp_path)  # type: ignore[attr-defined]
     expected = {**_expectations(admin_engine), **ids}
     base, server, thread, sock = _start(world.client.app)
     try:

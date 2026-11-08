@@ -77,7 +77,7 @@ when the issuer is built ([PROTOCOL.md](PROTOCOL.md) Decision 8).
 ### 1.4 System diagram
 
 ```text
- Customer phone                   Shopping agent (LLM)           Hostile agent (scripted or LLM)
+ Customer phone                   Shopping agent (LLM)           Adversary agent (scripted)
  Trusted Surface (web/approve)    agents/shopper                 agents/adversary
  device key signs consent              | UCP over HTTP                 | UCP or ACP
         |                              v                               v
@@ -610,8 +610,8 @@ root with the origin of `PUBLIC_BASE_URL`, the platform key, the issuer and this
 - `api`: the FastAPI app, the edge checks (strict JSON, size limits, request hashing), the customer
   key registration and consent endpoints, the dashboard API, the event stream and the webhook route.
 - `llm`: one interface for model calls with structured output, timeouts, logging and record and
-  replay for deterministic tests. It is used by the shopping agent, the assistant and the hostile
-  agent. No verification module imports it.
+  replay for deterministic tests. It is used by the shopping agent and the assistant (the adversary is scripted and
+  uses no model). No verification module imports it.
 - `catalog`: a seeded fictional catalog (`data/catalog.yaml`: 45 items, 5 categories, 6 invented
   brands, USD only, prices in integer minor units) used by the demo store and the agent. It is
   validated when loaded: duplicate YAML keys, float prices, unsorted or duplicate items, undeclared
@@ -733,8 +733,11 @@ citation chips. The package imports no authorization module and none imports it.
   `merchant_authorization` before trusting it, sign the closed mandates chained to the open ones, complete (handing the PayPal
   approval link to the payer), and report JSON lines plus a summary. `python -m agents.shopper "goal"`. Its imports are
   limited by a test.
-- `agents/adversary`: scripted attack cases plus a model-planned mode that plans across UCP and ACP
-  toward a goal. It has no PayPal credentials and no database access. Every attempt is logged.
+- `agents/adversary` ([PROTOCOL.md](PROTOCOL.md) Decisions 130 and 131): twelve scripted goals, each re-performing an
+  attack case over UCP and ACP through HTTP only. It has no PayPal credentials, no database access and imports nothing
+  from `countersign` (a test). Every attempt is logged without header values or bodies. The model-planned mode was cut
+  ([LIMITATIONS.md](LIMITATIONS.md) L65). The dashboard's "Run attack" button starts a goal against a fresh baseline and a
+  fresh full instance in dev, eval and demo.
 
 ### 7.6 Model text never decides (prompt-injection stance)
 
@@ -749,11 +752,13 @@ title or a user message is never an instruction to the gateway. The boundary is 
 
 ## 8. Evaluation
 
-**Implemented so far (P2.10).** `eval/run.py --suite attacks --mode {full,baseline,both}` runs the 25
-attack cases of `eval/attacks/` against the application built by the composition root over the PayPal
-simulator, judges each from the simulator's PayPal objects and the decision log (`eval/judge.py`), and
-writes `eval/reports/<timestamp>/report.{json,md}` and `eval/reports/latest.json`. See `eval/README.md`
-and [PROTOCOL.md](PROTOCOL.md) Decisions 64 to 66. The other suites are later work.
+**Implemented (P2.10, P4.7, P4.8).** `eval/run.py --suite {attacks,adversary,tasks,properties,concurrency,all}
+--mode {full,baseline,both}` runs against the application built by the composition root over the PayPal simulator and
+writes `eval/reports/<timestamp>/report.{json,md}`, merged into `eval/reports/latest.json` (every section dated on its own).
+Attack cases and adversary goals are judged from the simulator's PayPal objects and the decision log (`eval/judge.py`).
+See `eval/README.md` and [PROTOCOL.md](PROTOCOL.md) Decisions 64 to 66 and 130 to 133. Built: 40 attack cases, 12
+scripted adversary goals, 27 legitimate tasks, the property and concurrency files under one seed. Not built: model-planned
+adversary runs (L65) and a spec conformance suite as a runner suite (the conformance tests run in `make test`).
 
 Ground truth is PayPal sandbox state (fetched), the decision log and evidence verification. Never a
 model judge.
@@ -762,9 +767,9 @@ model judge.
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------- |
 | Spec conformance   | every endpoint against the vendored schemas; mandate structures; signatures verified by an independent Node implementation |
 | Properties         | Hypothesis; JCS stability, mutation detection, lock property, budget monotonicity, gate exactly-once                       |
-| Attack suite       | at least 40 cases across the categories below                                                                              |
-| Hostile agent runs | model-planned goals across several seeds; success means money captured outside what was signed or allowed                  |
-| Agent task suite   | at least 25 legitimate purchases; completion rate and latency                                                              |
+| Attack suite       | 40 cases across the categories below                                                                                       |
+| Adversary goals    | 12 scripted goals through `agents/adversary` (not model-planned, L65); success means money captured outside what was signed or allowed |
+| Task suite         | 27 legitimate purchases through the issuer and simulator (one Human Present); completion, false blocks, latency          |
 | Concurrency        | parallel completes, racing gates, duplicate webhooks                                                                       |
 
 Attack categories: `mandate_forged`, `alg_confusion`, `mandate_expired`, `mandate_revoked`,
@@ -779,7 +784,7 @@ mandates), `duplicate_json_keys`, `decimal_ambiguity`, `webhook_spoof`, `double_
 consent).
 
 Headline metrics, reported in baseline and full: unauthorized captures (target 0), attack success
-rate (0 for deterministic cases, hostile-agent rate with a 95 percent confidence interval),
+rate (0 for deterministic cases; scripted goals give a pass or fail, not a rate, L65),
 duplicate PayPal objects (0), evidence bundles that verify (all captures), legitimate task
 completion (at least 90 percent), false block rate, and added gate latency at p50 and p95. Per
 ablation results are reported, including any ablation that reopens nothing. Reports live under

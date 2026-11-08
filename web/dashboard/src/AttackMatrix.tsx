@@ -10,6 +10,12 @@ import {
   AgLoadingOverlay,
 } from "ag-studio-react";
 import { Pill } from "./OrderDetail";
+import {
+  fetchAttackRuns,
+  startAttackRun,
+  type AttackChoice,
+  type AttackRun,
+} from "./api";
 
 export const ATTACK_MATRIX_ID = "attack-matrix";
 const ICON =
@@ -46,6 +52,125 @@ const outcome = (value: unknown) =>
     </Pill>
   );
 
+const RUN_ERRORS: Record<string, string> = {
+  attack_runs_disabled: "Attack runs are off in this deployment.",
+  attack_run_busy: "Another run is in progress. Try again in a moment.",
+  attack_runs_unavailable:
+    "The scratch database for a run is not reachable here.",
+};
+
+// "Run attack": launches one scripted attack against a fresh baseline instance and a fresh full
+// instance, then shows each verdict. The verdict is the judge's (PayPal state and the decision log),
+// never the attacker's own reading. It renders nothing where the server has runs switched off.
+export function RunPanel() {
+  const [choices, setChoices] = useState<AttackChoice[] | null>(null);
+  const [pick, setPick] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [run, setRun] = useState<AttackRun | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    fetchAttackRuns()
+      .then((r) => {
+        if (!live) return;
+        setChoices(r.enabled ? r.attacks : []);
+        setPick(r.attacks[0]?.id ?? "");
+      })
+      .catch(() => live && setChoices([]));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  if (!choices?.length) return null;
+  const launch = async () => {
+    setBusy(true);
+    setProblem(null);
+    try {
+      setRun(await startAttackRun(pick));
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "";
+      setProblem(RUN_ERRORS[code] ?? "The run could not be started.");
+      setRun(null);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="cs-runpanel" data-testid="run-panel">
+      <label>
+        Attack{" "}
+        <select
+          value={pick}
+          onChange={(e) => setPick(e.target.value)}
+          disabled={busy}
+          data-testid="run-select"
+        >
+          {choices.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.id}
+            </option>
+          ))}
+        </select>
+      </label>{" "}
+      <button
+        type="button"
+        className="cs-funnel__button"
+        onClick={launch}
+        disabled={busy || !pick}
+        data-testid="run-button"
+      >
+        {busy ? "Running…" : "Run against baseline and full"}
+      </button>
+      <p className="cs-note">
+        Scripted attack, fresh instances on the PayPal simulator. The verdict is
+        taken from PayPal state and the decision log.
+      </p>
+      {problem ? (
+        <p role="alert" data-testid="run-problem">
+          {problem}
+        </p>
+      ) : null}
+      {run ? (
+        <table className="cs-table" data-testid="run-result">
+          <thead>
+            <tr>
+              <th>Instance</th>
+              <th>Money captured outside what was signed or allowed</th>
+              <th>Reason code</th>
+              <th>Attempts</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(["baseline", "full"] as const).map((mode) => {
+              const r = run.results[mode];
+              return (
+                <tr key={mode} data-mode={mode}>
+                  <td>{mode}</td>
+                  <td data-testid={`run-${mode}`}>
+                    {r.captured_outside_signed ? (
+                      <Pill tone="danger" glyph="!">
+                        Yes
+                      </Pill>
+                    ) : (
+                      <Pill tone="success" glyph="✓">
+                        No
+                      </Pill>
+                    )}
+                  </td>
+                  <td className="cs-mono">{r.reason_code ?? ""}</td>
+                  <td>{r.attempts}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      ) : null}
+    </section>
+  );
+}
+
 export function MatrixView({ cases }: { cases: Case[] }) {
   const count = (mode: "full" | "baseline") =>
     cases.filter((c) => c[mode] === "success").length;
@@ -59,6 +184,7 @@ export function MatrixView({ cases }: { cases: Case[] }) {
   );
   return (
     <div className="cs-detail" data-testid="attack-matrix">
+      <RunPanel />
       <p data-testid="matrix-totals">
         <strong>Full mode:</strong>{" "}
         <span data-testid="full-succeeded">{count("full")}</span> of{" "}

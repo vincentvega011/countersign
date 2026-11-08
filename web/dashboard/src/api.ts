@@ -1,5 +1,6 @@
 // The dashboard's only way to the backend: GET requests to the versioned read API on this origin,
-// and one Server-Sent Events stream. No write call exists here (the API has none).
+// one Server-Sent Events stream, and one POST that starts a scripted attack run (dev, eval and demo
+// only; it creates a run record and changes no merchant data).
 
 export type Source = "live_sandbox" | "recorded" | "simulator" | "unlabelled";
 
@@ -211,3 +212,40 @@ export const askAssistant = async (q: string, signal?: AbortSignal) => {
   if (!response.ok) throw new Error(`ask failed (${response.status})`);
   return (await response.json()) as { mode: string; answer: AssistantAnswer };
 };
+
+export interface AttackChoice {
+  id: string;
+  category: string;
+  description: string;
+}
+export interface AttackModeResult {
+  captured_outside_signed: boolean;
+  unauthorized_captures: number;
+  duplicate_paypal_objects: number;
+  captured_minor: number;
+  reason_code: string | null;
+  attempts: number;
+  violations: string[];
+  matches_expectation: boolean;
+  error: string | null;
+}
+export interface AttackRun {
+  run_id: string;
+  attack: string;
+  results: Record<"baseline" | "full", AttackModeResult>;
+}
+export const fetchAttackRuns = () =>
+  getJson<{ enabled: boolean; attacks: AttackChoice[] }>("/attack-runs");
+export async function startAttackRun(attack: string): Promise<AttackRun> {
+  const response = await fetch(`${API}/attack-runs`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Countersign-Dashboard": "1",
+    },
+    body: JSON.stringify({ attack }),
+  });
+  const body = await response.json();
+  if (!response.ok) throw new Error(String(body.code ?? response.status));
+  return body as AttackRun;
+}

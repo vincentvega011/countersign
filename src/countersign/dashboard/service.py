@@ -20,6 +20,7 @@ from countersign.runtime import Mode, RuntimeSettings
 
 ROOT = Path(__file__).resolve().parents[3]
 EVAL_LATEST = ROOT / "eval" / "reports" / "latest.json"
+ATTACK_RUN_ENVS = ("dev", "eval", "demo")
 
 
 @dataclass
@@ -32,9 +33,16 @@ class DashboardService:
     eval_path: Path = EVAL_LATEST
     lock_policy: Callable[[], dict[str, Any]] | None = None
     assistant: Any = None  # the Ask Countersign service, set by the composition root (Decision 125)
+    attack_launcher: Any = (
+        None  # `eval.launch.AttackLauncher`, installed only where it may run (Decision 131)
+    )
     poll_seconds: float = 1.0
     stream_seconds: float = 300.0  # the browser reconnects; a bounded stream frees its worker
     clock: Callable[[], float] = field(default=time.time)
+
+    def attack_runs_enabled(self) -> bool:
+        """The run launcher exists and this deployment is dev, eval or demo (never anything else)."""
+        return self.attack_launcher is not None and self.runtime.app_env in ATTACK_RUN_ENVS
 
     def status(self) -> dict[str, Any]:
         mode = self.runtime.mode.value

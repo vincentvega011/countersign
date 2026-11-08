@@ -50,8 +50,8 @@ def rows(dbs: Databases) -> list[dict[str, Any]]:
     return run_all(dbs)
 
 
-def test_there_are_twenty_five_cases_covering_the_required_categories() -> None:
-    assert len(CASES) >= 25 and len({c.id for c in CASES}) == len(CASES)
+def test_there_are_forty_cases_covering_the_required_categories() -> None:
+    assert len(CASES) >= 40 and len({c.id for c in CASES}) == len(CASES)
     assert REQUIRED_CATEGORIES <= {c.category for c in CASES}
     for case in CASES:
         assert case.description and case.steps and case.success_condition, case.id
