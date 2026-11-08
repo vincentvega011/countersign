@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { after, before, describe, test } from "node:test";
-import { launch, open, outsideOrigin } from "./support.mjs";
+import { consoleErrors, launch, open, outsideOrigin } from "./support.mjs";
 
 const latest = JSON.parse(
   readFileSync(
@@ -134,9 +134,6 @@ describe("the Results view", () => {
     const page = await opened(t);
     await page.waitForTimeout(1500);
     assert.deepEqual(outsideOrigin(page), []);
-    assert.deepEqual(
-      page.messages.filter((m) => m.type === "error" || m.type === "pageerror"),
-      [],
-    );
+    assert.deepEqual(consoleErrors(page), []);
   });
 });

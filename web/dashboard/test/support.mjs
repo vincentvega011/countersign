@@ -4,6 +4,21 @@ import { chromium } from "playwright";
 
 export const base = process.env.DASHBOARD_BASE_URL;
 export const expected = JSON.parse(process.env.DASHBOARD_EXPECT ?? "{}");
+
+// The build carries a licence key (DASHBOARD_LICENSED=1) or it does not (CI has no key).
+export const licensed = process.env.DASHBOARD_LICENSED === "1";
+// Without a key Studio prints its trial banner on the console as errors: a title and a notice in rows of
+// asterisks, the trial line and the watermark email line. Only those lines are tolerated.
+const LICENCE_BANNER = /licen[cs]e|trial|watermark|\*{5,}/i;
+
+// Console errors and uncaught page errors. Licensed builds must have none; unlicensed builds may have the
+// licence banner and nothing else.
+export function consoleErrors(page) {
+  const errors = page.messages.filter(
+    (m) => m.type === "error" || m.type === "pageerror",
+  );
+  return licensed ? errors : errors.filter((m) => !LICENCE_BANNER.test(m.text));
+}
 assert.ok(base, "DASHBOARD_BASE_URL must name the running app");
 
 export async function launch() {
