@@ -14,7 +14,8 @@ and verifier pages are plain files the app serves, and only the dashboard has a 
   `pnpm --filter @countersign/dashboard run build`. `AG_STUDIO_LICENSE_KEY` is read from the environment; the build also succeeds when
   it is empty (Studio then shows its trial watermark).
 - **Start** (`scripts/render_start.sh`): `alembic upgrade head` (a failure stops the start), `python -m countersign.demo_seed
-  --if-empty` (fills an empty database; a failure is logged and the service still starts), then `uvicorn`.
+  --if-incomplete` (adds whatever is missing and skips a complete database; a failure is logged and the service still starts), then
+  `uvicorn`.
 - **Health check:** `GET /health`.
 
 ## Free-tier facts that matter (ENV.md section 4)
@@ -65,7 +66,7 @@ is then not enforced by the database (L74).
    service and the database. It will ask for each `sync: false` variable.
 2. Enter the variables in the table above marked "you". Leave `EVAL_DATABASE_ADMIN_URL` out.
 3. Deploy. Watch the logs for `build ok`, `Running upgrade`, the seed summary lines, and the `selfcheck` line.
-4. Open `<service url>/selfcheck`: `ok` must be `true`, `app_env` `demo`, `mode` `full`, `ablations` and `dev_switches_on` empty,
+4. Open `<service url>/selfcheck`: `seed.seed_complete` must be `true` (below), `ok` must be `true`, `app_env` `demo`, `mode` `full`, `ablations` and `dev_switches_on` empty,
    `attack_runs_enabled` `false`.
 
 ## Registering the PayPal webhook (so one live delivery can be confirmed)
@@ -85,10 +86,34 @@ unverified), so the order is: create the webhook, copy its id, set the variable,
    `webhook.processed` with outcome `already_captured` for `PAYMENT.CAPTURE.COMPLETED`.
 7. Record what you saw in [ENV.md](ENV.md) section 11 (headers, delay, ordering, retry on non-2xx). Until then do not claim live delivery.
 
+## The demo seed: status, a healthy log, and a failed one
+
+The seed runs on every start and only adds what is missing (Decision 141), so a redeploy finishes a partial database without wiping it.
+It needs plain INSERT and SELECT on the application tables, never superuser.
+
+- **Status without the log:** `curl -s <url>/selfcheck`. `seed` holds counts only. Healthy: `"open_mandates":5`, `"bundles":2`,
+  `"orders"` about 44 or more, `"seed_complete":true`.
+- **Healthy log** (Render, Logs, search `demo seed`):
+
+      demo seed: before {'orders': 0, ... 'seed_complete': False}
+      recorded_rows: 2
+      recorded_purchase_rows: 1
+      evidence_bundle_rows: 1
+      open_mandates: 5
+      simulated_scenarios: {'completed': 28, ...}
+      demo seed summary: complete=true orders=44 simulated=40/30+ open_mandates=5/5 bundles=2/2 recorded=3/3 failed_steps=[]
+
+  On a later start the log shows `demo seed: already complete, nothing to do`.
+- **Failed seed:** the log has `demo seed: step <name> FAILED` followed by the traceback, then a summary with `complete=false` and the
+  failed step names, then `demo seed INCOMPLETE`. The service still starts. Fix the cause and redeploy (or restart); the next start
+  completes the missing items. `demo seed: FAILED, the database role lacks INSERT on <table>` means a privilege problem on the database
+  user. Do not delete rows by hand: the decision log is insert only, and a half-finished gate replay is labelled, not redone.
+- **Send for diagnosis:** the lines from `demo seed: before` to `took`, and the `/selfcheck` `seed` object.
+
 ## Verifying a deploy (five checks)
 
 1. `curl -s <url>/health` returns `{"status":"ok","mode":"full","app_env":"demo","ablations":[]}`. Allow a minute on a cold start.
-2. `curl -s <url>/selfcheck` returns `"ok":true`, `"attack_runs_enabled":false`, `"dev_switches_on":[]`, `"rate_limited":true`.
+2. `curl -s <url>/selfcheck` returns `"ok":true`, `"attack_runs_enabled":false`, `"dev_switches_on":[]`, `"rate_limited":true`, and `"seed":{"seed_complete":true,"open_mandates":5,"bundles":2,...}` (if `seed_complete` is `false`, see the seed section above).
 3. `curl -s <url>/.well-known/ucp` returns the profile, with `<url>` as the host in the endpoint URLs.
 4. Open `<url>/dashboard/`: the orders grid shows rows labelled simulated or recorded; Protection shows "Launching attacks is disabled on
    the hosted demo"; Assistant answers a suggested question.

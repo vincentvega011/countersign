@@ -662,6 +662,14 @@ purchase through the hosted demo is the only live sandbox data. Separately, whet
 ledger role is unverified; the fallback (`LEDGER_APP_ROLE` set to the owner) weakens the database-enforced append-only property (see
 [DEPLOY.md](DEPLOY.md)).
 
+### L76. Seeded mandates have placeholder consent rows; the recorded purchase's keys are not pinned
+
+The five seeded open mandates sit on placeholder challenge, device and consent rows that hold no key material, so the Trusted Surface
+cannot act on them and they prove nothing about a customer consent. The recorded purchase (capture 49029167TJ689282S, USD 69.00) is
+stored from a committed bundle, not replayed on the host (that needs a headless browser). Its bundle verifies except the key-pinning
+step, since its merchant and platform keys were generated for the recorded run. A gate replay that stopped part way is labelled but not
+redone (Decision 141).
+
 ### L75. Free tier behaviour
 
 The service sleeps after 15 idle minutes (about a minute to wake), the database expires 30 days after creation (replace it on or after

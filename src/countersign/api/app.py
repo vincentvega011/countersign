@@ -44,6 +44,15 @@ DEFAULT_BASE_URL = "http://localhost:8000"
 DEFAULT_DATABASE_URL = "postgresql+psycopg://countersign:countersign@localhost:5432/countersign"
 
 
+def seed_counts(runtime: RuntimeSettings, engine: Engine) -> dict[str, Any] | None:
+    """Counts for `/selfcheck`, in the environments the demo seed may run in only."""
+    if runtime.app_env not in ("dev", "demo"):
+        return None
+    from countersign.demo_seed import selfcheck_counts
+
+    return selfcheck_counts(engine)
+
+
 def create_app(
     *,
     key: MerchantKey | None = None,
@@ -117,6 +126,7 @@ def create_app(
             dashboard=getattr(app.state, "dashboard", None),
             webhook_configured=webhooks is not None,
             rate_limited=getattr(app.state, "rate_limiter", None) is not None,
+            seed=seed_counts(runtime, engine),
         )
         return JSONResponse(body, headers={"Cache-Control": "no-store"})
 

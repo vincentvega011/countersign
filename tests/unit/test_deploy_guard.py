@@ -75,6 +75,9 @@ def test_the_self_check_is_ok_for_a_clean_demo_and_holds_no_value() -> None:
     assert body["ablations"] == [] and body["dev_switches_on"] == []
     assert body["attack_runs_enabled"] is False and body["assistant_mode"] == "replay"
     assert "sekret" not in repr(body)
+    assert body["seed"] is None  # counts only when the caller supplies them
+    counts = {"orders": 44, "open_mandates": 5, "bundles": 2, "seed_complete": True}
+    assert selfcheck.report(settings, {}, seed=counts)["seed"] == counts
 
 
 def test_the_self_check_fails_when_a_public_launcher_has_no_named_admin_database() -> None:

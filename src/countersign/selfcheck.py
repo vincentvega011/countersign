@@ -4,7 +4,8 @@ Served as `GET /selfcheck` and logged once at start. It reports labels and boole
 no id, no URL with credentials, and environment variable NAMES but never values. `ok` is true only when
 no ablation and no development switch is on, the mode is `full` (or the process is a labelled baseline
 instance), and, in a public environment, no attack launcher is installed unless an administrator
-database was deliberately named. A public deployment that reports `ok: false` should not be trusted.
+database was deliberately named. `seed` holds counts only (orders, open mandates, bundles, whether the
+demo seed is complete) in the dev and demo environments, `null` elsewhere; it never changes `ok`. A public deployment that reports `ok: false` should not be trusted.
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ def report(
     dashboard: Any = None,
     webhook_configured: bool = False,
     rate_limited: bool = False,
+    seed: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     switches = dev_switches_on(env)
     launcher = bool(dashboard is not None and dashboard.attack_runs_enabled())
@@ -50,4 +52,5 @@ def report(
         "paypal_sandbox_configured": bool(dashboard is not None and dashboard.paypal_configured),
         "webhook_verification_configured": webhook_configured,
         "rate_limited": rate_limited,
+        "seed": dict(seed) if seed is not None else None,
     }

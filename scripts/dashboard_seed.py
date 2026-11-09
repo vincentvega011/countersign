@@ -27,6 +27,7 @@ import os
 import random
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -194,7 +195,10 @@ SCENARIOS = [
 ]  # fmt: skip
 
 
-def seed_simulated(engine: Engine, count: int, shops: int) -> dict[str, int]:
+def seed_simulated(
+    engine: Engine, count: int, shops: int, on_error: Callable[[Exception], None] | None = None
+) -> dict[str, int]:
+    """`on_error` receives each failed scenario (the demo seed logs it and goes on); without it a failure raises."""
     from tests.mandate_issuer import NOW
     from tests.mode_support import acp_create, acp_headers, acp_post
 
@@ -206,60 +210,66 @@ def seed_simulated(engine: Engine, count: int, shops: int) -> dict[str, int]:
     rng = random.Random(7)
     done: dict[str, int] = {}
     for _ in range(count):
-        scenario = rng.choices(names, weights)[0]
-        shop = ablated if scenario == "voided" else rng.choice(worlds)
-        item = rng.choice(CATALOG.items)
-        quantity = 1
-        customer = rng.choice(customers)
-        agent = rng.randrange(len(shop.keys.agents))
-        token = _delegation(shop, customer, agent)
-        named = {"Countersign-Delegation": token, "Countersign-Capabilities": AP2_CAPABILITY}
-        if scenario == "acp_refused":
-            acp_create(_W(shop), token, capability=True)  # type: ignore[arg-type]
-            session = acp_create(_W(shop), token, capability=False)  # type: ignore[arg-type]
-            if session.status_code == 201:
-                sid = session.json()["id"]
-                acp_post(_W(shop), f"/checkout_sessions/{sid}/complete",  # type: ignore[arg-type]
-                         {"payment_data": {"token": "x", "provider": "stripe"}},
-                         acp_headers(token))  # fmt: skip
+        try:
+            scenario = rng.choices(names, weights)[0]
+            shop = ablated if scenario == "voided" else rng.choice(worlds)
+            item = rng.choice(CATALOG.items)
+            quantity = 1
+            customer = rng.choice(customers)
+            agent = rng.randrange(len(shop.keys.agents))
+            token = _delegation(shop, customer, agent)
+            named = {"Countersign-Delegation": token, "Countersign-Capabilities": AP2_CAPABILITY}
+            if scenario == "acp_refused":
+                acp_create(_W(shop), token, capability=True)  # type: ignore[arg-type]
+                session = acp_create(_W(shop), token, capability=False)  # type: ignore[arg-type]
+                if session.status_code == 201:
+                    sid = session.json()["id"]
+                    acp_post(_W(shop), f"/checkout_sessions/{sid}/complete",  # type: ignore[arg-type]
+                             {"payment_data": {"token": "x", "provider": "stripe"}},
+                             acp_headers(token))  # fmt: skip
+                done[scenario] = done.get(scenario, 0) + 1
+                continue
+            body = shop.create(item, quantity, **named)
+            if body is None:
+                continue
+            cid = body["id"]
+            if scenario == "open":
+                pass
+            elif scenario == "lock_denied":
+                shop.complete(cid, None, None, **{"Countersign-Delegation": token})
+            else:
+                kw: dict[str, Any] = {"customer": customer, "agent": agent}
+                if scenario == "wrong_amount":
+                    kw["amount"] = int(body["totals"][-1]["amount"]) + rng.choice([100, 2500])
+                elif scenario == "expired":
+                    kw["open_exp"] = NOW - 60
+                elif scenario == "forged":
+                    kw["forged"] = True
+                elif scenario == "customer_mismatch":
+                    kw["customer"] = rng.choice([c for c in customers if c != customer])
+                cm, pm = shop.mandates(body, item, quantity, **kw)
+                first = shop.complete(cid, cm, pm)
+                needs_payer = "payer_approval_required" in [
+                    m["code"] for m in first.json().get("messages", [])
+                ]
+                if needs_payer and scenario != "awaiting_payer":
+                    if scenario == "voided":
+                        order_id = next(
+                            o for o, v in shop.sim.orders.items() if v["status"] != "APPROVED"
+                            and not any(a["order"] == o for a in shop.sim.authorizations.values())
+                        )  # fmt: skip
+                        shop.sim.approve(order_id)
+                        raised = int(body["totals"][-1]["amount"]) * 3
+                        shop.sim.patch(order_id, amount=f"{raised // 100}.{raised % 100:02d}")
+                    else:
+                        shop.approve_all()
+                    shop.complete(cid, None, None)
             done[scenario] = done.get(scenario, 0) + 1
-            continue
-        body = shop.create(item, quantity, **named)
-        if body is None:
-            continue
-        cid = body["id"]
-        if scenario == "open":
-            pass
-        elif scenario == "lock_denied":
-            shop.complete(cid, None, None, **{"Countersign-Delegation": token})
-        else:
-            kw: dict[str, Any] = {"customer": customer, "agent": agent}
-            if scenario == "wrong_amount":
-                kw["amount"] = int(body["totals"][-1]["amount"]) + rng.choice([100, 2500])
-            elif scenario == "expired":
-                kw["open_exp"] = NOW - 60
-            elif scenario == "forged":
-                kw["forged"] = True
-            elif scenario == "customer_mismatch":
-                kw["customer"] = rng.choice([c for c in customers if c != customer])
-            cm, pm = shop.mandates(body, item, quantity, **kw)
-            first = shop.complete(cid, cm, pm)
-            needs_payer = "payer_approval_required" in [
-                m["code"] for m in first.json().get("messages", [])
-            ]
-            if needs_payer and scenario != "awaiting_payer":
-                if scenario == "voided":
-                    order_id = next(
-                        o for o, v in shop.sim.orders.items() if v["status"] != "APPROVED"
-                        and not any(a["order"] == o for a in shop.sim.authorizations.values())
-                    )  # fmt: skip
-                    shop.sim.approve(order_id)
-                    raised = int(body["totals"][-1]["amount"]) * 3
-                    shop.sim.patch(order_id, amount=f"{raised // 100}.{raised % 100:02d}")
-                else:
-                    shop.approve_all()
-                shop.complete(cid, None, None)
-        done[scenario] = done.get(scenario, 0) + 1
+        except Exception as exc:
+            if on_error is None:
+                raise
+            on_error(exc)
+
     return done
 
 
@@ -270,6 +280,9 @@ def seed_simulated(engine: Engine, count: int, shops: int) -> dict[str, int]:
 _MANDATE_CREATED_US = 1_793_000_000_000_000  # 2026-10-26
 _FAR_FUTURE = 1_893_456_000  # 2030-01-01
 _PAST = 1_767_225_600  # 2026-01-01
+
+
+PLACEHOLDER_JWK = '{"simulated": true}'  # no key material; no verifier accepts it (Decision 141)
 
 
 def _thumb(label: str) -> str:
@@ -287,17 +300,52 @@ MANDATE_SEED = [
 
 
 def seed_mandates(engine: Engine) -> int:
-    """Five open mandates, one per state (unused, in flight, used, revoked, expired). Once per database."""
+    """Five open mandates, one per state (unused, in flight, used, revoked, expired).
+
+    Each mandate is written in its own transaction and only when its id is missing, so a run that stopped
+    part way is finished by the next run and nothing is ever updated or deleted. No superuser right is
+    needed (Decision 141): the foreign-key parents a real consent would have created (a challenge, a device
+    row, a consent record, an open payment mandate) are written as placeholders that hold no key material.
+    The device row's `jwk` is the text `PLACEHOLDER_JWK`, which no verifier accepts, and every
+    placeholder id carries the `sim` marker.
+    """
     added = 0
-    with engine.begin() as conn:
-        conn.execute(text("SET LOCAL session_replication_role = replica"))
-        for n, (name, _state, customer, agent, ceiling, exp, attempt, spent) in enumerate(
-            MANDATE_SEED
-        ):
-            mid = f"om_sim_{name}"
+    for n, (name, _state, customer, agent, ceiling, exp, attempt, spent) in enumerate(MANDATE_SEED):
+        mid = f"om_sim_{name}"
+        with engine.begin() as conn:
             if conn.execute(text("SELECT 1 FROM open_mandates WHERE id = :i"), {"i": mid}).first():
                 continue
             created = _MANDATE_CREATED_US + n
+            device = _thumb(f"device-sim-{customer}")
+            agent_thumb = _thumb(agent)
+            conn.execute(
+                text(
+                    "INSERT INTO customer_keys (customer_id, thumbprint, jwk, created_us) "
+                    "VALUES (:cust, :t, :jwk, :at) ON CONFLICT DO NOTHING"
+                ),
+                {"cust": customer, "t": device, "jwk": PLACEHOLDER_JWK, "at": created},
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO key_challenges (id, purpose, nonce, created_us) "
+                    "VALUES (:i, 'simulated', :nonce, :at) ON CONFLICT DO NOTHING"
+                ),
+                {"i": f"kc_sim_{name}", "nonce": hashlib.sha256(f"nonce-{name}".encode()).hexdigest(),
+                 "at": created},
+            )  # fmt: skip
+            conn.execute(
+                text(
+                    "INSERT INTO consent_records (id, challenge_id, customer_id, device_thumbprint, "
+                    "device_jwk, agent_thumbprint, record, signature, checkout_mandate, "
+                    "payment_mandate, checkout_open_digest, payment_open_digest, mandate_exp, "
+                    "created_us) VALUES (:id, :ch, :cust, :dev, :jwk, :agent, "
+                    "'simulated', 'simulated', 'simulated', 'simulated', :cod, :pod, :exp, :at) "
+                    "ON CONFLICT DO NOTHING"
+                ),
+                {"id": f"consent_sim_{name}", "ch": f"kc_sim_{name}", "cust": customer, "dev": device,
+                 "jwk": PLACEHOLDER_JWK, "agent": agent_thumb, "cod": f"om_sim_chk_{name}", "pod": mid, "exp": exp,
+                 "at": created},
+            )  # fmt: skip
             conn.execute(
                 text(
                     "INSERT INTO open_mandates (id, checkout_identity, customer_id, consent_id, "
@@ -305,7 +353,7 @@ def seed_mandates(engine: Engine) -> int:
                     "(:id, :co, :cust, :consent, :agent, :ceiling, 'USD', :exp, :created)"
                 ),
                 {"id": mid, "co": f"om_sim_chk_{name}", "cust": customer,
-                 "consent": f"consent_sim_{name}", "agent": _thumb(agent), "ceiling": ceiling,
+                 "consent": f"consent_sim_{name}", "agent": agent_thumb, "ceiling": ceiling,
                  "exp": exp, "created": created},
             )  # fmt: skip
             added += 1
@@ -320,6 +368,13 @@ def seed_mandates(engine: Engine) -> int:
             if attempt is None:
                 continue
             cid = f"chk_sim_mandate_{name}"
+            conn.execute(
+                text(
+                    "INSERT INTO open_payment_mandates (digest, currency, created_us) "
+                    "VALUES (:m, 'USD', :at) ON CONFLICT DO NOTHING"
+                ),
+                {"m": mid, "at": created},
+            )
             conn.execute(
                 text(
                     "INSERT INTO spend_entries (id, mandate_digest, checkout_id, amount_minor, "
@@ -349,10 +404,25 @@ def seed_mandates(engine: Engine) -> int:
     return added
 
 
-def seed_recorded(engine: Engine) -> int:
-    """Replay the gate cassette recorded from the real sandbox, once per database."""
-    import json as _json
+def _labelled(engine: Engine, ids: list[str]) -> set[str]:
+    with engine.connect() as conn:
+        return {
+            r[0]
+            for r in conn.execute(
+                text("SELECT checkout_id FROM checkout_sources WHERE checkout_id = ANY(:ids)"),
+                {"ids": ids},
+            )
+        }
 
+
+def seed_recorded(engine: Engine) -> int:
+    """Replay the gate cassette recorded from the real sandbox, once per database.
+
+    The replay writes through the services and cannot be run twice over the same ids, so a replay that
+    stopped part way is not redone (the log is insert only and is never wiped). What the next run can do
+    is label the checkouts that exist, so a half-finished replay never shows as unlabelled. Returns the
+    number of checkouts newly labelled `recorded`.
+    """
     from countersign.paypal.cassette import load_cassette
     from tests.gate_flow import GateFixtures
     from tests.integration.test_gate_cassette_replay import CASSETTE, FIXTURE, replay
@@ -361,18 +431,52 @@ def seed_recorded(engine: Engine) -> int:
         return 0
     fixtures = GateFixtures.from_json(FIXTURE.read_text(encoding="utf-8"))
     ids = [fixtures.clean.checkout_id, fixtures.changed.checkout_id]
+    before = _labelled(engine, ids)
     with engine.connect() as conn:
         present = conn.execute(
             select(checkout_sessions.c.id).where(checkout_sessions.c.id.in_(ids))
         ).all()
-    if present:
+    try:
+        if not present:
+            replay(load_cassette(CASSETTE), engine, fixtures)
+    finally:
+        with engine.begin() as conn:
+            existing = conn.execute(
+                select(checkout_sessions.c.id).where(checkout_sessions.c.id.in_(ids))
+            ).all()
+            for (cid,) in existing:
+                label_source(conn, cid, "recorded", time.time_ns() // 1000)
+    return len(_labelled(engine, ids) - before)
+
+
+RECORDED_PURCHASE_BUNDLE = ROOT / "tests" / "vectors" / "recorded" / "p3_capture_bundle.json"
+
+
+def seed_recorded_purchase(engine: Engine) -> int:
+    """The recorded P3 purchase (capture 49029167TJ689282S, USD 69.00) as an order with its bundle, once.
+
+    SHORTCUT: replaying that run needs a headless browser for the phone consent, which the hosted
+    service does not have. The committed bundle is the real output of that replay (the application's own
+    assembly, from the recorded sandbox cassette), written through the same row helper as the synthetic
+    vector and labelled `recorded`. It verifies in both verifiers except for the key-pinning step, since the
+    replay's merchant and platform keys were generated for that run.
+    """
+    from tests.dashboard_rows import insert_bundle_order
+
+    if not RECORDED_PURCHASE_BUNDLE.exists():
         return 0
-    replay(load_cassette(CASSETTE), engine, fixtures)
-    with engine.begin() as conn:
-        for cid in ids:
-            label_source(conn, cid, "recorded", time.time_ns() // 1000)
-    _ = _json
-    return len(ids)
+    text_ = RECORDED_PURCHASE_BUNDLE.read_text(encoding="utf-8")
+    cid = _json_id(text_)
+    with engine.connect() as conn:
+        if conn.execute(
+            select(checkout_sessions.c.id).where(checkout_sessions.c.id == cid)
+        ).first():
+            return 0
+    insert_bundle_order(engine, text_, source="recorded", created_us=RECORDED_PURCHASE_US)
+    return 1
+
+
+RECORDED_PURCHASE_US = 1_793_795_387_000_000  # 2026-11-04, the day of the recorded run
 
 
 def seed_bundle(engine: Engine) -> int:

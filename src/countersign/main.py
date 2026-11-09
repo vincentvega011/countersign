@@ -29,7 +29,7 @@ from sqlalchemy import create_engine
 
 from countersign import selfcheck
 from countersign.api import ratelimit
-from countersign.api.app import DEFAULT_BASE_URL, DEFAULT_KEY_PATH
+from countersign.api.app import DEFAULT_BASE_URL, DEFAULT_KEY_PATH, seed_counts
 from countersign.canonical.jsonstrict import loads_strict
 from countersign.composition import Wiring, build_app
 from countersign.dburl import database_url
@@ -143,6 +143,7 @@ def create(env: Mapping[str, str] | None = None) -> FastAPI:
         dashboard=getattr(app.state, "dashboard", None),
         webhook_configured=bool(getattr(app.state, "webhook_configured", False)),
         rate_limited=hasattr(app.state, "rate_limiter"),
+        seed=seed_counts(settings, app.state.engine),
     )
     log.info("selfcheck", **report)
     return app

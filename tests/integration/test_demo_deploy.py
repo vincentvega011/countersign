@@ -37,6 +37,8 @@ def test_selfcheck_endpoint_reports_mode_and_flags_without_secrets(
         assert body["ablations"] == [] and body["dev_switches_on"] == []
         assert body["attack_runs_enabled"] is False and body["ok"] is True
         assert body["dashboard_read_only"] is True
+        assert set(body["seed"]) == {"orders", "open_mandates", "bundles", "seed_complete"}
+        assert body["seed"]["seed_complete"] is False and body["seed"]["orders"] == 0
         assert w.client.get("/selfcheck").headers["cache-control"] == "no-store"
         text_ = w.client.get("/selfcheck").text
         assert "postgres" not in text_ and "secret" not in text_.lower()
@@ -70,19 +72,20 @@ def test_the_demo_seed_fills_an_empty_database_once(
         conn.execute(text("TRUNCATE evidence_bundles"))
     first = seed(admin_engine, orders=12, shops=1)
     assert first["recorded_rows"] == 2 and first["evidence_bundle_rows"] == 1
-    assert first["open_mandates"] == 5 and sum(first["simulated_scenarios"].values()) > 0  # type: ignore[union-attr]
+    assert first["recorded_purchase_rows"] == 1 and first["failed_steps"] == []
+    assert first["open_mandates"] == 5 and sum(first["simulated_scenarios"].values()) > 0
     with admin_engine.connect() as conn:
         sources = dict(
             conn.execute(text("SELECT source, count(*) FROM checkout_sources GROUP BY 1")).all()
         )
-    assert sources["recorded"] == 2 and sources["simulator"] > 1
+    assert sources["recorded"] == 3 and sources["simulator"] > 1
     assert "live_sandbox" not in sources  # nothing is passed off as a live sandbox capture
     states = {m["state"] for m in read.mandates(app_engine, 1_800_000_000)}
     assert {"unused", "used", "revoked"} <= states
     assert read.unauthorized_captures(app_engine) == 0
     second = seed(admin_engine, orders=12, shops=1)
-    assert second == {"recorded_rows": 0, "evidence_bundle_rows": 0, "open_mandates": 0,
-                      "simulated_scenarios": {}}  # fmt: skip
+    assert second["status"] == first["status"] and second["simulated_scenarios"] == {}
+    assert second["recorded_rows"] == 0 and second["open_mandates"] == 0
 
 
 def test_the_seed_refuses_outside_dev_and_demo(monkeypatch) -> None:  # type: ignore[no-untyped-def]

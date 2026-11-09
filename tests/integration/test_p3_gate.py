@@ -115,6 +115,9 @@ def gate_run(
         response = httpx.get(f"{base}/evidence/{run.result.capture_id}", timeout=10)
         assert response.status_code == 200, response.text
         run.bundle_text = response.text
+        export = os.environ.get("P3_EXPORT_BUNDLE")  # used once to refresh tests/vectors/recorded/
+        if export:
+            Path(export).write_text(response.text, encoding="utf-8")
     os.environ.pop("PHONE_VIDEO_DIR", None)
     run.logs = log_file.read_text() + "\n".join(json.dumps(e, default=repr) for e in events)
     run.bundle = json.loads(run.bundle_text)

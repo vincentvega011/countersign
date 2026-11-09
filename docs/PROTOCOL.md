@@ -3398,6 +3398,38 @@ five open mandates `om_sim_*`, one order with a bundle from the committed synthe
 simulator rows, and with `--if-empty` does nothing when any checkout exists. No device key is seeded (a key belongs to a phone and its
 origin), and nothing is labelled `live_sandbox`.
 
+### Decision 141: The demo seed needs no superuser, is re-runnable, and says what it did
+
+**Cause.** The first hosted seed stopped at `SET LOCAL session_replication_role = replica` in `seed_mandates`, which PostgreSQL allows only
+to a superuser; Render's database user is not one (`permission denied to set parameter "session_replication_role"`). The statement was
+there only to skip two foreign keys (`open_mandates.consent_id` to `consent_records`, `spend_entries.mandate_digest` to
+`open_payment_mandates`, and behind the first the challenge and device rows). No append-only trigger, grant or timestamp needed it:
+the guards fire on UPDATE only and the times are ordinary column values. The failed step ran before the simulated orders, which is
+why the hosted dashboard held three orders and no open mandates.
+
+**Fix.** The statement is gone, and no migration, trigger, grant or constraint changed. Each of the five mandates is written in its
+own transaction, only when its id is missing, with its parents in dependency order: a challenge `kc_sim_*`, a device row, a consent
+record `consent_sim_*` and, where an attempt exists, an open payment mandate. The device and consent rows are placeholders marked
+`sim` that hold no key material (`jwk` is `{"simulated": true}`, which no verifier accepts); nothing signs with them, and no new column
+exists, so there is no seed-only path from a public route to test. Rows are inserted, never updated or deleted.
+
+**Re-runnable.** Completeness is read from the rows (`demo_seed.status`): five `om_sim_*` mandates, two stored bundles including capture
+49029167TJ689282S, three `recorded` checkouts, and at least 75 percent of the requested simulator orders. `--if-incomplete` (and its
+old name `--if-empty`) skips only a complete database; otherwise each missing item is added and nothing present is touched, so the
+three orders already on Render are completed, not wiped. Each step is isolated: a failure prints its traceback, the other steps still
+run, the last lines are `demo seed summary: complete=... failed_steps=[...]`, and the exit code is 1 unless complete. The start command
+logs that and still starts the service. A preflight names a missing INSERT privilege in one line. The seed's apps are built in
+process without the rate limiter, which only the public entry point installs. The gate replay writes through the services and cannot
+be repeated over the same ids, so a replay that stopped part way is not redone; its checkouts are labelled `recorded` and the summary
+reports the shortfall.
+
+**Correction to Decision 140.** The gate cassette's capture is `7LN24060SW866991Y` (USD 29.00, plus one void). Capture
+49029167TJ689282S (USD 69.00) is the P3 purchase in `shopper_e2e.json`, whose replay needs a headless browser. The seed now adds it as
+an order labelled `recorded` with the bundle that replay produced (`tests/vectors/recorded/p3_capture_bundle.json`, exported with
+`P3_EXPORT_BUNDLE`). That bundle passes eleven of twelve verifier steps; `trusted_keys` fails unless the replay run's own keys are
+pinned, because they were generated for that run. `/selfcheck` shows `seed`: `orders`, `open_mandates`, `bundles`, `seed_complete`
+(counts only).
+
 ## 4. Confirmed PayPal facts
 
 Observed in the PayPal sandbox with `scripts/sandbox_smoke.py` and `scripts/sandbox_confirm.py`
