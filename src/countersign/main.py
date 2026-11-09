@@ -7,7 +7,7 @@ ablation together with baseline) stops the process with a clear message and no s
 the real thing; the same mode is on `GET /health` and in the `X-Countersign-Mode` response header.
 
 Environment, besides the mode variables in `countersign.runtime`: `DATABASE_URL`,
-`MERCHANT_KEY_PATH`, `PLATFORM_KEY_PATH` (the ES256 JWK of the trusted platform provider, Decision
+`MERCHANT_KEY_JSON` or `MERCHANT_KEY_PATH`, `PLATFORM_KEY_JSON` or `PLATFORM_KEY_PATH` (the ES256 JWK of the trusted platform provider, Decision
 5, private half included: it signs mandates after consent, the public half verifies them; without
 it no mandate verifies and no consent is accepted), `PUBLIC_BASE_URL`, `MERCHANT_ID`, `MERCHANT_NAME`,
 `PAYPAL_MERCHANT_ID` and the PayPal sandbox variables of `countersign.paypal.config`.
@@ -20,18 +20,23 @@ import json
 import os
 from collections.abc import Mapping
 from pathlib import Path
+from typing import cast
 
 import structlog
 from fastapi import FastAPI
 from joserfc.jwk import ECKey
 from sqlalchemy import create_engine
 
-from countersign.api.app import DEFAULT_BASE_URL, DEFAULT_DATABASE_URL, DEFAULT_KEY_PATH
+from countersign import selfcheck
+from countersign.api import ratelimit
+from countersign.api.app import DEFAULT_BASE_URL, DEFAULT_KEY_PATH
+from countersign.canonical.jsonstrict import loads_strict
 from countersign.composition import Wiring, build_app
-from countersign.merchant.keys import load_merchant_key
+from countersign.dburl import database_url
+from countersign.merchant.keys import MerchantKey, load_merchant_key, validate_jwk
 from countersign.paypal.client import PayPalClient
 from countersign.paypal.config import PayPalConfig
-from countersign.runtime import Mode, RuntimeSettings
+from countersign.runtime import PUBLIC_ENVS, Mode, RuntimeSettings
 
 log = structlog.get_logger("countersign.startup")
 
@@ -54,19 +59,40 @@ def announce(settings: RuntimeSettings) -> None:
         log.info("startup", mode=settings.mode.value, app_env=settings.app_env)
 
 
+def _platform_key(env: Mapping[str, str]) -> ECKey | None:
+    """The platform key from `PLATFORM_KEY_JSON` (a host with no secret files, such as Render) or from
+    the file named by `PLATFORM_KEY_PATH`. The JSON form is parsed with the strict loader."""
+    inline = env.get("PLATFORM_KEY_JSON")
+    if inline:
+        parsed = loads_strict(inline.encode())
+        if not isinstance(parsed, dict):
+            raise ValueError("PLATFORM_KEY_JSON must hold one JSON object")
+        return ECKey.import_key(cast(dict[str, str | list[str]], parsed))
+    path = env.get("PLATFORM_KEY_PATH")
+    return ECKey.import_key(json.loads(Path(path).read_text())) if path else None
+
+
+def _merchant_key(env: Mapping[str, str]) -> MerchantKey:
+    """The merchant key from `MERCHANT_KEY_JSON` or from the file at `MERCHANT_KEY_PATH`. Either way it
+    goes through the same validation (`validate_jwk`): curve, algorithm, thumbprint `kid`."""
+    inline = env.get("MERCHANT_KEY_JSON")
+    if inline:
+        return validate_jwk(loads_strict(inline.encode()))
+    return load_merchant_key(env.get("MERCHANT_KEY_PATH", DEFAULT_KEY_PATH))
+
+
 def wiring_from_env(env: Mapping[str, str]) -> Wiring:
-    platform_path = env.get("PLATFORM_KEY_PATH")
-    platform_key = (
-        ECKey.import_key(json.loads(Path(platform_path).read_text())) if platform_path else None
-    )
+    platform_key = _platform_key(env)
     paypal_config = PayPalConfig.from_env(env)
     merchant_id = env.get("MERCHANT_ID", "merchant-1")
     return Wiring(
-        engine=create_engine(env.get("DATABASE_URL", DEFAULT_DATABASE_URL), pool_size=10),
-        merchant_key=load_merchant_key(env.get("MERCHANT_KEY_PATH", DEFAULT_KEY_PATH)),
+        engine=create_engine(database_url(env), pool_size=10),
+        merchant_key=_merchant_key(env),
         platform_key=platform_key,
         paypal=PayPalClient(paypal_config),
-        public_base_url=env.get("PUBLIC_BASE_URL", DEFAULT_BASE_URL),
+        public_base_url=env.get("PUBLIC_BASE_URL")
+        or env.get("RENDER_EXTERNAL_URL")
+        or DEFAULT_BASE_URL,
         payee={"id": merchant_id, "name": env.get("MERCHANT_NAME", "Countersign demo store")},
         paypal_payee_merchant_id=env.get("PAYPAL_MERCHANT_ID", ""),
         merchant_constraint_id=merchant_id,
@@ -96,10 +122,27 @@ def install_attack_runs(app: FastAPI, settings: RuntimeSettings, env: Mapping[st
     dashboard.attack_launcher = launcher
 
 
+def install_rate_limit(app: FastAPI, settings: RuntimeSettings, env: Mapping[str, str]) -> None:
+    """On in public environments always; in dev and eval only with `RATE_LIMIT=1` (the evaluation hammers
+    the app on purpose). No variable turns it off in a public environment."""
+    wanted = settings.app_env in PUBLIC_ENVS or env.get("RATE_LIMIT") == "1"
+    if wanted:
+        ratelimit.install(app, ratelimit.RateLimiter(trust_proxy=env.get("TRUST_PROXY") == "1"))
+
+
 def create(env: Mapping[str, str] | None = None) -> FastAPI:
     source = os.environ if env is None else env
     settings = RuntimeSettings.from_env(source)  # raises ModeRefused before anything else runs
     announce(settings)
     app = build_app(settings, wiring_from_env(source))
     install_attack_runs(app, settings, source)
+    install_rate_limit(app, settings, source)
+    report = selfcheck.report(
+        settings,
+        source,
+        dashboard=getattr(app.state, "dashboard", None),
+        webhook_configured=bool(getattr(app.state, "webhook_configured", False)),
+        rate_limited=hasattr(app.state, "rate_limiter"),
+    )
+    log.info("selfcheck", **report)
     return app

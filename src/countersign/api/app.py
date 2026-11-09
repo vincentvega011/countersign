@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import Engine, create_engine
 
+from countersign import selfcheck
 from countersign.api.acp_routes import install as install_acp
 from countersign.api.catalog_routes import install as install_catalog
 from countersign.api.dashboard_routes import install as install_dashboard
@@ -90,6 +91,7 @@ def create_app(
     app.state.merchant_key = key
     app.state.engine = engine
     app.state.runtime = runtime
+    app.state.webhook_configured = webhooks is not None
 
     @app.middleware("http")
     async def label_mode(request: Request, call_next: Callable[[Request], Any]) -> Response:
@@ -105,6 +107,17 @@ def create_app(
             "app_env": runtime.app_env,
             "ablations": list(runtime.active_ablations),
         }
+        return JSONResponse(body, headers={"Cache-Control": "no-store"})
+
+    @app.get("/selfcheck")
+    def self_check() -> JSONResponse:
+        body = selfcheck.report(
+            runtime,
+            os.environ,
+            dashboard=getattr(app.state, "dashboard", None),
+            webhook_configured=webhooks is not None,
+            rate_limited=getattr(app.state, "rate_limiter", None) is not None,
+        )
         return JSONResponse(body, headers={"Cache-Control": "no-store"})
 
     if runtime.app_env in UI_ENVS and UI_DIR.is_dir():

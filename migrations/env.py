@@ -12,6 +12,9 @@ def database_url() -> str:
     url = config.get_main_option("sqlalchemy.url") or os.environ.get("DATABASE_URL")
     if not url:
         raise RuntimeError("set DATABASE_URL (or sqlalchemy.url) to run migrations")
+    for prefix in ("postgres://", "postgresql://"):  # hosts hand out these; the app uses psycopg 3
+        if url.startswith(prefix):
+            return "postgresql+psycopg://" + url[len(prefix) :]
     return url
 
 

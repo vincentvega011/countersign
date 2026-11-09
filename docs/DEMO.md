@@ -38,3 +38,17 @@ Open `http://localhost:8000/dashboard/`. The header says "Sandbox demo": simulat
 Nothing here is live PayPal except the recorded rows labelled recorded. Latency is simulator latency. Do not claim protection
 eligibility or dispute outcomes (INV-13). The evidence target was missed for evaluation captures (L68); say "the recorded sandbox
 capture verifies in both verifiers" and no more.
+
+## Hosted demo: what is seeded and what is recorded
+
+On the hosted instance (`APP_ENV=demo`, set up in [DEPLOY.md](DEPLOY.md)) the database is filled once by `python -m countersign.demo_seed`.
+The dashboard labels every order with its source:
+
+| Label       | What it is                                                                                                   |
+| ----------- | ------------------------------------------------------------------------------------------------------------ |
+| `recorded`  | The capture gate cassette recorded from the real PayPal sandbox: capture **49029167TJ689282S** and one void   |
+| `simulator` | Orders made by the real app over the in-memory PayPal simulator, five open mandates (`om_sim_*`: unused, in flight, used, revoked, expired) and one order with a bundle made from the committed synthetic vector |
+
+Nothing seeded is labelled as a live sandbox capture, and no device key is seeded. "Run attack" is disabled on the hosted demo (the panel
+says so) and the side by side results are the recorded ones from the frozen run `20261108T063449Z`. Ask Countersign answers the
+recorded suggested questions only; no model key is configured.

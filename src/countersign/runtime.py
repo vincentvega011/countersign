@@ -27,6 +27,11 @@ from enum import StrEnum
 
 from countersign.ablations import NAMES, AblationRefused, Ablations
 
+APP_ENVS = ("dev", "eval", "demo", "prod")
+PUBLIC_ENVS = ("demo", "prod")
+# Switches that exist for development and evaluation only. Setting one in a public environment stops
+# the start (names only are ever reported, never values).
+DEV_ONLY_SWITCHES = ("PAYPAL_ALLOW_NON_SANDBOX", "PAYPAL_RECORD_CASSETTES")
 MODE_HEADER = "X-Countersign-Mode"
 ABLATIONS_HEADER = "X-Countersign-Ablations"
 
@@ -38,6 +43,14 @@ class Mode(StrEnum):
 
 class ModeRefused(RuntimeError):
     """`CS_MODE` or its combination with ablations is not allowed. The process does not start."""
+
+
+def dev_switches_on(env: Mapping[str, str]) -> list[str]:
+    """Names (never values) of the development-only switches that are on in `env`."""
+    on = [name for name in DEV_ONLY_SWITCHES if env.get(name) == "1"]
+    if env.get("LLM_MODE") == "record":
+        on.append("LLM_MODE=record")
+    return on
 
 
 @dataclass(frozen=True)
@@ -60,6 +73,12 @@ class RuntimeSettings:
         except ValueError:
             raise ModeRefused("CS_MODE must be 'full' or 'baseline'") from None
         app_env = source.get("APP_ENV", "dev")
+        if app_env not in APP_ENVS:
+            raise ModeRefused("APP_ENV must be dev, eval, demo or prod")
+        if app_env in PUBLIC_ENVS:
+            on = dev_switches_on(source)
+            if on:
+                raise ModeRefused(f"development switches are refused when APP_ENV={app_env}: {on}")
         try:
             ablations = Ablations.from_env(source)
         except AblationRefused as error:

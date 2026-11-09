@@ -3354,6 +3354,50 @@ the browser test caught it), a grid of totals per mode, two bar charts, a pivot 
 and capture stage time, and a pivot grid of targets grouped by met and missed. Nothing in the view is typed in; the meta line names
 the run id.
 
+### Decision 136: A public environment is an allowlist, and dev-only switches stop the start
+
+`APP_ENV` must be `dev`, `eval`, `demo` or `prod`; any other value (including an empty one) stops the start. Ablations (`ABL_*`) are
+allowed only in `dev` and `eval`, so `prod` and any future name refuse them (before, only the literal `demo` did, which failed open
+for a typo). In `demo` and `prod`, `PAYPAL_ALLOW_NON_SANDBOX=1`, `PAYPAL_RECORD_CASSETTES=1` and `LLM_MODE=record` also stop the start.
+Errors name the switch, never a value. `render.yaml` pins `APP_ENV=demo`.
+
+### Decision 137: The attack launcher stays off in the hosted demo and says so
+
+The launcher was already off in `demo` unless `EVAL_DATABASE_ADMIN_URL` is set (Decision 131); `render.yaml` does not declare that
+variable. `GET /dashboard/api/v1/attack-runs` now adds `reason` (`hosted_demo` or `off`) and the Run panel shows a note naming the frozen
+run `20261108T063449Z` instead of rendering nothing. The recorded side by side results (the attack matrix) are the same committed report
+as before. Everything else under `/dashboard/` stays read only. This closes the MEDIUM finding of the P4 security review (anyone can start
+runs in demo); the per-IP limit on `POST attack-runs` stays as a second layer if an operator turns the launcher on.
+
+### Decision 138: An in-process sliding-window rate limit on the public mutating routes
+
+`countersign.api.ratelimit`, installed by the entry point in `demo` and `prod` (and in dev or eval only with `RATE_LIMIT=1`, because the
+evaluation hammers the app on purpose). Per client address and group, per minute: enrolment 10, consent and phone flow 20, checkout
+create 30, checkout update and cancel 60, checkout complete 20, assistant ask 12, evidence read 60, webhook 120, attack run 6. A refused
+request gets 429, `Retry-After` in whole seconds and `{"code":"rate_limited"}`, and is not counted. The address is the socket peer, or the
+rightmost `X-Forwarded-For` entry when `TRUST_PROXY=1` (the entry the platform proxy appended; entries to its left are client supplied).
+A test walks the real app and fails if a mutating route has no rule. The limit protects the log, the database and the sandbox quota; no
+money decision depends on it.
+
+### Decision 139: Keys may come from the environment, and the database URL is normalised
+
+`MERCHANT_KEY_JSON` and `PLATFORM_KEY_JSON` are read with the strict loader and validated exactly like the key files (the file mode check
+does not apply to an environment value). They take precedence over `*_KEY_PATH`. `DATABASE_URL` values starting `postgres://` or
+`postgresql://` are rewritten to `postgresql+psycopg://` for the app and for Alembic. `PUBLIC_BASE_URL` falls back to Render's
+`RENDER_EXTERNAL_URL`.
+
+### Decision 140: `GET /selfcheck`, and the demo seed reuses the dev seed's functions
+
+`/selfcheck` (also logged once at start) reports mode, environment, active ablations, the names of dev switches that are on, whether the
+launcher is installed, the assistant mode, and booleans for the PayPal app and the webhook id. `ok` is false when an ablation or a dev
+switch is on, or when a public environment has the launcher without an administrator database named on purpose. No value is reported.
+`python -m countersign.demo_seed` (`make demo-seed`) fills an empty database through the same functions as the dev seed: recorded rows
+replayed from the real sandbox cassette (capture 49029167TJ689282S and one void), simulated orders from apps over the PayPal simulator,
+five open mandates `om_sim_*`, one order with a bundle from the committed synthetic vector. It refuses unless `APP_ENV` is `dev` or
+`demo`, adds the recorded rows, bundle and each mandate once, adds simulated orders only when the database holds five or fewer
+simulator rows, and with `--if-empty` does nothing when any checkout exists. No device key is seeded (a key belongs to a phone and its
+origin), and nothing is labelled `live_sandbox`.
+
 ## 4. Confirmed PayPal facts
 
 Observed in the PayPal sandbox with `scripts/sandbox_smoke.py` and `scripts/sandbox_confirm.py`

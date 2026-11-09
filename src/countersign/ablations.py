@@ -1,8 +1,9 @@
-"""Ablation switches for evaluation (docs/architecture.md section 6, runtime modes), refused when `APP_ENV=demo`.
+"""Ablation switches for evaluation (docs/architecture.md section 6, runtime modes), allowed in dev and eval only.
 
-An ablation turns one protection off so the evaluation can show what it prevents. A demo
-deployment must never run with one, so `Ablations.from_env` raises when any switch is set while
-`APP_ENV` is `demo`, and the process does not start (INV-10). Unknown values are refused too: only
+An ablation turns one protection off so the evaluation can show what it prevents. Only a dev or eval
+process may run with one, so `Ablations.from_env` raises when any switch is set while `APP_ENV` is
+anything else (demo, prod, or an unknown value), and the process does not start (INV-10). The test is
+an allowlist on purpose: a new environment name is refused until it is added here. Unknown values are refused too: only
 `0`, `1` and an unset variable are accepted, so a typo cannot silently turn a protection off or leave
 it on.
 """
@@ -21,6 +22,9 @@ NAMES = (
     "ABL_NO_STRICT_JSON",
     "ABL_NO_PREAUTH_CHECK",
 )
+
+
+ABLATION_ENVS = ("dev", "eval")
 
 
 class AblationRefused(RuntimeError):
@@ -50,6 +54,7 @@ class Ablations:
                 raise AblationRefused(f"{name} must be 0 or 1")
             flags[name.removeprefix("ABL_").lower()] = value == "1"
         result = cls(**flags)
-        if result.any and source.get("APP_ENV", "dev") == "demo":
-            raise AblationRefused("ablations are refused when APP_ENV=demo")
+        env_name = source.get("APP_ENV", "dev")
+        if result.any and env_name not in ABLATION_ENVS:
+            raise AblationRefused(f"ablations are refused when APP_ENV={env_name}")
         return result

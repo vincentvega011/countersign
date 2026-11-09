@@ -235,7 +235,9 @@ export interface AttackRun {
   results: Record<"baseline" | "full", AttackModeResult>;
 }
 export const fetchAttackRuns = () =>
-  getJson<{ enabled: boolean; attacks: AttackChoice[] }>("/attack-runs");
+  getJson<{ enabled: boolean; attacks: AttackChoice[]; reason?: string }>(
+    "/attack-runs",
+  );
 export async function startAttackRun(attack: string): Promise<AttackRun> {
   const response = await fetch(`${API}/attack-runs`, {
     method: "POST",

@@ -1,0 +1,56 @@
+# Render Blueprint: one free web service (the API, the Trusted Surface, the verifier page and the built
+# dashboard are all served by the one app) and one free Postgres. Secrets are declared with
+# `sync: false`: Render asks for them in the dashboard and they are never in this repository.
+# Setup steps and every variable: docs/DEPLOY.md.
+services:
+  - type: web
+    name: countersign-demo
+    runtime: python
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    buildCommand: bash scripts/render_build.sh
+    startCommand: bash scripts/render_start.sh
+    envVars:
+      # Pinned. The app refuses to start for any other mode/environment combination it does not know.
+      - key: APP_ENV
+        value: demo
+      - key: CS_MODE
+        value: full
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: NODE_VERSION
+        value: 22.12.0
+      - key: TRUST_PROXY
+        value: "1"
+      - key: LLM_MODE
+        value: replay
+      - key: PAYPAL_API_BASE
+        value: https://api-m.sandbox.paypal.com
+      - key: DATABASE_URL
+        fromDatabase:
+          name: countersign-db
+          property: connectionString
+      # Entered by hand in the Render dashboard (names only here, see docs/DEPLOY.md).
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: PAYPAL_MERCHANT_ID
+        sync: false
+      - key: MERCHANT_KEY_JSON
+        sync: false
+      - key: PLATFORM_KEY_JSON
+        sync: false
+      - key: AG_STUDIO_LICENSE_KEY
+        sync: false
+      # EVAL_DATABASE_ADMIN_URL is deliberately NOT declared: without it the attack launcher is off.
+
+databases:
+  - name: countersign-db
+    plan: free
+    region: oregon
+    databaseName: countersign
+    user: countersign

@@ -54,6 +54,8 @@ CATALOG = load_catalog()
 
 
 def _guard(url: str) -> None:
+    """The dev seed: dev environment, local database. The hosted demo seed (`countersign.demo_seed`)
+    has its own guard and calls the `seed_*` functions below directly."""
     if os.environ.get("APP_ENV") != "dev":
         raise SystemExit("refused: set APP_ENV=dev (the seed writes simulated rows)")
     host = make_url(url).host or ""

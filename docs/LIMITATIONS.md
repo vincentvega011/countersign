@@ -635,6 +635,38 @@ The capture stage time (full 28.4 ms p50, 34.1 ms p95; baseline 10.1 ms, 11.8 ms
 `CaptureGate.run` over the in-memory PayPal simulator on one machine. It contains the gate's database and signing work and none of
 PayPal's network time, so against live PayPal the added latency is mostly extra PayPal reads and is unmeasured. The added p50 varied by about 2 ms across three runs of the same code during this phase (20.0, 20.8 and 18.3 ms); only the frozen run is kept, and it is the one cited.
 
+### L71. The hosted demo is public, read only and has no login
+
+Anyone with the URL can read the dashboard, the order detail and the stored evidence bundles (sanitized sandbox data, L57). The launcher
+is off (Decision 137), writes are limited to the protocol routes, and the rate limits (Decision 138) are per client address, in memory.
+The assistant answers the recorded questions only, so free text gets a fixed message.
+
+### L72. The rate limit is per process and per address
+
+Counters are in memory: they reset when the free service restarts or sleeps, and there is one instance. Clients behind one shared
+address share a bucket. `TRUST_PROXY=1` trusts the rightmost `X-Forwarded-For` entry, which is right only behind Render's proxy. The
+long-lived dashboard stream (`/dashboard/api/v1/stream`) and the unlisted read routes are not limited. Completes are limited per address,
+not per checkout or principal (Decision 68 stays open).
+
+### L73. No hosted baseline instance
+
+A second, unprotected instance would need its own service and database (the free plan allows one database) and a second set of
+secrets, which is more than a small configuration change, so it was not built. The side by side figures on the hosted demo are the
+recorded ones from the frozen run `20261108T063449Z`; the live "Run attack" comparison runs locally only.
+
+### L74. Seeded data is mostly simulated; the migration role is untested on Render
+
+The hosted dashboard's rows are labelled `simulator` (orders over the PayPal simulator, open mandates `om_sim_*`, one synthetic-vector
+bundle) or `recorded` (the replayed real sandbox capture 49029167TJ689282S and one void). No device key is seeded. A visitor's own
+purchase through the hosted demo is the only live sandbox data. Separately, whether the Render database user can `CREATE ROLE` for the
+ledger role is unverified; the fallback (`LEDGER_APP_ROLE` set to the owner) weakens the database-enforced append-only property (see
+[DEPLOY.md](DEPLOY.md)).
+
+### L75. Free tier behaviour
+
+The service sleeps after 15 idle minutes (about a minute to wake), the database expires 30 days after creation (replace it on or after
+16 Nov), and the disk is ephemeral. Build time and monthly allowances are unverified (ENV.md section 4).
+
 ### L39 (note)
 
 L39 was removed when the two cassettes were re-recorded (Decision 85). The numbers are not reused or shifted.

@@ -150,9 +150,11 @@ def install(app: FastAPI, service: DashboardService, dist: Path = DIST) -> None:
     @router.get(f"{API}/attack-runs")
     async def attack_runs() -> JSONResponse:
         if not service.attack_runs_enabled():
+            hosted = service.runtime.app_env in ("demo", "prod")
             return _json(
-                {"version": read.API_VERSION, "enabled": False, "attacks": [], "recent": []}
-            )
+                {"version": read.API_VERSION, "enabled": False, "attacks": [], "recent": [],
+                 "reason": "hosted_demo" if hosted else "off"}
+            )  # fmt: skip
         launcher = service.attack_launcher
         recent = await run_in_threadpool(launcher.recent)
         return _json(

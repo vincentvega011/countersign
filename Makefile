@@ -1,4 +1,4 @@
-.PHONY: dashboard-build dashboard-dev dashboard-seed dev-pair interop-mandates interop-ucp setup node-deps keys dev demo db test test-safety sandbox-smoke eval interop tamper-demo lint deploy
+.PHONY: demo-seed dashboard-build dashboard-dev dashboard-seed dev-pair interop-mandates interop-ucp setup node-deps keys dev demo db test test-safety sandbox-smoke eval interop tamper-demo lint deploy
 
 setup: node-deps
 	uv sync
@@ -45,6 +45,11 @@ dashboard-build:
 # (`uv run --env-file .env uvicorn countersign.main:create --factory`).
 dashboard-dev:
 	pnpm --filter @countersign/dashboard run dev
+
+# The hosted-demo seed (also run by the Render start command when the database is empty): idempotent,
+# APP_ENV must be dev or demo. Adds only what the app itself produces, labelled simulator or recorded.
+demo-seed: db
+	uv run --env-file .env python -m countersign.demo_seed
 
 # Simulated (labelled) and recorded rows in the DEV database; refuses unless APP_ENV=dev and the
 # database is local. ORDERS sets how many simulated orders to add.

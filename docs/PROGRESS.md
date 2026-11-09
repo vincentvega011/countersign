@@ -11,7 +11,7 @@ A phase starts only when the previous gate has passed.
 | P2    | Mandates, Merchant and Credential Provider roles, constraints, capture gate, principal lock, ACP adapter, baseline mode, first attacks | Downgrade, order-changed-after-approval (nothing is authorized in full; authorized, then voided by the gate with `ABL_NO_PREAUTH_CHECK`) and replay attacks succeed in baseline and fail in full with nothing captured; concurrency tests pass | Passed      |
 | P3    | Trusted Surface with device keys and consent, shopping agent, evidence bundles and verifiers                                           | An autonomous purchase runs from phone approval to a captured sandbox order to a verified evidence bundle, with no server-held customer key        | Passed      |
 | P4    | Dashboard, assistant, hostile agent, full evaluation                                                                                   | The whole demo runs from the dashboard locally and the evaluation numbers are frozen                                                               | In progress (P4.1 to P4.8 done) |
-| P5    | Deployment, design polish, documentation, fresh-clone test                                                                             | A stranger can use the hosted demo end to end and can run it locally from the README alone                                                         | Not started |
+| P5    | Deployment, design polish, documentation, fresh-clone test                                                                             | A stranger can use the hosted demo end to end and can run it locally from the README alone                                                         | P5a done (deploy readiness), P5b open |
 | P6    | Video, submission text, final checks                                                                                                   | Everything is submitted with time to spare                                                                                                         | Not started |
 
 ## P0 log
@@ -237,6 +237,20 @@ recorded request ids again, so:
   the package out of every authorization module. **The provider and model are still open until P3.6**; no
   cassette is recorded yet (`scripts/record_llm_cassette.py` is for the owner to run). One commit covers P3.4 and P3.5.
 
+## P5a log (9 Nov 2026): deploy readiness
+
+Not a gate; P5 closes after P5b. What changed (Decisions 136 to 140, L71 to L75):
+
+- Demo-mode gating: `APP_ENV` allowlist, ablations only in dev and eval, dev-only switches stop a public start, launcher off in the hosted
+  demo with a visible note and the recorded results (frozen run `20261108T063449Z`), `GET /selfcheck`.
+- Rate limits on the public mutating routes (in-process, per address, 429 with `Retry-After`), a test that every mutating route has a rule.
+- `python -m countersign.demo_seed` / `make demo-seed`: idempotent, labelled `simulator` and `recorded`, no fabricated sandbox data.
+- `render.yaml` (free web service and free Postgres), `scripts/render_build.sh`, `scripts/render_start.sh`, keys as environment JSON,
+  `DATABASE_URL` normalisation, [DEPLOY.md](DEPLOY.md) with the webhook registration steps.
+- Not done, for P5b: the actual Render deploy and its five checks; PayPal webhook registration and one confirmed live delivery
+  (ENV section 11); first-deploy migration role check (L74); design polish items and the other P5 carry-forwards below; README, threat
+  model update, fresh-clone test of the README; pinning keys in "Verify evidence".
+
 ## P4 log
 
 - **P4.1 and P4.2 (2026-11-05): done.** L55 closed: a checkout is bound to one customer (create, first offer or
@@ -385,16 +399,16 @@ Findings from the P1 review that belong to P2 and are not optional there:
 
 ## Carried forward
 
-- **P5.1:** rate limit the attack-run launcher and keep run records off ephemeral disk if it stays on in demo (L66).
+- **Done in P5a (Decisions 137, 138):** the attack launcher is off in the hosted demo and its route is rate limited; run records are never written there (L66, L71).
 - **Later:** a model-planned adversary and more goals if time allows (L65).
 
 - **P5.1:** rate limit completes and `complete_in_progress` log growth per checkout and per principal (Decision 68).
 - **Before vault mode is enabled:** key the payer vault on (customer id, agent thumbprint), not the agent key alone (L32).
 - **Cut for time (L62):** wire `check_category_policy` into the Merchant verifier; the editable, versioned policy view.
 - **P5.1:** run `CaptureGate.recover` and the CP recovery on a schedule (L26).
-- **P5.1:** rate limit unverified webhook requests (L26).
+- **Done in P5a (Decision 138):** webhook requests are rate limited per address (L26, L72).
 - **P5.1:** record a real refund once and confirm the `payments.refunds` reading (Decision 55 note).
-- **P5.1:** make ablation refusal fail closed when `APP_ENV` is not explicitly `dev` or `eval`, and pin `APP_ENV=demo` in `render.yaml` (L33).
+- **Done in P5a (Decision 136):** ablations are allowed only in dev and eval, unknown `APP_ENV` stops the start, and `render.yaml` pins `demo` (L33).
 - **P5.1:** log the "pending" answer, and let a resumed checkout with no attempt return to `ready_for_complete` after a fence (L34).
 - **P5.1:** create the PayPal webhook, record its id, and confirm live delivery and `verify-webhook-signature` against a real notification (ENV section 11).
 
@@ -402,11 +416,10 @@ Findings from the P1 review that belong to P2 and are not optional there:
 - **Later:** bind enrolment to a platform or merchant login, which closes L56 (an agent as its own customer) and L35.
 - **P4.5+:** a merchant login for the dashboard (L57).
 - **P4:** let the reader pin or recognise the customer's device key fingerprint on `/verify/` beyond showing it (L54).
-- **P5.1:** rate limit `GET /evidence/{capture_id}` (L46).
+- **Done in P5a (Decision 138):** `GET /evidence/{capture_id}` is rate limited (L46).
 - **Later:** anchor the decision log root so the log steps prove more than consistency (L48).
 
-- **P5.1 (from the P4 reviews):** gate the dashboard API in demo (a shared demo token or a plain statement that it is public, L57),
-  because it lists capture ids and so every bundle; operator token or launcher off in demo, a per-IP limit and run-record rotation (L66).
+- **Done in P5a (from the P4 reviews):** the launcher is off in demo with a visible note, rate limits are on, and the public read API is stated plainly (L71). A demo token was not added.
 - **P5:** pin the merchant key (from `/.well-known/ucp`) and the platform key in the dashboard's "Verify evidence", so the headline
   shot proves authenticity and not only consistency.
 - **P5:** append `evidence.failed` to the decision log when a bundle cannot be assembled (L68); run autonomous evaluation tasks through
@@ -415,8 +428,7 @@ Findings from the P1 review that belong to P2 and are not optional there:
   truncated Orders cells, the "Working" badge on the idle setup card, the Orders placeholder dashes, the dashboard at 375 px (11 px
   overflow, 34 px targets), the approve-intent and approve-purchase screens with live data (not captured in the review), a legend
   for the category chart.
-- **P5:** a hosted baseline as a separate, labelled instance; seed real data on the hosted demo, including open mandates and several real
-  sandbox bundles; trademark check on the six invented brand names.
+- **P5a done:** demo seed (recorded and simulated rows, labelled). **Not built:** a hosted baseline instance (L73). **Open:** several real sandbox bundles (only the one recorded capture exists), trademark check on the six invented brand names.
 
 ## Open risks
 

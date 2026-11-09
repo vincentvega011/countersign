@@ -68,6 +68,7 @@ export function RunPanel() {
   const [busy, setBusy] = useState(false);
   const [run, setRun] = useState<AttackRun | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [hosted, setHosted] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -75,6 +76,7 @@ export function RunPanel() {
       .then((r) => {
         if (!live) return;
         setChoices(r.enabled ? r.attacks : []);
+        setHosted(!r.enabled && r.reason === "hosted_demo");
         setPick(r.attacks[0]?.id ?? "");
       })
       .catch(() => live && setChoices([]));
@@ -83,6 +85,15 @@ export function RunPanel() {
     };
   }, []);
 
+  if (hosted)
+    return (
+      <section className="cs-runpanel" data-testid="run-panel-disabled">
+        <strong>Launching attacks is disabled on the hosted demo.</strong> The
+        side-by-side results below were recorded from the frozen evaluation run
+        20261108T063449Z (baseline and full, every scripted attack). Run the
+        launcher locally with the steps in the README.
+      </section>
+    );
   if (!choices?.length) return null;
   const launch = async () => {
     setBusy(true);
