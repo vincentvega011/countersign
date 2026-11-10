@@ -369,3 +369,54 @@ describe("the Policy panel", () => {
     assert.deepEqual(outsideOrigin(page), []);
   });
 });
+
+// Layout checks from the P4 design review (P5 polish): no clipping at the common desktop widths, no
+// horizontal page scroll and 44 px controls on a phone.
+describe("layout", () => {
+  for (const width of [1280, 1440]) {
+    test(`Protection (with the Run attack panel) and Results do not overflow the page at ${width} px`, async (t) => {
+      for (const hash of ["#/protection", "#/results"]) {
+        const page = await open(browser, t, {
+          width,
+          hash,
+          ready: '[data-testid="app-main"], .cs-main',
+        });
+        await page.waitForTimeout(1500);
+        const box = await page.evaluate(() => ({
+          scroll: document.documentElement.scrollWidth,
+          client: document.documentElement.clientWidth,
+        }));
+        assert.ok(
+          box.scroll <= box.client,
+          `${hash} at ${width}: ${JSON.stringify(box)}`,
+        );
+        if (hash === "#/protection") {
+          const panel = page.locator('[data-testid="attack-matrix"]');
+          await panel.waitFor({ timeout: 20000 });
+          const b = await panel.boundingBox();
+          assert.ok(
+            b.x >= 0 && b.x + b.width <= width,
+            `attack matrix ${JSON.stringify(b)}`,
+          );
+        }
+      }
+    });
+  }
+
+  test("at 375 px the page does not scroll sideways and the navigation and header controls are 44 px", async (t) => {
+    const page = await open(browser, t, { width: 375, ready: ".cs-nav" });
+    await page.waitForTimeout(1500);
+    const box = await page.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth,
+      client: document.documentElement.clientWidth,
+    }));
+    assert.ok(box.scroll <= box.client, JSON.stringify(box));
+    const small = await page.evaluate(
+      () =>
+        [...document.querySelectorAll(".cs-nav__item, .cs-top button")]
+          .map((e) => e.getBoundingClientRect())
+          .filter((r) => r.height < 43.5 || r.width < 43.5).length,
+    );
+    assert.equal(small, 0);
+  });
+});

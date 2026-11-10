@@ -165,6 +165,11 @@ describe("the enrolment flow", () => {
     });
     await page.goto(`${base}/approve/`);
     await state(page, "ready");
+    // An idle card waits for the person; it is tagged Ready, not Working (design review, P5).
+    assert.equal(
+      await page.locator(".ts-card__tag").first().innerText(),
+      "Ready",
+    );
     await page.getByRole("button", { name: LABELS.create }).click();
     await state(page, "registered");
     const key = await storedKey(page);
@@ -475,6 +480,7 @@ describe("what is on the page", () => {
     "The private part of the key cannot be exported. Countersign never sees it.",
     "Registered",
     "Working",
+    "Ready",
     "Action needed",
     "Problem",
     "Copy",

@@ -18,8 +18,9 @@ dev:
 dev-pair: db keys
 	uv run python scripts/dev_pair.py
 
+# From a fresh clone, no PayPal credentials: needs Postgres (make db) and uv, Node 22, pnpm. See scripts/demo.sh.
 demo:
-	@echo "not implemented yet"
+	bash scripts/demo.sh
 
 db:
 	docker compose up -d --wait postgres

@@ -1,0 +1,80 @@
+/* Layout of the landing page. Components and tokens come from /ui. */
+body {
+  margin: 0;
+}
+.lp {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 56rem;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: var(--space-4);
+}
+.lp__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.lp__brand {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 500;
+}
+.lp__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.lp__hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.lp__title {
+  font-size: var(--text-2xl);
+  line-height: 1.25;
+  margin: 0;
+}
+.lp__lead {
+  margin: 0;
+  max-width: 44rem;
+}
+.lp__h2 {
+  font-size: var(--text-xl);
+  margin: 0 0 var(--space-3);
+}
+.lp__list {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.lp__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.lp__item p {
+  margin: 0;
+}
+.lp__link {
+  font-weight: 600;
+  color: var(--color-accent);
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+}
+.lp__foot {
+  font-size: var(--text-sm);
+  padding-top: var(--space-3);
+  border-top: var(--border-width) solid var(--color-border);
+}

@@ -179,7 +179,7 @@ export function App() {
                   <span className="cs-visually-hidden">Search orders</span>
                   <input
                     type="search"
-                    placeholder="Search checkout, customer, agent, item, capture, reason"
+                    placeholder="Search orders"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     data-testid="quick-filter"

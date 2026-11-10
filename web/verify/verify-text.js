@@ -72,6 +72,7 @@ export const TEXT = {
   code: "Failure code",
   why: "What the check found",
   allPassed: "Every step passed",
+  onlyKeysTitle: "Every check passed except key pinning",
   allPassedBody:
     "The bundle is consistent and its keys are the ones you pinned.",
   failedAt: "Verification failed",
@@ -99,4 +100,20 @@ export const TEXT = {
   loadFailed: "The stored bundle could not be loaded. Try again.",
   fileRead: "Read the file. Press Verify to check it.",
   fileFailed: "The file could not be read.",
+};
+
+// The try-it buttons. Fixed templates only.
+export const TRY_TEXT = {
+  loadFailed: "The sample could not be loaded. Try again.",
+  syntheticLoaded:
+    "Synthetic sample (made by the project's own test generator). Its own keys are pinned below, which shows what a fully passing result looks like. In real use you paste keys you got from somewhere else.",
+  recordedLoaded:
+    "Recorded sample: the one real PayPal sandbox capture, 49029167TJ689282S. It is run without pinned keys, so every step passes except Trusted keys, on purpose. Its merchant and platform keys were made for that run and are not published anywhere to pin them from (limitation L76). Press the pin button to see the step pass with the keys inside the sample, which proves the mechanism but not who signed it.",
+  pinned:
+    "Pinned the keys that came inside this sample and ran the check again. This shows the Trusted keys step passing; it does not show who signed the bundle, because the keys came from the bundle itself.",
+  changed: (path, before, after) =>
+    `Changed ${path} from ${before} to ${after}, in this page only.`,
+  firstFailure: (title) => `The first failing step is: ${title}.`,
+  nothingToChange: "Load a sample first.",
+  cannotChange: "This sample has no capture amount to change.",
 };

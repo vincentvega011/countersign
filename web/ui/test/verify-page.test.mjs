@@ -226,3 +226,104 @@ for (const width of [375, 1280])
         fullPage: true,
       });
     });
+
+// The try-it buttons (Decision 142): they press the same Verify button and use the same verifier.
+const stepsOf = (page) =>
+  page.$$eval('[data-testid="step"]', (nodes) =>
+    nodes.map((n) => ({ name: n.dataset.step, ok: n.dataset.ok === "true" })),
+  );
+
+test("try-it: the synthetic sample loads, verifies with every step passing, and nothing leaves the origin", async (t) => {
+  const page = await open(t);
+  await page.click('[data-testid="try-synthetic"]');
+  await page.waitForSelector('[data-testid="summary"]');
+  assert.deepEqual(await summary(page), { state: "passed", first: null });
+  const list = await stepsOf(page);
+  assert.equal(list.length, 12);
+  assert.ok(list.every((s) => s.ok));
+  assert.ok(page.requests.every((u) => u.startsWith(base)));
+  await page.waitForSelector('[data-testid="try-note"]');
+  assert.match(
+    await page.textContent('[data-testid="try-note"]'),
+    /Synthetic sample/,
+  );
+});
+
+test("try-it: change one field shows exactly which step fails and why", async (t) => {
+  const page = await open(t);
+  await page.click('[data-testid="try-synthetic"]');
+  await page.waitForSelector('[data-testid="summary"]');
+  await page.click('[data-testid="try-tamper"]');
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="summary"]')?.dataset.state ===
+      "failed",
+  );
+  assert.deepEqual(await summary(page), {
+    state: "failed",
+    first: "paypal_objects",
+  });
+  const failed = (await steps(page)).filter((s) => !s.ok);
+  assert.deepEqual(failed, [
+    { name: "paypal_objects", ok: false, first: true, code: "paypal_amount" },
+  ]);
+  await page.waitForSelector('[data-testid="try-note"]');
+  const message = await page.textContent('[data-testid="step-message"]');
+  assert.match(message, /capture amount/);
+  const note = await page.textContent('[data-testid="try-note"]');
+  assert.match(
+    note,
+    /paypal\.capture\[0\]\.amount\.value from 45\.00 to 45\.01/,
+  );
+  assert.match(
+    note,
+    /first failing step is: PayPal order, authorization and capture/,
+  );
+  // Pressing it again starts from the pristine sample, so the change is the same, not cumulative.
+  await page.click('[data-testid="try-tamper"]');
+  await page.waitForFunction(() =>
+    document
+      .querySelector('[data-testid="try-note"]')
+      ?.textContent.includes("45.00 to 45.01"),
+  );
+});
+
+test("try-it: the recorded sample fails only the key pinning step until its own keys are pinned", async (t) => {
+  const page = await open(t);
+  await page.click('[data-testid="try-recorded"]');
+  await page.waitForSelector('[data-testid="summary"]');
+  assert.deepEqual(await summary(page), {
+    state: "unpinned",
+    first: "trusted_keys",
+  });
+  const failed = (await steps(page)).filter((s) => !s.ok);
+  assert.deepEqual(failed, [
+    { name: "trusted_keys", ok: false, first: true, code: "keys_not_pinned" },
+  ]);
+  await page.waitForSelector('[data-testid="try-note"]');
+  assert.match(await page.textContent('[data-testid="try-note"]'), /L76/);
+  assert.match(
+    await page.textContent('[data-testid="summary-title"]'),
+    /Every check passed except key pinning/,
+  );
+  await page.click('[data-testid="try-pin"]');
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="summary"]')?.dataset.state ===
+      "passed",
+  );
+  assert.ok((await stepsOf(page)).every((s) => s.ok));
+  await page.waitForFunction(() =>
+    document
+      .querySelector('[data-testid="try-note"]')
+      ?.textContent.includes("does not show who signed"),
+  );
+});
+
+test("try-it: ?try=synthetic runs on load, and the change button is off before a sample is loaded", async (t) => {
+  const page = await open(t);
+  assert.equal(await page.isDisabled('[data-testid="try-tamper"]'), true);
+  await page.goto(`${base}/verify/?try=synthetic`);
+  await page.waitForSelector('[data-testid="summary"]');
+  assert.deepEqual(await summary(page), { state: "passed", first: null });
+});

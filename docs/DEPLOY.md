@@ -3,6 +3,14 @@
 Sandbox only. No live PayPal credential belongs anywhere in this setup (INV-13, the project rules). Secrets are entered in the Render
 dashboard and nowhere else; `.env.example` keeps its fields empty. The blueprint is [render.yaml](../render.yaml).
 
+## What the hosted demo can and cannot do
+
+- **Landing page at `/`** links the dashboard, the verifier try-it, the UCP profile, `/health` and the repository.
+- **Can:** the dashboard on seeded, labelled data (simulator and recorded); the verifier and its try-it in the visitor's browser; the UCP
+  and ACP endpoints; the Trusted Surface; one purchase with the owner's sandbox credentials if they are set.
+- **Cannot:** "Run attack" (off by design, L71; run `make demo` locally), a live model (replay answers only), a hosted baseline instance
+  (L73). Nothing seeded is a live PayPal capture; the recorded rows replay one real sandbox capture.
+
 ## What runs
 
 One free **web service** (`countersign-demo`) serves everything from one origin: the UCP and ACP endpoints, the Trusted Surface

@@ -3571,6 +3571,41 @@ the developer portal; `webhook_event` is the received body. The response carries
 `verification_status`, either `SUCCESS` or `FAILURE`. Behavior beyond this (retries, ordering,
 delivery delay) was not read and is not assumed.
 
+### Decision 142: A landing page at `/`, served from the same exact allowlist
+
+The hosted demo answered 404 at `/`. A two-file page (`web/landing/index.html`, `landing.css`) is now two entries of the static table in
+`countersign.api.static_routes`, in every mode, with the same strict Content-Security-Policy (no script, no inline style, no framing, no
+forms). It states what Countersign is, labels itself a sandbox demo, and links the dashboard, the verifier try-it, the UCP profile,
+`/health` and the repository. A test fails if `web/landing` holds a file that is not in the table, if the page loads anything the CSP
+forbids, or if it links an external resource other than the repository.
+
+### Decision 143: The verifier page has a try-it that only presses the page's own buttons
+
+`web/verify/tryit.js` loads one of two samples, fills the same fields and presses the same Verify button a visitor would, so every result
+comes from the one verifier in `web/ui/evidence/` (strict JSON, nesting cap 64, unchanged). The samples are the committed test vectors
+served byte for byte at `/verify/samples/synthetic.json` and `/verify/samples/recorded.json` (allowlist entries, a test compares them
+with the files). The synthetic sample is run with its own keys pinned (twelve of twelve pass). The recorded sandbox sample is run
+unpinned so the `trusted_keys` step fails with `keys_not_pinned` (L76); a button pins the keys inside the sample to show the step
+passing, and the text says that this proves the mechanism, not who signed. The change button edits a copy of the loaded sample
+(the first capture's amount, last digit) in the page only and shows the failing step: `paypal_objects`, code `paypal_amount`. The Python
+verifier `countersign_verify` gives the same failure on the same edited file. The unpinned summary title now reads "Every check passed
+except key pinning" instead of "Every step passed".
+
+### Decision 144: A PayPal-free local demo mode
+
+`scripts/demo.sh` (`make demo`) runs the app with `APP_ENV=dev`, `CS_MODE=full`, the placeholder credential `local-demo-no-credentials`
+(`countersign.main.NO_CREDENTIALS`: the app reports `paypal_sandbox_configured: false` for it and PayPal would reject it, so a purchase
+fails closed), migrates, runs the demo seed and starts the app. It does not read `.env`. The "Run attack" launcher is on in `dev` and
+uses `EVAL_DATABASE_ADMIN_URL`, which the script sets to `DATABASE_URL`, so the Postgres user needs `CREATEDB` and `CREATEROLE`. Run
+records go to `eval/reports/attack-runs/` (ignored by git). Nothing in the public environments changes.
+
+### Decision 145: Design polish from the P4 design review
+
+Phone setup, intent, purchase and activity cards that wait for the person are tagged "Ready", not "Working". The dashboard shell uses
+`minmax(0, 1fr)` so the page no longer overflows by 11 px at 375 px, and below 600 px the navigation and header controls and the
+inputs are at least 44 px. The Orders search placeholder is shorter. Chart category labels in Results are cut with an ellipsis at 24
+characters, because Studio clips a long label at its left edge at 1280 px. Browser tests cover each.
+
 ---
 
 ## 5. Still to be written

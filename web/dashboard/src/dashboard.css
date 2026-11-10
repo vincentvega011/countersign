@@ -370,7 +370,7 @@ a {
 
 @media (max-width: 1000px) {
   .cs-shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
       "top"
       "nav"
@@ -684,4 +684,28 @@ a.cs-chip:hover {
 }
 .cs-chip__kind {
   color: var(--color-muted);
+}
+
+/* Phone width: no horizontal page scroll, and every control is at least 44 px (design review, P5). */
+@media (max-width: 600px) {
+  .cs-nav__item,
+  .cs-top button {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+  .cs-top button {
+    min-width: 44px;
+    justify-content: center;
+  }
+  .cs-main input[type="search"],
+  .cs-main input[type="text"] {
+    min-height: 44px;
+  }
+  .cs-main label {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
 }

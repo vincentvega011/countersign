@@ -23,7 +23,9 @@ def test_every_file_of_the_page_and_the_verifier_is_in_the_table_and_nothing_els
         for p in (WEB / "verify").iterdir()
         if p.is_file() and p.name not in {"package.json", ".prettierignore"}
     }
-    assert on_disk == {f.name for f, _ in static_routes.VERIFY_FILES.values()}
+    # The two try-it samples are the committed test vectors, served from their own place (test_landing_static).
+    served = {f.name for f, _ in static_routes.VERIFY_FILES.values() if f.parent == WEB / "verify"}
+    assert on_disk == served
     modules = {p.name for p in (WEB / "ui" / "evidence").iterdir() if p.is_file()}
     assert modules == set(static_routes.EVIDENCE_MODULES)
 

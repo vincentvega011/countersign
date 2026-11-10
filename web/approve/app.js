@@ -51,6 +51,15 @@ function h(tag, attrs = {}, ...children) {
   return node;
 }
 
+// Screens that wait for the person, not for the device: tagged "Ready", never "Working".
+const IDLE = new Set([
+  "ready",
+  "intent",
+  "purchase",
+  "activity",
+  "activity_empty",
+]);
+
 const TONES = {
   info: "Working",
   success: "Registered",
@@ -84,7 +93,10 @@ function show(
     h(
       "div",
       { class: "ts-card__tag" },
-      badge(TONES[tone], tone === "info" ? "accent" : tone),
+      badge(
+        tone === "info" && IDLE.has(kind) ? "Ready" : TONES[tone],
+        tone === "info" ? "accent" : tone,
+      ),
     ),
     title,
     h("p", { class: "ts-card__body" }, message.body),

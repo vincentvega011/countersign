@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Countersign: agent purchases with proof</title>
+    <link rel="stylesheet" href="/ui/fonts.css" />
+    <link rel="stylesheet" href="/ui/tokens.css" />
+    <link rel="stylesheet" href="/ui/components.css" />
+    <link rel="stylesheet" href="/landing/landing.css" />
+  </head>
+  <body class="cs-scope">
+    <div class="lp">
+      <header class="lp__head">
+        <span class="lp__brand">Countersign</span>
+        <span class="cs-badge cs-badge--warning" data-testid="sandbox-label"
+          >Sandbox demo</span
+        >
+      </header>
+      <main class="lp__main">
+        <section class="lp__hero">
+          <h1 class="lp__title">
+            Let any PayPal merchant accept AI-agent purchases, with
+            cryptographic proof of what the customer approved, enforced at the
+            moment PayPal captures the money.
+          </h1>
+          <p class="lp__lead">
+            Countersign sits in front of a merchant's PayPal Orders integration.
+            It checks the customer's signed mandates before a PayPal
+            authorization, and it re-reads the live PayPal order before every
+            capture, voiding the authorization if anything differs from what was
+            signed.
+          </p>
+          <p class="lp__lead cs-muted">
+            It also keeps a dispute evidence bundle for each capture that can be
+            verified offline. This is PayPal sandbox only. Orders marked
+            simulator or recorded in the dashboard are exactly that: made over
+            an in-memory PayPal simulator, or replayed from one real recorded
+            sandbox capture. Nothing here is a live payment.
+          </p>
+        </section>
+
+        <section aria-labelledby="try-title">
+          <h2 class="lp__h2" id="try-title">What you can try</h2>
+          <ul class="lp__list" data-testid="try-list">
+            <li class="cs-card lp__item">
+              <a
+                class="lp__link"
+                href="/dashboard/"
+                data-testid="link-dashboard"
+                >Merchant dashboard</a
+              >
+              <p class="cs-muted">
+                The orders grid, an order's signed checkout against the live
+                PayPal order, evidence, protection results and the assistant.
+                Rows are labelled simulator or recorded.
+              </p>
+            </li>
+            <li class="cs-card lp__item">
+              <a
+                class="lp__link"
+                href="/verify/?try=synthetic"
+                data-testid="link-verify"
+                >Evidence verifier, with a one-click try-it</a
+              >
+              <p class="cs-muted">
+                Loads a sample evidence bundle, checks all twelve steps in your
+                browser, then lets you change one field and see exactly which
+                step fails.
+              </p>
+            </li>
+            <li class="cs-card lp__item">
+              <a class="lp__link" href="/.well-known/ucp" data-testid="link-ucp"
+                >UCP discovery profile</a
+              >
+              <p class="cs-muted">
+                The merchant's public profile an agent reads first: the checkout
+                capability, the AP2 mandates extension and the signing key.
+              </p>
+            </li>
+            <li class="cs-card lp__item">
+              <a class="lp__link" href="/health" data-testid="link-health"
+                >Health</a
+              >
+              <p class="cs-muted">
+                The running mode and whether any protection is switched off.
+              </p>
+            </li>
+            <li class="cs-card lp__item">
+              <a
+                class="lp__link"
+                href="https://github.com/vincentvega011/countersign"
+                rel="noopener noreferrer"
+                data-testid="link-repo"
+                >Source and README</a
+              >
+              <p class="cs-muted">
+                MIT licensed. How to run it locally, the evaluation results and
+                the limitations.
+              </p>
+            </li>
+          </ul>
+        </section>
+      </main>
+      <footer class="lp__foot cs-muted">
+        Built for the PayPal AI Hackathon. PayPal sandbox only; no claim is made
+        about PayPal buyer or seller protection or about dispute outcomes.
+      </footer>
+    </div>
+  </body>
+</html>

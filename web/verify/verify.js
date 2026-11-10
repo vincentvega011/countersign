@@ -161,7 +161,11 @@ async function show(results, pinned, bundleKeys, device) {
       tabindex: "-1",
       "data-testid": "summary-title",
     },
-    state === "failed" ? TEXT.failedAt : TEXT.allPassed,
+    state === "failed"
+      ? TEXT.failedAt
+      : state === "unpinned"
+        ? TEXT.onlyKeysTitle
+        : TEXT.allPassed,
   );
   const body =
     state === "passed"

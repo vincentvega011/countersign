@@ -11,7 +11,7 @@ A phase starts only when the previous gate has passed.
 | P2    | Mandates, Merchant and Credential Provider roles, constraints, capture gate, principal lock, ACP adapter, baseline mode, first attacks | Downgrade, order-changed-after-approval (nothing is authorized in full; authorized, then voided by the gate with `ABL_NO_PREAUTH_CHECK`) and replay attacks succeed in baseline and fail in full with nothing captured; concurrency tests pass | Passed      |
 | P3    | Trusted Surface with device keys and consent, shopping agent, evidence bundles and verifiers                                           | An autonomous purchase runs from phone approval to a captured sandbox order to a verified evidence bundle, with no server-held customer key        | Passed      |
 | P4    | Dashboard, assistant, hostile agent, full evaluation                                                                                   | The whole demo runs from the dashboard locally and the evaluation numbers are frozen                                                               | In progress (P4.1 to P4.8 done) |
-| P5    | Deployment, design polish, documentation, fresh-clone test                                                                             | A stranger can use the hosted demo end to end and can run it locally from the README alone                                                         | P5a done (deploy readiness), P5b open |
+| P5    | Deployment, design polish, documentation, fresh-clone test                                                                             | A stranger can use the hosted demo end to end and can run it locally from the README alone                                                         | P5a and P5b done (Render deploy itself still to do by the owner) |
 | P6    | Video, submission text, final checks                                                                                                   | Everything is submitted with time to spare                                                                                                         | Not started |
 
 ## P0 log
@@ -250,6 +250,19 @@ Not a gate; P5 closes after P5b. What changed (Decisions 136 to 140, L71 to L75)
 - Not done, for P5b: the actual Render deploy and its five checks; PayPal webhook registration and one confirmed live delivery
   (ENV section 11); first-deploy migration role check (L74); design polish items and the other P5 carry-forwards below; README, threat
   model update, fresh-clone test of the README; pinning keys in "Verify evidence".
+
+## P5b log (10 Nov 2026): a stranger can use it
+
+Decisions 142 to 145, L77 to L79.
+
+- Landing page at `/`; evidence verifier try-it (synthetic and recorded sample, change one field, pin the keys inside the sample).
+- `make demo` / `scripts/demo.sh`: one command from a fresh clone, no PayPal credentials, attack launcher on locally.
+- README rewritten for a stranger; [docs/README.md](README.md) index; DEPLOY and DEMO updated; trademark check of the six catalog brands.
+- Fresh-clone test: a clone of a snapshot of the tree, no `.env`, no `secrets/`, a scratch Postgres role, README commands followed literally.
+- Design polish from [p4-review.md](p4-review.md): phone "Ready" tag, dashboard 375 px overflow and 44 px controls, shorter search placeholder, Results chart labels.
+- **Remaining for P6:** the Render deploy and its five checks, the PayPal webhook, a fresh Render database on or after 16 Nov, the hosted URL in the README
+  and the repository About field, the video, the submission text and screenshots, the owner's manual USPTO check. Still open from the P5 list: pin the
+  merchant and platform keys in the dashboard's "Verify evidence", `evidence.failed` in the log (L68).
 
 ## P4 log
 

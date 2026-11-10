@@ -24,6 +24,59 @@
           in this browser. The bundle and the keys you give never leave this
           page.
         </p>
+        <section
+          class="cs-card vf-panel"
+          aria-labelledby="try-title"
+          data-testid="tryit"
+        >
+          <h2 class="vf-panel__title" id="try-title">Try it</h2>
+          <p class="vf-note">
+            Two sample bundles ship with this page. Each button loads a sample
+            and checks it here in your browser; nothing is sent anywhere.
+          </p>
+          <div class="vf-try">
+            <button
+              type="button"
+              class="cs-btn cs-btn--primary"
+              id="try-synthetic"
+              data-testid="try-synthetic"
+            >
+              Load and verify the synthetic sample
+            </button>
+            <button
+              type="button"
+              class="cs-btn cs-btn--secondary"
+              id="try-recorded"
+              data-testid="try-recorded"
+            >
+              Load and verify the recorded sandbox sample
+            </button>
+            <button
+              type="button"
+              class="cs-btn cs-btn--secondary"
+              id="try-tamper"
+              data-testid="try-tamper"
+              disabled
+            >
+              Change one field, then verify again
+            </button>
+            <button
+              type="button"
+              class="cs-btn cs-btn--secondary"
+              id="try-pin"
+              data-testid="try-pin"
+              hidden
+            >
+              Pin the keys inside this sample, then verify again
+            </button>
+          </div>
+          <p class="vf-note cs-muted">
+            The offline Python verifier in this repository
+            (<code>countersign_verify</code>) runs the same twelve steps on the
+            same file and agrees with this page on every result, including the
+            failure after a change.
+          </p>
+        </section>
         <div class="vf__inputs">
           <section class="cs-card vf-panel" aria-labelledby="bundle-title">
             <h2 class="vf-panel__title" id="bundle-title">Bundle</h2>
@@ -129,5 +182,6 @@
       <p class="vf__noscript">This page needs JavaScript to check a bundle.</p>
     </noscript>
     <script type="module" src="verify.js"></script>
+    <script type="module" src="tryit.js"></script>
   </body>
 </html>

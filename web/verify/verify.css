@@ -242,3 +242,26 @@ body {
     width: auto;
   }
 }
+.vf-try {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.vf-try .cs-btn[hidden] {
+  display: none;
+}
+@media (min-width: 40rem) {
+  .vf-try {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+.vf-trynote {
+  margin: 0;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-left: 0.25rem solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-size: var(--text-sm);
+}

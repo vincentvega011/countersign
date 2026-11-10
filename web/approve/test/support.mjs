@@ -297,6 +297,7 @@ export const PAGE_CHROME = [
   "Trusted Surface",
   "The private part of the key cannot be exported. Countersign never sees it.",
   "Working",
+  "Ready",
   "Done",
   "Copy",
   "Copied",

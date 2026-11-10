@@ -675,6 +675,26 @@ redone (Decision 141).
 The service sleeps after 15 idle minutes (about a minute to wake), the database expires 30 days after creation (replace it on or after
 16 Nov), and the disk is ephemeral. Build time and monthly allowances are unverified (ENV.md section 4).
 
+### L77. The local demo needs a Postgres user that can create databases and roles, and cannot make a real purchase
+
+`make demo` starts the app with no PayPal credentials (Decision 144). The "Run attack" launcher creates and drops scratch databases and
+roles on the same server, so the database user needs `CREATEDB` and `CREATEROLE`; the Docker Postgres user has both, a restricted
+managed database may not. A purchase against the real PayPal sandbox and the PayPal webhook are not exercised in this mode and need
+the owner's own sandbox credentials. The launcher is on in this mode only; on a public deployment it stays off (L71).
+
+### L78. The verifier try-it proves the mechanism, not authorship
+
+The synthetic sample is verified with its own keys pinned, and the recorded sample's step passes only after the keys inside it are
+pinned, so neither shows that a particular merchant signed anything (L76). The change button edits one field of the loaded sample in the
+page; it shows that the checks notice that edit, not that they notice every possible edit (the tamper vectors and the mutation tests do
+that work).
+
+### L79. The trademark check is a web search, and some chart and grid layout belongs to Studio
+
+[submission/trademark-check.md](submission/trademark-check.md) is a quick web search, not a clearance. Layout polish was limited to
+what the dashboard code controls: Studio still truncates the Orders time column, skips alternate chart category labels, and its trial
+watermark stays without a licence key.
+
 ### L39 (note)
 
 L39 was removed when the two cassettes were re-recorded (Decision 85). The numbers are not reused or shifted.

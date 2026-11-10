@@ -40,6 +40,11 @@ from countersign.runtime import PUBLIC_ENVS, Mode, RuntimeSettings
 
 log = structlog.get_logger("countersign.startup")
 
+# `scripts/demo.sh` starts the app with this placeholder so the PayPal-free local demo runs. It is not a
+# credential: the app treats it as "no PayPal credentials" (selfcheck says so) and never sends it anywhere
+# useful, since PayPal rejects it and every purchase then fails closed (INV-10).
+NO_CREDENTIALS = "local-demo-no-credentials"
+
 
 def announce(settings: RuntimeSettings) -> None:
     if settings.mode is Mode.BASELINE:
@@ -98,7 +103,11 @@ def wiring_from_env(env: Mapping[str, str]) -> Wiring:
         merchant_constraint_id=merchant_id,
         webhook_id=paypal_config.webhook_id or None,
         data_source="simulator" if paypal_config.allow_non_sandbox else "live_sandbox",
-        paypal_configured=bool(paypal_config.client_id and paypal_config.client_secret),
+        paypal_configured=bool(
+            paypal_config.client_id
+            and paypal_config.client_secret
+            and NO_CREDENTIALS not in (paypal_config.client_id, paypal_config.client_secret)
+        ),
     )
 
 

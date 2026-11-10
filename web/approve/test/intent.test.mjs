@@ -420,6 +420,7 @@ describe("nothing an agent wrote reaches the page", () => {
       "Your device key proves that an approval came from you. It is made and kept in this browser.",
       "The private part of the key cannot be exported. Countersign never sees it.",
       "Working",
+      "Ready",
       "Copy",
       "Copied",
       MESSAGES.intent.title,

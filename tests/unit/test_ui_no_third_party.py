@@ -25,6 +25,16 @@ SOURCES = sorted(
     and ".artifacts" not in p.parts
     and "test" not in p.relative_to(WEB).parts
 )
+# The landing page (Decision 142) links the project's own repository: the one absolute URL any page may hold,
+# a plain anchor that loads nothing. It is removed before the checks below so any other absolute URL fails.
+REPOSITORY_LINK = "https://github.com/vincentvega011/countersign"
+LANDING_PAGE = WEB / "landing" / "index.html"
+
+
+def without_repository_link(path: Path, text: str) -> str:
+    return text.replace(REPOSITORY_LINK, "") if path == LANDING_PAGE else text
+
+
 ABSOLUTE = re.compile(r"(?:https?:)?//[A-Za-z0-9\[]", re.IGNORECASE)
 # A scheme is followed directly by its body; `data: rows` in a TypeScript object literal is not one.
 SCHEMES = re.compile(r"\b(?:data|blob|ftp|ws|wss):(?!\s)", re.IGNORECASE)
@@ -41,7 +51,7 @@ def test_there_is_something_to_check() -> None:
 
 @pytest.mark.parametrize("path", SOURCES, ids=lambda p: str(p.relative_to(WEB)))
 def test_a_source_references_only_its_own_origin(path: Path) -> None:
-    text = path.read_text()
+    text = without_repository_link(path, path.read_text())
     assert ABSOLUTE.search(text) is None, f"absolute URL in {path}"
     assert SCHEMES.search(text) is None, f"remote or inline scheme in {path}"
     assert IMPORT_REMOTE.search(text) is None, f"remote @import in {path}"
@@ -50,7 +60,7 @@ def test_a_source_references_only_its_own_origin(path: Path) -> None:
 
 @pytest.mark.parametrize("path", [p for p in SOURCES if p.suffix == ".html"], ids=lambda p: p.name)
 def test_html_loads_scripts_and_styles_by_relative_path_only(path: Path) -> None:
-    text = path.read_text()
+    text = without_repository_link(path, path.read_text())
     refs = re.findall(r"""(?:src|href)=["']([^"']+)["']""", text)
     assert refs, "a page with no resources is suspicious"
     for ref in refs:
@@ -74,7 +84,7 @@ def test_fonts_are_local_woff2_with_their_licence_beside_them() -> None:
 # The evidence verifier reads a bundle whose members and step names say `paypal` (fixed by the Python
 # CLI), and its page names PayPal as the platform the evidence comes from, as text only: no logo, no
 # brand colour (Decision 108). Every other page may not name it.
-NAMES_THE_PLATFORM = {WEB / "verify", WEB / "ui" / "evidence"}
+NAMES_THE_PLATFORM = {WEB / "verify", WEB / "ui" / "evidence", WEB / "landing"}
 # The merchant dashboard names PayPal as the platform its orders are paid on, in text only (Decision 117).
 DASHBOARD_SRC = WEB / "dashboard" / "src"
 

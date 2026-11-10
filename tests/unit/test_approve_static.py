@@ -63,7 +63,8 @@ def test_the_page_and_its_files_are_served_in_every_mode(env: str) -> None:
         r = c.get(path)
         assert r.status_code == 200, (env, path)
         assert r.headers["content-type"].split(";")[0] in {
-            "text/html", "text/css", "text/javascript", "application/javascript", "font/woff2"
+            "text/html", "text/css", "text/javascript", "application/javascript", "font/woff2",
+            "application/json",
         }, path  # fmt: skip
         assert r.headers["x-content-type-options"] == "nosniff"
         assert "default-src 'none'" in r.headers["content-security-policy"]

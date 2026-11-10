@@ -21,10 +21,14 @@ APPROVE_DIR = WEB_DIR / "approve"
 UI_DIR = WEB_DIR / "ui"
 VERIFY_DIR = WEB_DIR / "verify"
 EVIDENCE_DIR = UI_DIR / "evidence"
+LANDING_DIR = WEB_DIR / "landing"
+VECTORS_DIR = WEB_DIR.parent / "tests" / "vectors"
 
 APPROVE_PATH = "/approve/"
 VERIFY_PATH = "/verify/"
+LANDING_PATH = "/"
 CSS, JS, HTML, WOFF2 = "text/css", "text/javascript", "text/html", "font/woff2"
+JSON_MEDIA = "application/json"
 FONTS = (
     "instrument-sans-latin-wght-normal.woff2",
     "jetbrains-mono-latin-wght-normal.woff2",
@@ -53,6 +57,18 @@ VERIFY_FILES: dict[str, tuple[Path, str]] = {
     "/verify/verify.css": (VERIFY_DIR / "verify.css", CSS),
     "/verify/verify.js": (VERIFY_DIR / "verify.js", JS),
     "/verify/verify-text.js": (VERIFY_DIR / "verify-text.js", JS),
+    "/verify/tryit.js": (VERIFY_DIR / "tryit.js", JS),
+    # The try-it samples are the committed test vectors themselves, so the page and the tests cannot drift.
+    "/verify/samples/synthetic.json": (VECTORS_DIR / "evidence" / "valid.json", JSON_MEDIA),
+    "/verify/samples/recorded.json": (
+        VECTORS_DIR / "recorded" / "p3_capture_bundle.json",
+        JSON_MEDIA,
+    ),
+}
+# The landing page at the root (Decision 142): two files, nothing else under `web/landing`.
+LANDING_FILES: dict[str, tuple[Path, str]] = {
+    LANDING_PATH: (LANDING_DIR / "index.html", HTML),
+    "/landing/landing.css": (LANDING_DIR / "landing.css", CSS),
 }
 EVIDENCE_MODULES = (
     "json.js",
@@ -71,7 +87,7 @@ UI_FILES: dict[str, tuple[Path, str]] = {
     **{f"/ui/fonts/{name}": (UI_DIR / "fonts" / name, WOFF2) for name in FONTS},
     **{f"/ui/evidence/{name}": (EVIDENCE_DIR / name, JS) for name in EVIDENCE_MODULES},
 }
-SERVED: dict[str, tuple[Path, str]] = {**PAGE_FILES, **VERIFY_FILES, **UI_FILES}
+SERVED: dict[str, tuple[Path, str]] = {**PAGE_FILES, **VERIFY_FILES, **LANDING_FILES, **UI_FILES}
 
 CSP = (
     "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; "

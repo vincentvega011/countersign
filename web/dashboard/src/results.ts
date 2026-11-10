@@ -83,15 +83,21 @@ export const ABLATION_FIELDS = [
   text("note", "Note"),
 ] as const; // prettier-ignore
 
+// A chart axis clips a long label at its left edge at 1280 px wide; cut it at the end with an ellipsis instead.
+export const shortLabel = (id: string, max = 24): string =>
+  id.length > max ? `${id.slice(0, max - 1)}…` : id;
+
 export const categoryRows = (r: Results): Row[] =>
   r.categories.map((c) => ({
     id: c.category,
+    label: shortLabel(c.category),
     cases: c.cases,
     full_succeeded: c.full_succeeded,
     baseline_succeeded: c.baseline_succeeded,
   }));
 export const CATEGORY_FIELDS = [
   text("id", "Category"),
+  text("label", "Category (chart)"),
   int("cases", "Cases"),
   int("full_succeeded", "Succeeded in full"),
   int("baseline_succeeded", "Succeeded in baseline"),
@@ -217,7 +223,7 @@ export function resultsState(r: Results) {
                 : "Baseline against full",
             ),
             dataMapping: {
-              categoryKey: [t("categories", "id")],
+              categoryKey: [t("categories", "label")],
               valueKey: [
                 t("categories", "baseline_succeeded", "sum"),
                 t("categories", "full_succeeded", "sum"),
