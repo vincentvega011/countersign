@@ -9,7 +9,7 @@ voiding the authorization if anything differs from what was signed. Every captur
 verify offline. **PayPal sandbox only**: no live credential is used or accepted anywhere, and nothing here claims PayPal buyer or
 seller protection or any dispute outcome.
 
-- Hosted demo: _the URL is in the repository About field and on the submission page_ (free tier: the first request after 15 idle minutes takes about a minute). The landing page at `/` links everything below.
+- Hosted demo: <https://countersign-demo-xb79.onrender.com> (free tier: the first request after 15 idle minutes takes about a minute). The landing page at `/` links everything below.
 - Source: <https://github.com/vincentvega011/countersign>
 
 ## 60-second tour of the hosted demo
