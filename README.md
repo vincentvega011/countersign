@@ -160,6 +160,32 @@ All code in this repository was written between 21 Oct and 11 Nov 2026; nothing 
 
 Honest list: [docs/LIMITATIONS.md](docs/LIMITATIONS.md). The short version: sandbox only; one merchant; Countersign plays several roles together; most hosted rows are simulated and labelled; the evaluation runs over a PayPal simulator; the live "Run attack" comparison runs locally only; three evaluation targets were missed (above); specs are pinned drafts and the extra constraint types are ours, not AP2 standard.
 
+## Repository map
+
+| Path | What it holds | What runs it |
+| --- | --- | --- |
+| `src/countersign/` | The gateway: UCP and ACP endpoints, mandate verification, the PayPal client, the capture gate, the principal lock, the decision log, evidence bundles and the dashboard API | `uvicorn countersign.main:create --factory` (`make dev`, `make demo`) |
+| `agents/` | The shopping agent and the scripted adversary, each a separate process that talks to the gateway only over HTTP | `python -m agents.shopper`, `python -m agents.adversary` |
+| `countersign_verify/` | The offline Python evidence verifier; it imports nothing from `countersign` | `python -m countersign_verify <bundle>` |
+| `web/approve/` | The customer phone page (Trusted Surface) with the device-bound key | Served by the gateway |
+| `web/dashboard/` | The merchant dashboard (React and AG Studio) | Built by `make dashboard-build`, served by the gateway at `/dashboard/` |
+| `web/verify/` | The evidence verifier page, with its try-it | Served by the gateway |
+| `web/ui/` | Shared tokens, components and self-hosted fonts used by the pages above | Imported by the web projects |
+| `web/landing/` | The landing page of the hosted demo | Served by the gateway |
+| `web/demo/` | A placeholder workspace package, no code yet | Nothing |
+| `eval/` | The attack cases, task, property and concurrency suites, the runner and the frozen reports in `eval/reports/` | `uv run python -m eval.run` (`make eval`) |
+| `tests/` | Unit, conformance, property, concurrency and integration tests, cassettes and vectors | `make test`, `make test-safety` |
+| `migrations/` | Alembic database migrations | `alembic upgrade head`, run by the start scripts |
+| `data/` | The seeded catalog (`catalog.yaml`) | Read by the gateway |
+| `scripts/` | Demo, seed, interop, secret scan, cassette recorders and the Render build and start scripts | `make` targets and Render |
+| `spec/` | Vendored protocol specs and our constraint schemas, pinned in `spec/vendor/SOURCES.md` | Read by tests and the verifier |
+| `docs/` | Protocol notes, architecture, threat model, limitations, environment, deployment | Read by people |
+| `render.yaml` | The Render service definition for the hosted demo | Render |
+| `Makefile` | Setup, run, test, evaluation, lint and deploy targets | `make <target>` |
+| `pyproject.toml`, `uv.lock`, `package.json`, `pnpm-*.yaml`, `alembic.ini`, `docker-compose.yml`, `.env.example` | Python and Node dependencies and pins, migration config, the local Postgres service and the environment template | `uv`, `pnpm`, `alembic`, `docker compose` |
+
+The layout is deliberate: the build and deploy scripts (`render.yaml`, `scripts/render_build.sh`, `scripts/render_start.sh`) and the Makefile depend on these paths, so moving a directory breaks hosting.
+
 ## Documentation
 
 [docs/DEMO.md](docs/DEMO.md) click path, [docs/DEPLOY.md](docs/DEPLOY.md) hosting, [docs/ENV.md](docs/ENV.md) environment and sandbox facts, [docs/PROTOCOL.md](docs/PROTOCOL.md) design decisions, [docs/architecture.md](docs/architecture.md), [docs/threat-model.md](docs/threat-model.md), [docs/LIMITATIONS.md](docs/LIMITATIONS.md), [docs/PROGRESS.md](docs/PROGRESS.md).
