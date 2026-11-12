@@ -109,4 +109,56 @@ describe("order detail", () => {
       ),
     );
   });
+
+  for (const width of [1280, 1440]) {
+    test(`PayPal objects names are never broken mid-word and there is one default-order note at ${width} px`, async (t) => {
+      const page = await open(browser, t, { width });
+      await page.waitForSelector('[data-testid="paypal-table"]');
+      assert.equal(
+        await page.locator('[data-testid="detail-default"]').count(),
+        1,
+      );
+      assert.equal(await page.getByText(/Shows a default order/).count(), 0);
+      // A cell whose text is not broken mid-word renders no taller than one line and at least as wide as
+      // its longest word, so compare each header word and field name with its unbroken width.
+      const broken = await page.evaluate(() => {
+        const out = [];
+        const probe = document.createElement("span");
+        probe.style.cssText =
+          "position:absolute;visibility:hidden;white-space:nowrap";
+        document.body.appendChild(probe);
+        const cells = document.querySelectorAll(
+          '[data-testid="paypal-table"] th, [data-testid="paypal-table"] td.cs-name',
+        );
+        for (const c of cells) {
+          const cs = getComputedStyle(c);
+          probe.style.font = cs.font;
+          const longest = Math.max(
+            0,
+            ...c.textContent
+              .trim()
+              .split(/\s+/)
+              .map((w) => {
+                probe.textContent = w;
+                return probe.getBoundingClientRect().width;
+              }),
+          );
+          const inner =
+            c.getBoundingClientRect().width -
+            parseFloat(cs.paddingLeft) -
+            parseFloat(cs.paddingRight);
+          if (inner + 1 < longest) out.push(c.textContent.trim());
+        }
+        probe.remove();
+        return { out, n: cells.length };
+      });
+      assert.ok(broken.n > 5, "table has cells");
+      assert.deepEqual(broken.out, []);
+      const sizes = await page.evaluate(() => [
+        document.documentElement.scrollWidth,
+        innerWidth,
+      ]);
+      assert.ok(sizes[0] <= sizes[1] + 1, sizes.join(" "));
+    });
+  }
 });

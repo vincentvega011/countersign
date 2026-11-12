@@ -461,6 +461,10 @@ a {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   gap: var(--space-4);
+  align-items: start;
+}
+.cs-panel--wide {
+  grid-column: 1 / -1;
 }
 .cs-panel {
   border: 1px solid var(--color-border);
@@ -726,4 +730,49 @@ a.cs-chip:hover {
   display: inline-block;
   min-width: 146px;
   white-space: nowrap;
+}
+
+/* PayPal objects table: headers and field names never break inside a word; only values wrap. */
+.cs-table--pp th,
+.cs-table--pp td.cs-name {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.cs-table--pp td.cs-name {
+  white-space: nowrap;
+}
+.cs-table--pp td.cs-value {
+  overflow-wrap: anywhere;
+  min-width: 10ch;
+}
+@media (max-width: 640px) {
+  .cs-table--pp thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .cs-table--pp,
+  .cs-table--pp tbody,
+  .cs-table--pp tr,
+  .cs-table--pp td {
+    display: block;
+  }
+  .cs-table--pp tr {
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .cs-table--pp td {
+    border: 0;
+    padding: 2px 0;
+  }
+  .cs-table--pp td::before {
+    content: attr(data-label) ": ";
+    color: var(--color-muted);
+    font-family: var(--font-ui);
+  }
+  .cs-table--pp td.cs-name {
+    white-space: normal;
+  }
 }

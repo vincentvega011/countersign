@@ -190,12 +190,18 @@ function MandatesPanel({ m }: { m: DetailModel }) {
           <h4>{md.title}</h4>
           <ul className="cs-timeline">
             <li>
-              <Ok yes={md.open.ok} testid="link-open" /> Open mandate, signed by
-              the platform {fail(md.open)}
+              <span className="cs-label">
+                Open mandate, signed by the platform:
+              </span>{" "}
+              <Ok yes={md.open.ok} testid="link-open" />
+              {fail(md.open)}
             </li>
             <li>
-              <Ok yes={md.closed.ok} testid="link-closed" /> Closed mandate,
-              signed by the agent key the open one names {fail(md.closed)}
+              <span className="cs-label">
+                Closed mandate, signed by the agent key the open one names:
+              </span>{" "}
+              <Ok yes={md.closed.ok} testid="link-closed" />
+              {fail(md.closed)}
             </li>
           </ul>
           {md.open.ok && (
@@ -256,7 +262,7 @@ function MandatesPanel({ m }: { m: DetailModel }) {
 function PaypalPanel({ m }: { m: DetailModel }) {
   return (
     <section
-      className="cs-panel"
+      className="cs-panel cs-panel--wide"
       data-testid="panel-paypal"
       aria-labelledby="p3"
     >
@@ -265,7 +271,7 @@ function PaypalPanel({ m }: { m: DetailModel }) {
         As fetched at capture time and stored in the evidence bundle. Not live:
         this dashboard has no PayPal credentials and never calls PayPal.
       </p>
-      <table className="cs-table" data-testid="paypal-table">
+      <table className="cs-table cs-table--pp" data-testid="paypal-table">
         <thead>
           <tr>
             <th>Object</th>
@@ -282,11 +288,22 @@ function PaypalPanel({ m }: { m: DetailModel }) {
               data-differs={String(r.differs)}
               data-field={`${r.label}.${r.field}`}
             >
-              <td>{r.label}</td>
-              <td>{r.field}</td>
-              <td className="cs-mono">{r.found}</td>
-              <td className="cs-mono">{r.expected}</td>
-              <td>
+              <td data-label="Object" className="cs-name">
+                {r.label}
+              </td>
+              <td data-label="Field" className="cs-name">
+                {r.field}
+              </td>
+              <td data-label="Stored at PayPal" className="cs-mono cs-value">
+                {r.found}
+              </td>
+              <td
+                data-label="Re-derived from the signed checkout"
+                className="cs-mono cs-value"
+              >
+                {r.expected}
+              </td>
+              <td data-label="Result">
                 {r.differs ? (
                   <Pill tone="danger" glyph="!">
                     Differs

@@ -112,7 +112,7 @@ export function ordersState(grouped: boolean) {
             type: DETAIL_ID,
             format: title(
               "Order detail",
-              "Shows a default order; select a row in the grid above to change it",
+              "The order selected in the grid above, in full",
             ),
             dataMapping: { checkout: [t("id")] },
           },
