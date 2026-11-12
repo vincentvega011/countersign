@@ -125,6 +125,57 @@ describe("the merchant dashboard on AG Studio", () => {
     );
   });
 
+  test("dates are unambiguous, the grid fits without sideways scrolling, the donut legend does not paginate and a default order is shown", async (t) => {
+    for (const width of [1280, 1440]) {
+      const page = await open(t, { width });
+      await page.waitForSelector(".cs-cell-time", {
+        timeout: 15000,
+      });
+      const header = await page.evaluate(() =>
+        [...document.querySelectorAll(".ag-header-cell-text")].map((e) =>
+          e.textContent.trim(),
+        ),
+      );
+      assert.ok(header.includes("Time (UTC)"), header.join());
+      const times = await page.evaluate(() =>
+        [...document.querySelectorAll(".cs-cell-time")].map((e) =>
+          e.textContent.trim(),
+        ),
+      );
+      times.splice(0, times.length, ...times.filter((v) => v !== "Total"));
+      assert.ok(times.length > 0);
+      assert.ok(
+        times.every((v) =>
+          /^\d{1,2} [A-Z][a-z]{2} \d{4}, \d{2}:\d{2}$/.test(v),
+        ),
+        times.join(" | "),
+      );
+      const fit = await page.evaluate(() => {
+        const v = document.querySelector(
+          ".ag-studio-layout-widget .ag-body-horizontal-scroll-viewport",
+        );
+        return { scroll: v.scrollWidth, client: v.clientWidth };
+      });
+      assert.ok(
+        fit.scroll <= fit.client,
+        `width ${width}: ${JSON.stringify(fit)}`,
+      );
+      assert.equal(
+        await page.locator(".ag-charts-legend-pagination").count(),
+        0,
+      );
+      // The detail panel is filled on first load, with its default-order note.
+      await page.waitForSelector('[data-testid="order-detail"]', {
+        timeout: 20000,
+      });
+      assert.equal(
+        await page.locator('[data-testid="detail-empty"]').count(),
+        0,
+      );
+      await page.waitForSelector('[data-testid="detail-default"]');
+    }
+  });
+
   test("the quick filter and cross-filtering narrow every widget", async (t) => {
     const page = await open(t);
     await page.fill(

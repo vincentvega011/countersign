@@ -24,7 +24,7 @@ import { ResultsStudio } from "./ResultsStudio";
 import { EvidenceView } from "./Evidence";
 import { PolicyView_ } from "./Policy";
 import { AssistantStudio } from "./AssistantStudio";
-import { SOURCE_LABEL } from "./format";
+import { SOURCE_LABEL, formatDateTime } from "./format";
 import { applyScheme, initialScheme, remember, type Scheme } from "./theme";
 
 const LICENSE = __AG_STUDIO_LICENSE_KEY__ || undefined;
@@ -256,8 +256,10 @@ export function App() {
           {view === "results" && results && (
             <section className="cs-protection" aria-label="Evaluation results">
               <p className="cs-muted" data-testid="results-meta">
-                Run {results.run_id} · seeds {results.seeds.join(", ")} ·
-                simulator, not live PayPal. Read only.
+                Run {results.run_id} · generated{" "}
+                {formatDateTime(results.generated_at)} UTC · seeds{" "}
+                {results.seeds.join(", ")} · simulator, not live PayPal. Read
+                only.
               </p>
               <p className="cs-muted" data-testid="results-note">
                 Simulator captures carry no evidence bundle, so the bundle

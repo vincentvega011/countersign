@@ -6,9 +6,12 @@ entries; nothing else under `web/verify` or `web/ui/evidence` (tests, the Node r
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
+from typing import Any
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from countersign.api import static_routes
@@ -67,3 +70,50 @@ def test_nothing_else_is_served(env: str, path: str) -> None:
     assert raw_status(make_app(env), path) in (404, 307, 308), path
     r = TestClient(make_app(env)).get(path)
     assert r.status_code == 404 or r.url.path in static_routes.SERVED, path
+
+
+def raw_get(app: FastAPI, raw_path: str) -> tuple[int, dict[str, str]]:
+    """GET `raw_path` exactly as given, straight into the ASGI app (an HTTP client would read `//x` as a host)."""
+    path, _, query = raw_path.partition("?")
+    scope = {
+        "type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": "GET",
+        "scheme": "http", "path": path, "raw_path": path.encode(), "query_string": query.encode(),
+        "headers": [(b"host", b"testserver")], "client": ("127.0.0.1", 1),
+        "server": ("testserver", 80),
+    }  # fmt: skip
+    seen: dict[str, Any] = {"headers": {}}
+
+    async def receive() -> dict[str, Any]:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(message: dict[str, Any]) -> None:
+        if message["type"] == "http.response.start":
+            seen["status"] = message["status"]
+            seen["headers"] = {k.decode(): v.decode() for k, v in message["headers"]}
+
+    asyncio.run(app(scope, receive, send))  # type: ignore[arg-type]
+    return seen["status"], seen["headers"]
+
+
+@pytest.mark.parametrize("env", ALL_ENVS)
+def test_a_double_leading_slash_redirects_to_the_normalised_path(env: str) -> None:
+    app = make_app(env)
+    status, headers = raw_get(app, "//verify/?try=synthetic")
+    assert status == 308
+    assert headers["location"] == "/verify/?try=synthetic"
+    # Following it reaches the same page the single-slash path serves.
+    assert TestClient(app).get(headers["location"]).status_code == 200
+
+
+def test_the_redirect_target_never_leaves_the_origin() -> None:
+    app = make_app("demo")
+    for path in ["//evil.example/x", "///evil.example", "////"]:
+        status, headers = raw_get(app, path)
+        assert status == 308
+        assert headers["location"].startswith("/") and not headers["location"].startswith("//")
+
+
+def test_the_allowlist_is_unchanged_by_the_redirect() -> None:
+    app = make_app("demo")
+    assert raw_get(app, "//web/verify/package.json")[1]["location"] == "/web/verify/package.json"
+    assert TestClient(app).get("/web/verify/package.json").status_code == 404

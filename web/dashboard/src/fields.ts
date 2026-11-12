@@ -2,7 +2,12 @@
 // definitions, formats and money formatters. Amounts stay integer minor units; only the formatter turns
 // them into text, through the shared UI's formatter (never a float).
 import type { Order } from "./api";
-import { SOURCE_LABEL, money, shortFingerprint } from "./format";
+import {
+  SOURCE_LABEL,
+  dateTimeFormatter,
+  money,
+  shortFingerprint,
+} from "./format";
 
 export const TABLE = "orders";
 
@@ -55,7 +60,7 @@ const moneyFormatter = () => (value: unknown) => money(value);
 
 export const FIELDS = [
   { id: "id", name: "Checkout", format: "textFormat", cardinality: "high" },
-  { id: "created", name: "Time", format: "dateTimeFormat" },
+  { id: "created", name: "Time (UTC)", format: "dateTimeFormat", createValueFormatter: dateTimeFormatter },
   { id: "agent", name: "Agent key", format: "textFormat", blankValue: "None" },
   { id: "customer", name: "Customer", format: "textFormat", blankValue: "Unbound" },
   { id: "items", name: "Items", format: "textFormat", cardinality: "high" },

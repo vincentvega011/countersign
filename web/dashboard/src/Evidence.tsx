@@ -357,6 +357,13 @@ export function EvidenceView({
           Bundle: {source.label}
         </p>
       )}
+      {!results && !message && (
+        <p className="cs-muted" data-testid="evidence-idle">
+          Nothing checked yet. Choose a captured order and press Verify
+          evidence, or load a committed sample, to see every dispute step pass
+          or fail here.
+        </p>
+      )}
       {results && <Results results={results} pinned={source?.pinned != null} />}
     </section>
   );

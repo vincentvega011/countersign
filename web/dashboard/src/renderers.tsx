@@ -53,7 +53,46 @@ function pill(table: Record<string, Pill>, testid: string) {
   };
 }
 
+// Long text cells are capped so the grid's auto sizing measures a bounded width, then truncate with
+// an ellipsis and carry the full value as a tooltip. Items gets the most room; the grid scales the
+// columns up to fill the width, so the grid fits without sideways scrolling.
+const CAPS: Record<string, number> = {
+  items: Math.max(90, Math.min(300, innerWidth - 1250)),
+  id: 100,
+  customer: 95,
+  agent: 110,
+  capture_id: 85,
+  reason: 130,
+  gate: 100,
+};
+function truncated(name: string) {
+  return function TruncCell(props: AgWidgetCustomCellRendererProps) {
+    const value = props.valueFormatted ?? props.value;
+    if (value === null || value === undefined || value === "") return null;
+    const text = String(value);
+    return (
+      <span
+        className="cs-cell-trunc"
+        style={{ maxWidth: CAPS[name] }}
+        title={text}
+      >
+        {text}
+      </span>
+    );
+  };
+}
+
+// Dates read "9 Nov 2026, 18:20" (UTC, see format.ts); the floor keeps a two digit day from clipping.
+function TimeCell(props: AgWidgetCustomCellRendererProps) {
+  const text = props.valueFormatted ?? "";
+  return text ? <span className="cs-cell-time">{text}</span> : null;
+}
+
 const RENDERERS: Record<string, ReturnType<typeof pill>> = {
+  created: TimeCell,
+  at: TimeCell,
+  expires: TimeCell,
+  ...Object.fromEntries(Object.keys(CAPS).map((n) => [n, truncated(n)])),
   status: pill(STATUS, "cell-status"),
   mandate: pill(MANDATE, "cell-mandate"),
   source: pill(SOURCE, "cell-source"),

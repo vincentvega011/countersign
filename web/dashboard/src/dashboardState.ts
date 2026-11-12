@@ -12,9 +12,10 @@ const title = (text: string, subtitle?: string) => ({
   ...(subtitle ? { subtitle: { text: subtitle, enabled: true } } : {}),
 });
 
+// The default columns fit a 1280 px screen without sideways scrolling; agent, protocol, gate, PayPal
+// capture and reason code are in the order detail panel and can be added in edit mode or the grouped view.
 export const GRID_COLUMNS = [
-  "created", "source", "id", "status", "mandate", "amount_minor", "items", "agent", "customer",
-  "protocol", "gate", "reason", "capture_id",
+  "created", "source", "id", "status", "mandate", "amount_minor", "items", "customer",
 ]; // prettier-ignore
 
 export function ordersState(grouped: boolean) {
@@ -75,7 +76,16 @@ export function ordersState(grouped: boolean) {
           },
           byStatus: {
             type: "donut-chart",
-            format: title("Orders by status"),
+            // Every status visible at once: the legend sits on the right with room for all of them, so
+            // it never paginates behind arrows.
+            format: {
+              ...title("Orders by status"),
+              style: {
+                theme: {
+                  common: { legend: { enabled: true, position: "bottom" } },
+                },
+              },
+            },
             dataMapping: {
               categoryKey: [t("status")],
               valueKey: [t("id", "count")],
@@ -100,7 +110,10 @@ export function ordersState(grouped: boolean) {
           grid,
           detail: {
             type: DETAIL_ID,
-            format: title("Order detail", "Select a row in the grid above"),
+            format: title(
+              "Order detail",
+              "Shows a default order; select a row in the grid above to change it",
+            ),
             dataMapping: { checkout: [t("id")] },
           },
         },
@@ -109,9 +122,9 @@ export function ordersState(grouped: boolean) {
           orders: { xTrack: 6, yTrack: 0, xSpan: 6, ySpan: 3 },
           blocked: { xTrack: 12, yTrack: 0, xSpan: 6, ySpan: 3 },
           unauthorized: { xTrack: 18, yTrack: 0, xSpan: 6, ySpan: 3 },
-          byStatus: { xTrack: 0, yTrack: 3, xSpan: 6, ySpan: 10 },
-          byReason: { xTrack: 6, yTrack: 3, xSpan: 8, ySpan: 10 },
-          funnel: { xTrack: 14, yTrack: 3, xSpan: 10, ySpan: 10 },
+          byStatus: { xTrack: 0, yTrack: 3, xSpan: 9, ySpan: 10 },
+          byReason: { xTrack: 9, yTrack: 3, xSpan: 6, ySpan: 10 },
+          funnel: { xTrack: 15, yTrack: 3, xSpan: 9, ySpan: 10 },
           grid: { xTrack: 0, yTrack: 13, xSpan: 24, ySpan: 15 },
           detail: { xTrack: 0, yTrack: 28, xSpan: 24, ySpan: 26 },
         },

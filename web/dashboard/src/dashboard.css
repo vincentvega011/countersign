@@ -272,7 +272,8 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 0 10px;
+  padding: 0 8px;
+  margin-right: 8px; /* keeps the pill from clipping in an auto sized column */
   line-height: 22px;
   border-radius: var(--radius-pill);
   font-size: var(--text-xs);
@@ -708,4 +709,21 @@ a.cs-chip:hover {
     align-items: center;
     gap: var(--space-2);
   }
+}
+
+.cs-cell-trunc {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cs-detail__hint {
+  margin: 0;
+  padding: var(--space-2) var(--space-4) 0;
+  font-size: var(--text-xs);
+}
+.cs-cell-time {
+  display: inline-block;
+  min-width: 146px;
+  white-space: nowrap;
 }

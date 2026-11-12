@@ -12,6 +12,7 @@ import { totalDefinition, totalMoneyDefinition } from "./kpi";
 import { cellRendererFor } from "./renderers";
 import { ordersState } from "./dashboardState";
 import { buildTheme } from "./theme";
+import { pickDefaultOrder, setDefaultOrder } from "./defaultOrder";
 
 const PANELS = {
   edit: { left: ["filters"], right: ["edit", "data"] },
@@ -30,6 +31,8 @@ export function OrdersStudio({ orders, mode, grouped, query, onLive }: Props) {
   const api = useRef<AgStudioApi | null>(null);
   const known = useRef(new Set(orders.map((o) => o.id)));
   const data = useMemo(() => dataSources(orders.map(toRow)), [orders]);
+  // Set during render, before the detail widget mounts, so its first paint already has an order.
+  setDefaultOrder(useMemo(() => pickDefaultOrder(orders), [orders]));
   const initialState = useMemo(() => ordersState(grouped), [grouped]);
   const theme = useMemo(() => buildTheme(), []);
   const widgets = useCallback(

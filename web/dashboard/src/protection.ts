@@ -8,6 +8,7 @@ import {
   FIELDS as ORDER_FIELDS,
   type Row,
 } from "./fields";
+import { dateTimeFormatter } from "./format";
 import { FUNNEL_ID } from "./funnel";
 import { ATTACK_MATRIX_ID } from "./AttackMatrix";
 import { TOTAL_ID, TOTAL_MONEY_ID } from "./kpi";
@@ -52,7 +53,7 @@ export function eventRow(e: EventRow): Row {
 }
 export const EVENT_FIELDS = [
   { id: "id", name: "Event", format: "textFormat", cardinality: "high" },
-  { id: "at", name: "Time", format: "dateTimeFormat" },
+  { id: "at", name: "Time (UTC)", format: "dateTimeFormat", createValueFormatter: dateTimeFormatter },
   { id: "day", name: "Day", format: "textFormat", cardinality: "low" },
   { id: "checkout_id", name: "Checkout", format: "textFormat", cardinality: "high", blankValue: "None" },
   { id: "stage", name: "Where it was stopped", format: "textFormat", cardinality: "low" },
@@ -84,8 +85,8 @@ export const MANDATE_FIELDS = [
   { id: "ceiling_minor", name: "Ceiling", format: "integerFormat", createValueFormatter: moneyFormatter },
   { id: "spent_minor", name: "Spent", format: "integerFormat", createValueFormatter: moneyFormatter },
   { id: "currency", name: "Currency", format: "textFormat", cardinality: "low" },
-  { id: "expires", name: "Expires", format: "dateTimeFormat" },
-  { id: "created", name: "Created", format: "dateTimeFormat" },
+  { id: "expires", name: "Expires (UTC)", format: "dateTimeFormat", createValueFormatter: dateTimeFormatter },
+  { id: "created", name: "Created (UTC)", format: "dateTimeFormat", createValueFormatter: dateTimeFormatter },
   { id: "source", name: "Source", format: "textFormat", cardinality: "low" },
 ] as const; // prettier-ignore
 

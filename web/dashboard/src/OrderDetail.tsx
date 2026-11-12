@@ -11,7 +11,8 @@ import { AgIncompleteDataMappingOverlay } from "ag-studio-react";
 import { fetchDetail, type Detail } from "./api";
 import { describe, type Check, type DetailModel } from "./evidenceModel";
 import { groupFingerprint } from "./fingerprint";
-import { money } from "./format";
+import { formatDateTime, money } from "./format";
+import { getDefaultOrder } from "./defaultOrder";
 
 export const DETAIL_ID = "order-detail";
 const DETAIL_ICON =
@@ -62,13 +63,24 @@ const fail = (c: Check) =>
   c.ok ? null : <span className="cs-mono"> {c.code}</span>;
 const compact = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v));
 
+// Times in claims (epoch seconds under iat, exp, nbf, or ISO strings) read "9 Nov 2026, 18:20 UTC".
+const EPOCH_KEYS = new Set(["iat", "exp", "nbf"]);
+const ISO = /^\d{4}-\d\d-\d\dT\d\d:\d\d/;
+function shown(key: string, v: unknown): string {
+  if (EPOCH_KEYS.has(key) && typeof v === "number" && Number.isSafeInteger(v))
+    return `${formatDateTime(v * 1000)} UTC`;
+  if (typeof v === "string" && ISO.test(v) && formatDateTime(v))
+    return `${formatDateTime(v)} UTC`;
+  return compact(v);
+}
+
 function Kv({ rows }: { rows: [string, unknown][] }) {
   return (
     <dl className="cs-kv">
       {rows.map(([k, v]) => (
         <div key={k} style={{ display: "contents" }}>
           <dt>{k}</dt>
-          <dd>{compact(v)}</dd>
+          <dd>{shown(k, v)}</dd>
         </div>
       ))}
     </dl>
@@ -421,7 +433,10 @@ export function OrderDetailWidget(params: AgWidgetParams) {
   const { widgetApi, dataMapping } = params;
   const slot = (dataMapping as Record<string, Slot[] | undefined>)
     .checkout?.[0];
-  const [selected, setSelected] = useState<string | null>(null);
+  const [picked, setSelected] = useState<string | null>(null);
+  // Until a row is chosen the panel shows the default order, so it is never a blank box.
+  const fallback = getDefaultOrder();
+  const selected = picked ?? fallback;
   const [detail, setDetail] = useState<Detail | "error" | null>(null);
 
   useEffect(() => {
@@ -484,8 +499,17 @@ export function OrderDetailWidget(params: AgWidgetParams) {
           </p>
         </div>
       );
-    return <DetailBody detail={detail} />;
-  }, [slot, selected, detail]);
+    return (
+      <>
+        {picked === null && (
+          <p className="cs-muted cs-detail__hint" data-testid="detail-default">
+            Showing a default order. Select a row in the grid to change it.
+          </p>
+        )}
+        <DetailBody detail={detail} />
+      </>
+    );
+  }, [slot, selected, picked, detail]);
   if (!slot) return <AgIncompleteDataMappingOverlay />;
   return body;
 }

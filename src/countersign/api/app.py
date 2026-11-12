@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import Engine, create_engine
 
@@ -104,6 +104,16 @@ def create_app(
 
     @app.middleware("http")
     async def label_mode(request: Request, call_next: Callable[[Request], Any]) -> Response:
+        path = request.url.path
+        if path.startswith("//") and request.method in ("GET", "HEAD"):
+            # `//verify/` resolves like `/verify/`: redirect to the same path with the leading slashes
+            # collapsed to one. The target is always a single-slash path, so it never leaves this origin.
+            target = "/" + path.lstrip("/")
+            if request.url.query:
+                target += "?" + request.url.query
+            redirect = RedirectResponse(target, status_code=308)
+            redirect.headers.update(labels)
+            return redirect
         response: Response = await call_next(request)
         response.headers.update(labels)
         return response

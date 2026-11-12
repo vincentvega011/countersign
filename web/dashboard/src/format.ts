@@ -18,3 +18,29 @@ export const SOURCE_LABEL: Record<string, string> = {
   simulator: "Simulated",
   unlabelled: "Unlabelled",
 };
+
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+const two = (n: number) => String(n).padStart(2, "0");
+
+// "9 Nov 2026, 18:20" in UTC: the month is a name, so no reader has to guess day/month order, and the
+// zone is fixed so the same instant reads the same everywhere. Column headers say "(UTC)".
+export function formatDateTime(value: unknown): string {
+  const d = value instanceof Date ? value : new Date(value as string | number);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}, ${two(d.getUTCHours())}:${two(d.getUTCMinutes())}`;
+}
+export const dateTimeFormatter = () => (value: unknown) =>
+  formatDateTime(value);

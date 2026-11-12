@@ -17,9 +17,10 @@ before(async () => {
 after(() => browser.close());
 
 describe("order detail", () => {
-  test("nothing is selected at first, then a row shows the four panels checked in the browser", async (t) => {
+  test("a default order is shown at first, then a selected row shows the four panels checked in the browser", async (t) => {
     const page = await open(browser, t);
-    await page.waitForSelector('[data-testid="detail-empty"]');
+    await page.waitForSelector('[data-testid="order-detail"]');
+    await page.waitForSelector('[data-testid="detail-default"]');
     await selectOrder(page, expected.checkout_id);
     const text = (id) => page.textContent(`[data-testid="${id}"]`);
     await page.waitForSelector('[data-testid="merchant-auth"]');
